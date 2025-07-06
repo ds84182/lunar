@@ -583,7 +583,7 @@ unsafe extern "C-unwind" fn prepCallInfo(
     };
     let mut ci: *mut CallInfo = (*L).ci;
     (*ci).func.p = func;
-    (*ci).nresults = nret as std::ffi::c_short;
+    (*ci).nresults = nret as i16;
     (*ci).callstatus = mask as u16;
     (*ci).top.p = top;
     return ci;

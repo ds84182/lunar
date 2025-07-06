@@ -131,7 +131,7 @@ pub struct CallInfo {
     pub next: *mut CallInfo,
     pub u: CallInfoState,
     pub u2: CallInfoUnion2,
-    pub nresults: std::ffi::c_short,
+    pub nresults: i16,
     pub callstatus: u16,
 }
 #[derive(Copy, Clone)]
@@ -724,7 +724,7 @@ pub struct C2RustUnnamed_10 {
     pub tt_: lu_byte,
     pub kind: lu_byte,
     pub ridx: lu_byte,
-    pub pidx: std::ffi::c_short,
+    pub pidx: i16,
     pub name: *mut TString,
 }
 #[derive(Copy, Clone)]
@@ -758,7 +758,7 @@ pub struct FuncState {
     pub nabslineinfo: i32,
     pub firstlocal: i32,
     pub firstlabel: i32,
-    pub ndebugvars: std::ffi::c_short,
+    pub ndebugvars: i16,
     pub nactvar: lu_byte,
     pub nups: lu_byte,
     pub freereg: lu_byte,
@@ -830,7 +830,7 @@ pub struct C2RustUnnamed_12 {
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct C2RustUnnamed_13 {
-    pub idx: std::ffi::c_short,
+    pub idx: i16,
     pub t: lu_byte,
 }
 #[derive(Copy, Clone)]
@@ -2310,7 +2310,7 @@ unsafe extern "C-unwind" fn stack_init(mut L1: *mut lua_State, mut L: *mut lua_S
     (*ci).callstatus = ((1 as i32) << 1 as i32) as u16;
     (*ci).func.p = (*L1).top.p;
     (*ci).u.c.k = None;
-    (*ci).nresults = 0 as std::ffi::c_short;
+    (*ci).nresults = 0 as i16;
     (*(*L1).top.p).val.tt_ = (0 | (0) << 4 as i32) as lu_byte;
     (*L1).top.p = ((*L1).top.p).offset(1);
     (*L1).top.p;
@@ -5058,7 +5058,7 @@ pub unsafe extern "C-unwind" fn luaK_indexed(
     if (*t).k as u32 == VUPVAL as i32 as u32 {
         let mut temp: i32 = (*t).u.info;
         (*t).u.ind.t = temp as lu_byte;
-        (*t).u.ind.idx = (*k).u.info as std::ffi::c_short;
+        (*t).u.ind.idx = (*k).u.info as i16;
         (*t).k = VINDEXUP;
     } else {
         (*t).u.ind.t = (if (*t).k as u32 == VLOCAL as i32 as u32 {
@@ -5067,13 +5067,13 @@ pub unsafe extern "C-unwind" fn luaK_indexed(
             (*t).u.info
         }) as lu_byte;
         if isKstr(fs, k) != 0 {
-            (*t).u.ind.idx = (*k).u.info as std::ffi::c_short;
+            (*t).u.ind.idx = (*k).u.info as i16;
             (*t).k = VINDEXSTR;
         } else if isCint(k) != 0 {
-            (*t).u.ind.idx = (*k).u.ival as i32 as std::ffi::c_short;
+            (*t).u.ind.idx = (*k).u.ival as i32 as i16;
             (*t).k = VINDEXI;
         } else {
-            (*t).u.ind.idx = luaK_exp2anyreg(fs, k) as std::ffi::c_short;
+            (*t).u.ind.idx = luaK_exp2anyreg(fs, k) as i16;
             (*t).k = VINDEXED;
         }
     };
@@ -5981,7 +5981,7 @@ unsafe extern "C-unwind" fn adjustlocalvars(mut ls: *mut LexState, mut nvars: i3
         let fresh102 = reglevel_0;
         reglevel_0 = reglevel_0 + 1;
         (*var).vd.ridx = fresh102 as lu_byte;
-        (*var).vd.pidx = registerlocalvar(ls, fs, (*var).vd.name) as std::ffi::c_short;
+        (*var).vd.pidx = registerlocalvar(ls, fs, (*var).vd.name) as i16;
         i += 1;
         i;
     }
@@ -6471,7 +6471,7 @@ unsafe extern "C-unwind" fn open_func(
     (*fs).nabslineinfo = 0;
     (*fs).np = 0;
     (*fs).nups = 0 as lu_byte;
-    (*fs).ndebugvars = 0 as std::ffi::c_short;
+    (*fs).ndebugvars = 0 as i16;
     (*fs).nactvar = 0 as lu_byte;
     (*fs).needclose = 0 as lu_byte;
     (*fs).firstlocal = (*(*ls).dyd).actvar.n;
@@ -7246,7 +7246,7 @@ unsafe extern "C-unwind" fn check_conflict(
                     && (*lh).v.u.ind.idx as i32 == (*v).u.var.ridx as i32
                 {
                     conflict = 1 as i32;
-                    (*lh).v.u.ind.idx = extra as std::ffi::c_short;
+                    (*lh).v.u.ind.idx = extra as i16;
                 }
             }
         }
@@ -18234,7 +18234,7 @@ pub unsafe extern "C-unwind" fn lua_toclose(mut L: *mut lua_State, mut idx: i32)
     nresults = (*(*L).ci).nresults as i32;
     luaF_newtbcupval(L, o);
     if !(nresults < -(1 as i32)) {
-        (*(*L).ci).nresults = (-nresults - 3 as i32) as std::ffi::c_short;
+        (*(*L).ci).nresults = (-nresults - 3 as i32) as i16;
     }
 }
 #[unsafe(no_mangle)]
@@ -25941,11 +25941,11 @@ unsafe extern "C-unwind" fn getoption(
             return Kuint;
         }
         104 => {
-            *size = ::core::mem::size_of::<std::ffi::c_short>() as usize as i32;
+            *size = ::core::mem::size_of::<i16>() as usize as i32;
             return Kint;
         }
         72 => {
-            *size = ::core::mem::size_of::<std::ffi::c_short>() as usize as i32;
+            *size = ::core::mem::size_of::<i16>() as usize as i32;
             return Kuint;
         }
         108 => {
