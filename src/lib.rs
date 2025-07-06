@@ -15896,7 +15896,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                 pc = pc.offset(1);
                 i = *fresh134;
                 match (i >> 0 & !(!(0 as Instruction) << 7 as i32) << 0) as OpCode as u32 {
-                    0 => {
+                    OP_MOVE => {
                         let mut ra: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -15922,7 +15922,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         };
                         continue;
                     }
-                    1 => {
+                    OP_LOADI => {
                         let mut ra_0: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -15938,7 +15938,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         (*io).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
                         continue;
                     }
-                    2 => {
+                    OP_LOADF => {
                         let mut ra_1: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -15953,7 +15953,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         (*io_0).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
                         continue;
                     }
-                    3 => {
+                    OP_LOADK => {
                         let mut ra_2: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -15979,7 +15979,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         };
                         continue;
                     }
-                    4 => {
+                    OP_LOADKX => {
                         let mut ra_3: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -16009,7 +16009,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         };
                         continue;
                     }
-                    5 => {
+                    OP_LOADFALSE => {
                         let mut ra_4: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -16017,7 +16017,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         (*ra_4).val.tt_ = (1 as i32 | (0) << 4 as i32) as lu_byte;
                         continue;
                     }
-                    6 => {
+                    OP_LFALSESKIP => {
                         let mut ra_5: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -16027,7 +16027,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         pc;
                         continue;
                     }
-                    7 => {
+                    OP_LOADTRUE => {
                         let mut ra_6: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -16035,7 +16035,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         (*ra_6).val.tt_ = (1 as i32 | (1 as i32) << 4 as i32) as lu_byte;
                         continue;
                     }
-                    8 => {
+                    OP_LOADNIL => {
                         let mut ra_7: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -16055,7 +16055,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    9 => {
+                    OP_GETUPVAL => {
                         let mut ra_8: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -16080,7 +16080,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         };
                         continue;
                     }
-                    10 => {
+                    OP_SETUPVAL => {
                         let mut ra_9: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -16121,7 +16121,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         };
                         continue;
                     }
-                    11 => {
+                    OP_GETTABUP => {
                         let mut ra_10: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -16177,7 +16177,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    12 => {
+                    OP_GETTABLE => {
                         let mut ra_11: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -16258,7 +16258,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    13 => {
+                    OP_GETI => {
                         let mut ra_12: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -16330,7 +16330,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    14 => {
+                    OP_GETFIELD => {
                         let mut ra_13: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -16386,7 +16386,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    15 => {
+                    OP_SETTABUP => {
                         let mut slot_3: *const TValue = 0 as *const TValue;
                         let mut upval_0: *mut TValue = (**((*cl).upvals).as_mut_ptr().offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
@@ -16465,7 +16465,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    16 => {
+                    OP_SETTABLE => {
                         let mut ra_14: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -16568,7 +16568,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    17 => {
+                    OP_SETI => {
                         let mut ra_15: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -16663,7 +16663,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    18 => {
+                    OP_SETFIELD => {
                         let mut ra_16: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -16740,7 +16740,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    19 => {
+                    OP_NEWTABLE => {
                         let mut ra_17: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -16792,7 +16792,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    20 => {
+                    OP_SELF => {
                         let mut ra_18: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -16871,7 +16871,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    21 => {
+                    OP_ADDI => {
                         let mut ra_19: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -16906,7 +16906,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    22 => {
+                    OP_ADDK => {
                         let mut v1_0: *mut TValue = &mut (*base.offset(
                             (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
                                 & !(!(0 as Instruction) << 8 as i32) << 0)
@@ -16968,7 +16968,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    23 => {
+                    OP_SUBK => {
                         let mut v1_1: *mut TValue = &mut (*base.offset(
                             (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
                                 & !(!(0 as Instruction) << 8 as i32) << 0)
@@ -17031,7 +17031,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    24 => {
+                    OP_MULK => {
                         let mut v1_2: *mut TValue = &mut (*base.offset(
                             (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
                                 & !(!(0 as Instruction) << 8 as i32) << 0)
@@ -17093,7 +17093,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    25 => {
+                    OP_MODK => {
                         (*ci).u.l.savedpc = pc;
                         (*L).top.p = (*ci).top.p;
                         let mut v1_3: *mut TValue = &mut (*base.offset(
@@ -17156,7 +17156,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    26 => {
+                    OP_POWK => {
                         let mut ra_24: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -17209,7 +17209,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    27 => {
+                    OP_DIVK => {
                         let mut ra_25: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -17258,7 +17258,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    28 => {
+                    OP_IDIVK => {
                         (*ci).u.l.savedpc = pc;
                         (*L).top.p = (*ci).top.p;
                         let mut v1_6: *mut TValue = &mut (*base.offset(
@@ -17321,7 +17321,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    29 => {
+                    OP_BANDK => {
                         let mut ra_27: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -17358,7 +17358,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    30 => {
+                    OP_BORK => {
                         let mut ra_28: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -17395,7 +17395,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    31 => {
+                    OP_BXORK => {
                         let mut ra_29: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -17432,7 +17432,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    32 => {
+                    OP_SHRI => {
                         let mut ra_30: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -17466,7 +17466,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    33 => {
+                    OP_SHLI => {
                         let mut ra_31: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -17500,7 +17500,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    34 => {
+                    OP_ADD => {
                         let mut v1_10: *mut TValue = &mut (*base.offset(
                             (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
                                 & !(!(0 as Instruction) << 8 as i32) << 0)
@@ -17564,7 +17564,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    35 => {
+                    OP_SUB => {
                         let mut v1_11: *mut TValue = &mut (*base.offset(
                             (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
                                 & !(!(0 as Instruction) << 8 as i32) << 0)
@@ -17628,7 +17628,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    36 => {
+                    OP_MUL => {
                         let mut v1_12: *mut TValue = &mut (*base.offset(
                             (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
                                 & !(!(0 as Instruction) << 8 as i32) << 0)
@@ -17691,7 +17691,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    37 => {
+                    OP_MOD => {
                         (*ci).u.l.savedpc = pc;
                         (*L).top.p = (*ci).top.p;
                         let mut v1_13: *mut TValue = &mut (*base.offset(
@@ -17755,7 +17755,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    38 => {
+                    OP_POW => {
                         let mut ra_36: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -17809,7 +17809,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    39 => {
+                    OP_DIV => {
                         let mut ra_37: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -17859,7 +17859,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    40 => {
+                    OP_IDIV => {
                         (*ci).u.l.savedpc = pc;
                         (*L).top.p = (*ci).top.p;
                         let mut v1_16: *mut TValue = &mut (*base.offset(
@@ -17923,7 +17923,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    41 => {
+                    OP_BAND => {
                         let mut ra_39: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -17970,7 +17970,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    42 => {
+                    OP_BOR => {
                         let mut ra_40: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18017,7 +18017,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    43 => {
+                    OP_BXOR => {
                         let mut ra_41: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18064,7 +18064,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    45 => {
+                    OP_SHR => {
                         let mut ra_42: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18114,7 +18114,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    44 => {
+                    OP_SHL => {
                         let mut ra_43: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18160,7 +18160,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    46 => {
+                    OP_MMBIN => {
                         let mut ra_44: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18185,7 +18185,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         trap = (*ci).u.l.trap;
                         continue;
                     }
-                    47 => {
+                    OP_MMBINI => {
                         let mut ra_45: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18218,7 +18218,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         trap = (*ci).u.l.trap;
                         continue;
                     }
-                    48 => {
+                    OP_MMBINK => {
                         let mut ra_46: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18245,7 +18245,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         trap = (*ci).u.l.trap;
                         continue;
                     }
-                    49 => {
+                    OP_UNM => {
                         let mut ra_47: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18285,7 +18285,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    50 => {
+                    OP_BNOT => {
                         let mut ra_48: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18319,7 +18319,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    51 => {
+                    OP_NOT => {
                         let mut ra_49: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18339,7 +18339,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    52 => {
+                    OP_LEN => {
                         let mut ra_50: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18359,7 +18359,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         trap = (*ci).u.l.trap;
                         continue;
                     }
-                    53 => {
+                    OP_CONCAT => {
                         let mut ra_51: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18379,7 +18379,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    54 => {
+                    OP_CLOSE => {
                         let mut ra_52: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18390,7 +18390,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         trap = (*ci).u.l.trap;
                         continue;
                     }
-                    55 => {
+                    OP_TBC => {
                         let mut ra_53: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18400,7 +18400,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         luaF_newtbcupval(L, ra_53);
                         continue;
                     }
-                    56 => {
+                    OP_JMP => {
                         pc = pc.offset(
                             ((i >> 0 + 7 as i32
                                 & !(!(0 as Instruction)
@@ -18414,7 +18414,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         trap = (*ci).u.l.trap;
                         continue;
                     }
-                    57 => {
+                    OP_EQ => {
                         let mut ra_54: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18453,7 +18453,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    58 => {
+                    OP_LT => {
                         let mut ra_55: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18504,7 +18504,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    59 => {
+                    OP_LE => {
                         let mut ra_56: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18555,7 +18555,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    60 => {
+                    OP_EQK => {
                         let mut ra_57: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18590,7 +18590,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    61 => {
+                    OP_EQI => {
                         let mut ra_58: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18630,7 +18630,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    62 => {
+                    OP_LTI => {
                         let mut ra_59: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18678,7 +18678,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    63 => {
+                    OP_LEI => {
                         let mut ra_60: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18727,7 +18727,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    64 => {
+                    OP_GTI => {
                         let mut ra_61: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18783,7 +18783,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    65 => {
+                    OP_GEI => {
                         let mut ra_62: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18839,7 +18839,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    66 => {
+                    OP_TEST => {
                         let mut ra_63: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18871,7 +18871,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    67 => {
+                    OP_TESTSET => {
                         let mut ra_64: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18923,7 +18923,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    68 => {
+                    OP_CALL => {
                         ra_65 = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18947,7 +18947,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         trap = (*ci).u.l.trap;
                         continue;
                     }
-                    69 => {
+                    OP_TAILCALL => {
                         let mut ra_66: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -18982,7 +18982,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         trap = (*ci).u.l.trap;
                         break;
                     }
-                    70 => {
+                    OP_RETURN => {
                         let mut ra_67: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -19023,7 +19023,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         trap = (*ci).u.l.trap;
                         break;
                     }
-                    71 => {
+                    OP_RETURN0 => {
                         if ((*L).hookmask != 0) as i32 as std::ffi::c_long != 0 {
                             let mut ra_68: StkId = base.offset(
                                 (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
@@ -19048,7 +19048,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         break;
                     }
-                    72 => {
+                    OP_RETURN1 => {
                         if ((*L).hookmask != 0) as i32 as std::ffi::c_long != 0 {
                             let mut ra_69: StkId = base.offset(
                                 (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
@@ -19099,7 +19099,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         break;
                     }
-                    73 => {
+                    OP_FORLOOP => {
                         let mut ra_71: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -19142,7 +19142,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         trap = (*ci).u.l.trap;
                         continue;
                     }
-                    74 => {
+                    OP_FORPREP => {
                         let mut ra_72: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -19159,7 +19159,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    75 => {
+                    OP_TFORPREP => {
                         let mut ra_73: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -19177,13 +19177,13 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         i = *fresh139;
                         current_block = 13973394567113199817;
                     }
-                    76 => {
+                    OP_TFORCALL => {
                         current_block = 13973394567113199817;
                     }
-                    77 => {
+                    OP_TFORLOOP => {
                         current_block = 15611964311717037170;
                     }
-                    78 => {
+                    OP_SETLIST => {
                         let mut ra_76: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -19258,7 +19258,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    79 => {
+                    OP_CLOSURE => {
                         let mut ra_77: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -19279,7 +19279,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         }
                         continue;
                     }
-                    80 => {
+                    OP_VARARG => {
                         let mut ra_78: StkId = base.offset(
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
@@ -19294,7 +19294,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         trap = (*ci).u.l.trap;
                         continue;
                     }
-                    81 => {
+                    OP_VARARGPREP => {
                         (*ci).u.l.savedpc = pc;
                         luaT_adjustvarargs(
                             L,
@@ -19310,7 +19310,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         base = ((*ci).func.p).offset(1);
                         continue;
                     }
-                    82 | _ => {
+                    OP_EXTRAARG | _ => {
                         continue;
                     }
                 }
