@@ -27,7 +27,7 @@ pub unsafe extern "C-unwind" fn luaD_seterrorobj(
             let mut io_0: *mut TValue = &mut (*oldtop).val;
             let mut x__0: *mut TString = luaS_newlstr(
                 L,
-                b"error in error handling\0" as *const u8 as *const std::ffi::c_char,
+                c"error in error handling".as_ptr(),
                 (::core::mem::size_of::<[std::ffi::c_char; 24]>() as usize)
                     .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
                     .wrapping_sub(1 as i32 as usize),
@@ -243,10 +243,7 @@ pub unsafe extern "C-unwind" fn luaD_growstack(
     }
     luaD_reallocstack(L, 1000000 + 200, raiseerror);
     if raiseerror != 0 {
-        luaG_runerror(
-            L,
-            b"stack overflow\0" as *const u8 as *const std::ffi::c_char,
-        );
+        luaG_runerror(L, c"stack overflow".as_ptr());
     }
     return 0;
 }
@@ -962,27 +959,15 @@ pub unsafe extern "C-unwind" fn lua_resume(
     let mut status: i32 = 0;
     if (*L).status as i32 == 0 {
         if (*L).ci != &mut (*L).base_ci as *mut CallInfo {
-            return resume_error(
-                L,
-                b"cannot resume non-suspended coroutine\0" as *const u8 as *const std::ffi::c_char,
-                nargs,
-            );
+            return resume_error(L, c"cannot resume non-suspended coroutine".as_ptr(), nargs);
         } else if ((*L).top.p).offset_from(((*(*L).ci).func.p).offset(1 as i32 as isize))
             as std::ffi::c_long
             == nargs as std::ffi::c_long
         {
-            return resume_error(
-                L,
-                b"cannot resume dead coroutine\0" as *const u8 as *const std::ffi::c_char,
-                nargs,
-            );
+            return resume_error(L, c"cannot resume dead coroutine".as_ptr(), nargs);
         }
     } else if (*L).status as i32 != 1 as i32 {
-        return resume_error(
-            L,
-            b"cannot resume dead coroutine\0" as *const u8 as *const std::ffi::c_char,
-            nargs,
-        );
+        return resume_error(L, c"cannot resume dead coroutine".as_ptr(), nargs);
     }
     (*L).nCcalls = if !from.is_null() {
         (*from).nCcalls & 0xffff as i32 as l_uint32
@@ -990,11 +975,7 @@ pub unsafe extern "C-unwind" fn lua_resume(
         0 as l_uint32
     };
     if (*L).nCcalls & 0xffff as i32 as l_uint32 >= 200 as l_uint32 {
-        return resume_error(
-            L,
-            b"C stack overflow\0" as *const u8 as *const std::ffi::c_char,
-            nargs,
-        );
+        return resume_error(L, c"C stack overflow".as_ptr(), nargs);
     }
     (*L).nCcalls = ((*L).nCcalls).wrapping_add(1);
     (*L).nCcalls;
@@ -1033,17 +1014,9 @@ pub unsafe extern "C-unwind" fn lua_yieldk(
     if (!((*L).nCcalls & 0xffff0000 as u32 == 0 as u32) as i32 != 0) as i32 as std::ffi::c_long != 0
     {
         if L != (*(*L).l_G).mainthread {
-            luaG_runerror(
-                L,
-                b"attempt to yield across a C-call boundary\0" as *const u8
-                    as *const std::ffi::c_char,
-            );
+            luaG_runerror(L, c"attempt to yield across a C-call boundary".as_ptr());
         } else {
-            luaG_runerror(
-                L,
-                b"attempt to yield from outside a coroutine\0" as *const u8
-                    as *const std::ffi::c_char,
-            );
+            luaG_runerror(L, c"attempt to yield from outside a coroutine".as_ptr());
         }
     }
     (*L).status = 1 as i32 as lu_byte;
@@ -1126,7 +1099,7 @@ unsafe extern "C-unwind" fn checkmode(
     if !mode.is_null() && (strchr(mode, *x.offset(0 as isize) as i32)).is_null() {
         luaO_pushfstring(
             L,
-            b"attempt to load a %s chunk (mode is '%s')\0" as *const u8 as *const std::ffi::c_char,
+            c"attempt to load a %s chunk (mode is '%s')".as_ptr(),
             x,
             mode,
         );
@@ -1148,18 +1121,10 @@ unsafe extern "C-unwind" fn f_parser(mut L: *mut lua_State, mut ud: *mut c_void)
     if c == (*::core::mem::transmute::<&[u8; 5], &[std::ffi::c_char; 5]>(b"\x1BLua\0"))[0 as usize]
         as i32
     {
-        checkmode(
-            L,
-            (*p).mode,
-            b"binary\0" as *const u8 as *const std::ffi::c_char,
-        );
+        checkmode(L, (*p).mode, c"binary".as_ptr());
         cl = luaU_undump(L, (*p).z, (*p).name);
     } else {
-        checkmode(
-            L,
-            (*p).mode,
-            b"text\0" as *const u8 as *const std::ffi::c_char,
-        );
+        checkmode(L, (*p).mode, c"text".as_ptr());
         cl = luaY_parser(L, (*p).z, &mut (*p).buff, &mut (*p).dyd, (*p).name, c);
     }
     luaF_initupvals(L, cl);

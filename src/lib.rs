@@ -1391,12 +1391,7 @@ pub unsafe extern "C-unwind" fn luaM_growaux_(
     }
     if size >= limit / 2 as i32 {
         if ((size >= limit) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-            luaG_runerror(
-                L,
-                b"too many %s (limit is %d)\0" as *const u8 as *const std::ffi::c_char,
-                what,
-                limit,
-            );
+            luaG_runerror(L, c"too many %s (limit is %d)".as_ptr(), what, limit);
         }
         size = limit;
     } else {
@@ -1431,10 +1426,7 @@ pub unsafe extern "C-unwind" fn luaM_shrinkvector_(
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaM_toobig(mut L: *mut lua_State) -> ! {
-    luaG_runerror(
-        L,
-        b"memory allocation error: block too big\0" as *const u8 as *const std::ffi::c_char,
-    );
+    luaG_runerror(L, c"memory allocation error: block too big".as_ptr());
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaM_free_(
@@ -1528,7 +1520,7 @@ pub unsafe extern "C-unwind" fn luaM_malloc_(
 unsafe extern "C-unwind" fn error(mut S: *mut LoadState, mut why: *const std::ffi::c_char) -> ! {
     luaO_pushfstring(
         (*S).L,
-        b"%s: bad binary format (%s)\0" as *const u8 as *const std::ffi::c_char,
+        c"%s: bad binary format (%s)".as_ptr(),
         (*S).name,
         why,
     );
@@ -1536,10 +1528,7 @@ unsafe extern "C-unwind" fn error(mut S: *mut LoadState, mut why: *const std::ff
 }
 unsafe extern "C-unwind" fn loadBlock(mut S: *mut LoadState, mut b: *mut c_void, mut size: size_t) {
     if luaZ_read((*S).Z, b, size) != 0 as size_t {
-        error(
-            S,
-            b"truncated chunk\0" as *const u8 as *const std::ffi::c_char,
-        );
+        error(S, c"truncated chunk".as_ptr());
     }
 }
 unsafe extern "C-unwind" fn loadByte(mut S: *mut LoadState) -> lu_byte {
@@ -1553,10 +1542,7 @@ unsafe extern "C-unwind" fn loadByte(mut S: *mut LoadState) -> lu_byte {
         luaZ_fill((*S).Z)
     };
     if b == -(1 as i32) {
-        error(
-            S,
-            b"truncated chunk\0" as *const u8 as *const std::ffi::c_char,
-        );
+        error(S, c"truncated chunk".as_ptr());
     }
     return b as lu_byte;
 }
@@ -1567,10 +1553,7 @@ unsafe extern "C-unwind" fn loadUnsigned(mut S: *mut LoadState, mut limit: size_
     loop {
         b = loadByte(S) as i32;
         if x >= limit {
-            error(
-                S,
-                b"integer overflow\0" as *const u8 as *const std::ffi::c_char,
-            );
+            error(S, c"integer overflow".as_ptr());
         }
         x = x << 7 as i32 | (b & 0x7f as i32) as size_t;
         if !(b & 0x80 == 0) {
@@ -1660,10 +1643,7 @@ unsafe extern "C-unwind" fn loadStringN(mut S: *mut LoadState, mut p: *mut Proto
 unsafe extern "C-unwind" fn loadString(mut S: *mut LoadState, mut p: *mut Proto) -> *mut TString {
     let mut st: *mut TString = loadStringN(S, p);
     if st.is_null() {
-        error(
-            S,
-            b"bad format for constant string\0" as *const u8 as *const std::ffi::c_char,
-        );
+        error(S, c"bad format for constant string".as_ptr());
     }
     return st;
 }
@@ -1962,63 +1942,47 @@ unsafe extern "C-unwind" fn fchecksize(
     if loadByte(S) as size_t != size {
         error(
             S,
-            luaO_pushfstring(
-                (*S).L,
-                b"%s size mismatch\0" as *const u8 as *const std::ffi::c_char,
-                tname,
-            ),
+            luaO_pushfstring((*S).L, c"%s size mismatch".as_ptr(), tname),
         );
     }
 }
 unsafe extern "C-unwind" fn checkHeader(mut S: *mut LoadState) {
     checkliteral(
         S,
-        &*(b"\x1BLua\0" as *const u8 as *const std::ffi::c_char).offset(1 as i32 as isize),
-        b"not a binary chunk\0" as *const u8 as *const std::ffi::c_char,
+        &*(c"\x1BLua".as_ptr()).offset(1 as i32 as isize),
+        c"not a binary chunk".as_ptr(),
     );
     if loadByte(S) as i32 != 504 as i32 / 100 * 16 as i32 + 504 as i32 % 100 {
-        error(
-            S,
-            b"version mismatch\0" as *const u8 as *const std::ffi::c_char,
-        );
+        error(S, c"version mismatch".as_ptr());
     }
     if loadByte(S) as i32 != 0 {
-        error(
-            S,
-            b"format mismatch\0" as *const u8 as *const std::ffi::c_char,
-        );
+        error(S, c"format mismatch".as_ptr());
     }
     checkliteral(
         S,
-        b"\x19\x93\r\n\x1A\n\0" as *const u8 as *const std::ffi::c_char,
-        b"corrupted chunk\0" as *const u8 as *const std::ffi::c_char,
+        c"\x19\x93\r\n\x1A\n".as_ptr(),
+        c"corrupted chunk".as_ptr(),
     );
     fchecksize(
         S,
         ::core::mem::size_of::<Instruction>() as usize,
-        b"Instruction\0" as *const u8 as *const std::ffi::c_char,
+        c"Instruction".as_ptr(),
     );
     fchecksize(
         S,
         ::core::mem::size_of::<lua_Integer>() as usize,
-        b"lua_Integer\0" as *const u8 as *const std::ffi::c_char,
+        c"lua_Integer".as_ptr(),
     );
     fchecksize(
         S,
         ::core::mem::size_of::<lua_Number>() as usize,
-        b"lua_Number\0" as *const u8 as *const std::ffi::c_char,
+        c"lua_Number".as_ptr(),
     );
     if loadInteger(S) != 0x5678 as i32 as lua_Integer {
-        error(
-            S,
-            b"integer format mismatch\0" as *const u8 as *const std::ffi::c_char,
-        );
+        error(S, c"integer format mismatch".as_ptr());
     }
     if loadNumber(S) != 370.5f64 {
-        error(
-            S,
-            b"float format mismatch\0" as *const u8 as *const std::ffi::c_char,
-        );
+        error(S, c"float format mismatch".as_ptr());
     }
 }
 #[unsafe(no_mangle)]
@@ -2039,7 +2003,7 @@ pub unsafe extern "C-unwind" fn luaU_undump(
         == (*::core::mem::transmute::<&[u8; 5], &[std::ffi::c_char; 5]>(b"\x1BLua\0"))[0 as usize]
             as i32
     {
-        S.name = b"binary string\0" as *const u8 as *const std::ffi::c_char;
+        S.name = c"binary string".as_ptr();
     } else {
         S.name = name;
     }
@@ -2299,7 +2263,7 @@ unsafe extern "C-unwind" fn dumpFunction(
 unsafe extern "C-unwind" fn dumpHeader(mut D: *mut DumpState) {
     dumpBlock(
         D,
-        b"\x1BLua\0" as *const u8 as *const std::ffi::c_char as *const c_void,
+        c"\x1BLua".as_ptr() as *const c_void,
         (::core::mem::size_of::<[std::ffi::c_char; 5]>() as usize)
             .wrapping_sub(::core::mem::size_of::<std::ffi::c_char>() as usize),
     );
@@ -2307,7 +2271,7 @@ unsafe extern "C-unwind" fn dumpHeader(mut D: *mut DumpState) {
     dumpByte(D, 0);
     dumpBlock(
         D,
-        b"\x19\x93\r\n\x1A\n\0" as *const u8 as *const std::ffi::c_char as *const c_void,
+        c"\x19\x93\r\n\x1A\n".as_ptr() as *const c_void,
         (::core::mem::size_of::<[std::ffi::c_char; 7]>() as usize)
             .wrapping_sub(::core::mem::size_of::<std::ffi::c_char>() as usize),
     );
@@ -2449,10 +2413,7 @@ pub unsafe extern "C-unwind" fn luaE_shrinkCI(mut L: *mut lua_State) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaE_checkcstack(mut L: *mut lua_State) {
     if (*L).nCcalls & 0xffff as i32 as l_uint32 == 200 as l_uint32 {
-        luaG_runerror(
-            L,
-            b"C stack overflow\0" as *const u8 as *const std::ffi::c_char,
-        );
+        luaG_runerror(L, c"C stack overflow".as_ptr());
     } else if (*L).nCcalls & 0xffff as i32 as l_uint32 >= (200 / 10 * 11 as i32) as l_uint32 {
         luaD_throw(L, 5 as i32);
     }
@@ -2825,17 +2786,13 @@ pub unsafe extern "C-unwind" fn luaE_warnerror(
         ((*(&mut (*((*errobj).value_.gc as *mut GCUnion)).ts as *mut TString)).contents)
             .as_mut_ptr() as *const std::ffi::c_char
     } else {
-        b"error object is not a string\0" as *const u8 as *const std::ffi::c_char
+        c"error object is not a string".as_ptr()
     };
-    luaE_warning(
-        L,
-        b"error in \0" as *const u8 as *const std::ffi::c_char,
-        1 as i32,
-    );
+    luaE_warning(L, c"error in ".as_ptr(), 1 as i32);
     luaE_warning(L, where_0, 1 as i32);
-    luaE_warning(L, b" (\0" as *const u8 as *const std::ffi::c_char, 1 as i32);
+    luaE_warning(L, c" (".as_ptr(), 1 as i32);
     luaE_warning(L, msg, 1 as i32);
-    luaE_warning(L, b")\0" as *const u8 as *const std::ffi::c_char, 0);
+    luaE_warning(L, c")".as_ptr(), 0);
 }
 unsafe extern "C-unwind" fn getgclist(mut o: *mut GCObject) -> *mut *mut GCObject {
     match (*o).tt as i32 {
@@ -3994,7 +3951,7 @@ unsafe extern "C-unwind" fn GCTM(mut L: *mut lua_State) {
         (*L).allowhook = oldah;
         (*g).gcstp = oldgcstp as lu_byte;
         if ((status != 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-            luaE_warnerror(L, b"__gc\0" as *const u8 as *const std::ffi::c_char);
+            luaE_warnerror(L, c"__gc".as_ptr());
             (*L).top.p = ((*L).top.p).offset(-1);
             (*L).top.p;
         }
@@ -4638,43 +4595,43 @@ pub unsafe extern "C-unwind" fn luaC_fullgc(mut L: *mut lua_State, mut isemergen
     (*g).gcemergency = 0 as lu_byte;
 }
 static mut luaX_tokens: [*const std::ffi::c_char; 37] = [
-    b"and\0" as *const u8 as *const std::ffi::c_char,
-    b"break\0" as *const u8 as *const std::ffi::c_char,
-    b"do\0" as *const u8 as *const std::ffi::c_char,
-    b"else\0" as *const u8 as *const std::ffi::c_char,
-    b"elseif\0" as *const u8 as *const std::ffi::c_char,
-    b"end\0" as *const u8 as *const std::ffi::c_char,
-    b"false\0" as *const u8 as *const std::ffi::c_char,
-    b"for\0" as *const u8 as *const std::ffi::c_char,
-    b"function\0" as *const u8 as *const std::ffi::c_char,
-    b"goto\0" as *const u8 as *const std::ffi::c_char,
-    b"if\0" as *const u8 as *const std::ffi::c_char,
-    b"in\0" as *const u8 as *const std::ffi::c_char,
-    b"local\0" as *const u8 as *const std::ffi::c_char,
-    b"nil\0" as *const u8 as *const std::ffi::c_char,
-    b"not\0" as *const u8 as *const std::ffi::c_char,
-    b"or\0" as *const u8 as *const std::ffi::c_char,
-    b"repeat\0" as *const u8 as *const std::ffi::c_char,
-    b"return\0" as *const u8 as *const std::ffi::c_char,
-    b"then\0" as *const u8 as *const std::ffi::c_char,
-    b"true\0" as *const u8 as *const std::ffi::c_char,
-    b"until\0" as *const u8 as *const std::ffi::c_char,
-    b"while\0" as *const u8 as *const std::ffi::c_char,
-    b"//\0" as *const u8 as *const std::ffi::c_char,
-    b"..\0" as *const u8 as *const std::ffi::c_char,
-    b"...\0" as *const u8 as *const std::ffi::c_char,
-    b"==\0" as *const u8 as *const std::ffi::c_char,
-    b">=\0" as *const u8 as *const std::ffi::c_char,
-    b"<=\0" as *const u8 as *const std::ffi::c_char,
-    b"~=\0" as *const u8 as *const std::ffi::c_char,
-    b"<<\0" as *const u8 as *const std::ffi::c_char,
-    b">>\0" as *const u8 as *const std::ffi::c_char,
-    b"::\0" as *const u8 as *const std::ffi::c_char,
-    b"<eof>\0" as *const u8 as *const std::ffi::c_char,
-    b"<number>\0" as *const u8 as *const std::ffi::c_char,
-    b"<integer>\0" as *const u8 as *const std::ffi::c_char,
-    b"<name>\0" as *const u8 as *const std::ffi::c_char,
-    b"<string>\0" as *const u8 as *const std::ffi::c_char,
+    c"and".as_ptr(),
+    c"break".as_ptr(),
+    c"do".as_ptr(),
+    c"else".as_ptr(),
+    c"elseif".as_ptr(),
+    c"end".as_ptr(),
+    c"false".as_ptr(),
+    c"for".as_ptr(),
+    c"function".as_ptr(),
+    c"goto".as_ptr(),
+    c"if".as_ptr(),
+    c"in".as_ptr(),
+    c"local".as_ptr(),
+    c"nil".as_ptr(),
+    c"not".as_ptr(),
+    c"or".as_ptr(),
+    c"repeat".as_ptr(),
+    c"return".as_ptr(),
+    c"then".as_ptr(),
+    c"true".as_ptr(),
+    c"until".as_ptr(),
+    c"while".as_ptr(),
+    c"//".as_ptr(),
+    c"..".as_ptr(),
+    c"...".as_ptr(),
+    c"==".as_ptr(),
+    c">=".as_ptr(),
+    c"<=".as_ptr(),
+    c"~=".as_ptr(),
+    c"<<".as_ptr(),
+    c">>".as_ptr(),
+    c"::".as_ptr(),
+    c"<eof>".as_ptr(),
+    c"<number>".as_ptr(),
+    c"<integer>".as_ptr(),
+    c"<name>".as_ptr(),
+    c"<string>".as_ptr(),
 ];
 unsafe extern "C-unwind" fn save(mut ls: *mut LexState, mut c: i32) {
     let mut b: *mut Mbuffer = (*ls).buff;
@@ -4689,11 +4646,7 @@ unsafe extern "C-unwind" fn save(mut ls: *mut LexState, mut c: i32) {
                 9223372036854775807 as std::ffi::c_longlong as size_t
             }) / 2 as i32 as size_t
         {
-            lexerror(
-                ls,
-                b"lexical element too long\0" as *const u8 as *const std::ffi::c_char,
-                0,
-            );
+            lexerror(ls, c"lexical element too long".as_ptr(), 0);
         }
         newsize = (*b).buffsize * 2 as i32 as size_t;
         (*b).buffer = luaM_saferealloc_(
@@ -4713,7 +4666,7 @@ pub unsafe extern "C-unwind" fn luaX_init(mut L: *mut lua_State) {
     let mut i: i32 = 0;
     let mut e: *mut TString = luaS_newlstr(
         L,
-        b"_ENV\0" as *const u8 as *const std::ffi::c_char,
+        c"_ENV".as_ptr(),
         (::core::mem::size_of::<[std::ffi::c_char; 5]>() as usize)
             .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
             .wrapping_sub(1 as i32 as usize),
@@ -4735,27 +4688,15 @@ pub unsafe extern "C-unwind" fn luaX_token2str(
 ) -> *const std::ffi::c_char {
     if token < 127 as i32 * 2 as i32 + 1 as i32 + 1 as i32 {
         if luai_ctype_[(token + 1 as i32) as usize] as i32 & (1 as i32) << 2 as i32 != 0 {
-            return luaO_pushfstring(
-                (*ls).L,
-                b"'%c'\0" as *const u8 as *const std::ffi::c_char,
-                token,
-            );
+            return luaO_pushfstring((*ls).L, c"'%c'".as_ptr(), token);
         } else {
-            return luaO_pushfstring(
-                (*ls).L,
-                b"'<\\%d>'\0" as *const u8 as *const std::ffi::c_char,
-                token,
-            );
+            return luaO_pushfstring((*ls).L, c"'<\\%d>'".as_ptr(), token);
         }
     } else {
         let mut s: *const std::ffi::c_char =
             luaX_tokens[(token - (127 as i32 * 2 as i32 + 1 as i32 + 1 as i32)) as usize];
         if token < TK_EOS as i32 {
-            return luaO_pushfstring(
-                (*ls).L,
-                b"'%s'\0" as *const u8 as *const std::ffi::c_char,
-                s,
-            );
+            return luaO_pushfstring((*ls).L, c"'%s'".as_ptr(), s);
         } else {
             return s;
         }
@@ -4768,11 +4709,7 @@ unsafe extern "C-unwind" fn txtToken(
     match token {
         291 | 292 | 289 | 290 => {
             save(ls, '\0' as i32);
-            return luaO_pushfstring(
-                (*ls).L,
-                b"'%s'\0" as *const u8 as *const std::ffi::c_char,
-                (*(*ls).buff).buffer,
-            );
+            return luaO_pushfstring((*ls).L, c"'%s'".as_ptr(), (*(*ls).buff).buffer);
         }
         _ => return luaX_token2str(ls, token),
     };
@@ -4784,12 +4721,7 @@ unsafe extern "C-unwind" fn lexerror(
 ) -> ! {
     msg = luaG_addinfo((*ls).L, msg, (*ls).source, (*ls).linenumber);
     if token != 0 {
-        luaO_pushfstring(
-            (*ls).L,
-            b"%s near %s\0" as *const u8 as *const std::ffi::c_char,
-            msg,
-            txtToken(ls, token),
-        );
+        luaO_pushfstring((*ls).L, c"%s near %s".as_ptr(), msg, txtToken(ls, token));
     }
     luaD_throw((*ls).L, 3 as i32);
 }
@@ -4862,11 +4794,7 @@ unsafe extern "C-unwind" fn inclinenumber(mut ls: *mut LexState) {
     }
     (*ls).linenumber += 1;
     if (*ls).linenumber >= 2147483647 as i32 {
-        lexerror(
-            ls,
-            b"chunk has too many lines\0" as *const u8 as *const std::ffi::c_char,
-            0,
-        );
+        lexerror(ls, c"chunk has too many lines".as_ptr(), 0);
     }
 }
 #[unsafe(no_mangle)]
@@ -4888,7 +4816,7 @@ pub unsafe extern "C-unwind" fn luaX_setinput(
     (*ls).source = source;
     (*ls).envn = luaS_newlstr(
         L,
-        b"_ENV\0" as *const u8 as *const std::ffi::c_char,
+        c"_ENV".as_ptr(),
         (::core::mem::size_of::<[std::ffi::c_char; 5]>() as usize)
             .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
             .wrapping_sub(1 as i32 as usize),
@@ -4946,7 +4874,7 @@ unsafe extern "C-unwind" fn read_numeral(mut ls: *mut LexState, mut seminfo: *mu
         },
         tt_: 0,
     };
-    let mut expo: *const std::ffi::c_char = b"Ee\0" as *const u8 as *const std::ffi::c_char;
+    let mut expo: *const std::ffi::c_char = c"Ee".as_ptr();
     let mut first: i32 = (*ls).current;
     save(ls, (*ls).current);
     let fresh21 = (*(*ls).z).n;
@@ -4958,13 +4886,12 @@ unsafe extern "C-unwind" fn read_numeral(mut ls: *mut LexState, mut seminfo: *mu
     } else {
         luaZ_fill((*ls).z)
     });
-    if first == '0' as i32 && check_next2(ls, b"xX\0" as *const u8 as *const std::ffi::c_char) != 0
-    {
-        expo = b"Pp\0" as *const u8 as *const std::ffi::c_char;
+    if first == '0' as i32 && check_next2(ls, c"xX".as_ptr()) != 0 {
+        expo = c"Pp".as_ptr();
     }
     loop {
         if check_next2(ls, expo) != 0 {
-            check_next2(ls, b"-+\0" as *const u8 as *const std::ffi::c_char);
+            check_next2(ls, c"-+".as_ptr());
         } else {
             if !(luai_ctype_[((*ls).current + 1 as i32) as usize] as i32 & (1 as i32) << 4 as i32
                 != 0
@@ -4998,11 +4925,7 @@ unsafe extern "C-unwind" fn read_numeral(mut ls: *mut LexState, mut seminfo: *mu
     }
     save(ls, '\0' as i32);
     if luaO_str2num((*(*ls).buff).buffer, &mut obj) == 0 as size_t {
-        lexerror(
-            ls,
-            b"malformed number\0" as *const u8 as *const std::ffi::c_char,
-            TK_FLT as i32,
-        );
+        lexerror(ls, c"malformed number".as_ptr(), TK_FLT as i32);
     }
     if obj.tt_ as i32 == 3 as i32 | (0) << 4 as i32 {
         (*seminfo).i = obj.value_.i;
@@ -5068,14 +4991,13 @@ unsafe extern "C-unwind" fn read_long_string(
         match (*ls).current {
             -1 => {
                 let mut what: *const std::ffi::c_char = if !seminfo.is_null() {
-                    b"string\0" as *const u8 as *const std::ffi::c_char
+                    c"string".as_ptr()
                 } else {
-                    b"comment\0" as *const u8 as *const std::ffi::c_char
+                    c"comment".as_ptr()
                 };
                 let mut msg: *const std::ffi::c_char = luaO_pushfstring(
                     (*ls).L,
-                    b"unfinished long %s (starting at line %d)\0" as *const u8
-                        as *const std::ffi::c_char,
+                    c"unfinished long %s (starting at line %d)".as_ptr(),
                     what,
                     line,
                 );
@@ -5173,7 +5095,7 @@ unsafe extern "C-unwind" fn gethexa(mut ls: *mut LexState) -> i32 {
     esccheck(
         ls,
         luai_ctype_[((*ls).current + 1 as i32) as usize] as i32 & (1 as i32) << 4 as i32,
-        b"hexadecimal digit expected\0" as *const u8 as *const std::ffi::c_char,
+        c"hexadecimal digit expected".as_ptr(),
     );
     return luaO_hexavalue((*ls).current);
 }
@@ -5199,7 +5121,7 @@ unsafe extern "C-unwind" fn readutf8esc(mut ls: *mut LexState) -> usize {
     esccheck(
         ls,
         ((*ls).current == '{' as i32) as i32,
-        b"missing '{'\0" as *const u8 as *const std::ffi::c_char,
+        c"missing '{'".as_ptr(),
     );
     r = gethexa(ls) as usize;
     loop {
@@ -5222,14 +5144,14 @@ unsafe extern "C-unwind" fn readutf8esc(mut ls: *mut LexState) -> usize {
         esccheck(
             ls,
             (r <= (0x7fffffff as u32 >> 4 as i32) as usize) as i32,
-            b"UTF-8 value too large\0" as *const u8 as *const std::ffi::c_char,
+            c"UTF-8 value too large".as_ptr(),
         );
         r = (r << 4 as i32).wrapping_add(luaO_hexavalue((*ls).current) as usize);
     }
     esccheck(
         ls,
         ((*ls).current == '}' as i32) as i32,
-        b"missing '}'\0" as *const u8 as *const std::ffi::c_char,
+        c"missing '}'".as_ptr(),
     );
     let fresh47 = (*(*ls).z).n;
     (*(*ls).z).n = ((*(*ls).z).n).wrapping_sub(1);
@@ -5276,7 +5198,7 @@ unsafe extern "C-unwind" fn readdecesc(mut ls: *mut LexState) -> i32 {
     esccheck(
         ls,
         (r <= 127 as i32 * 2 as i32 + 1 as i32) as i32,
-        b"decimal escape too large\0" as *const u8 as *const std::ffi::c_char,
+        c"decimal escape too large".as_ptr(),
     );
     (*(*ls).buff).n = ((*(*ls).buff).n).wrapping_sub(i as size_t);
     return r;
@@ -5300,18 +5222,10 @@ unsafe extern "C-unwind" fn read_string(
     while (*ls).current != del {
         match (*ls).current {
             -1 => {
-                lexerror(
-                    ls,
-                    b"unfinished string\0" as *const u8 as *const std::ffi::c_char,
-                    TK_EOS as i32,
-                );
+                lexerror(ls, c"unfinished string".as_ptr(), TK_EOS as i32);
             }
             10 | 13 => {
-                lexerror(
-                    ls,
-                    b"unfinished string\0" as *const u8 as *const std::ffi::c_char,
-                    TK_STRING as i32,
-                );
+                lexerror(ls, c"unfinished string".as_ptr(), TK_STRING as i32);
             }
             92 => {
                 let mut c: i32 = 0;
@@ -5410,7 +5324,7 @@ unsafe extern "C-unwind" fn read_string(
                             ls,
                             luai_ctype_[((*ls).current + 1 as i32) as usize] as i32
                                 & (1 as i32) << 1 as i32,
-                            b"invalid escape sequence\0" as *const u8 as *const std::ffi::c_char,
+                            c"invalid escape sequence".as_ptr(),
                         );
                         c = readdecesc(ls);
                         current_block = 14094486417619109786;
@@ -5544,7 +5458,7 @@ unsafe extern "C-unwind" fn llex(mut ls: *mut LexState, mut seminfo: *mut SemInf
                 } else if sep_0 == 0 as size_t {
                     lexerror(
                         ls,
-                        b"invalid long string delimiter\0" as *const u8 as *const std::ffi::c_char,
+                        c"invalid long string delimiter".as_ptr(),
                         TK_STRING as i32,
                     );
                 }
@@ -5903,10 +5817,7 @@ unsafe extern "C-unwind" fn fixjump(mut fs: *mut FuncState, mut pc: i32, mut des
                 - (((1 as i32) << 8 as i32 + 8 as i32 + 1 as i32 + 8 as i32) - 1 as i32
                     >> 1 as i32))
     {
-        luaX_syntaxerror(
-            (*fs).ls,
-            b"control structure too long\0" as *const u8 as *const std::ffi::c_char,
-        );
+        luaX_syntaxerror((*fs).ls, c"control structure too long".as_ptr());
     }
     *jmp = *jmp
         & !(!(!(0 as Instruction) << 8 as i32 + 8 as i32 + 1 as i32 + 8 as i32) << 0 + 7 as i32)
@@ -6082,7 +5993,7 @@ unsafe extern "C-unwind" fn savelineinfo(mut fs: *mut FuncState, mut f: *mut Pro
             } else {
                 (!(0 as size_t)).wrapping_div(::core::mem::size_of::<AbsLineInfo>() as usize) as u32
             }) as i32,
-            b"lines\0" as *const u8 as *const std::ffi::c_char,
+            c"lines".as_ptr(),
         ) as *mut AbsLineInfo;
         (*((*f).abslineinfo).offset((*fs).nabslineinfo as isize)).pc = pc;
         let fresh92 = (*fs).nabslineinfo;
@@ -6104,7 +6015,7 @@ unsafe extern "C-unwind" fn savelineinfo(mut fs: *mut FuncState, mut f: *mut Pro
         } else {
             (!(0 as size_t)).wrapping_div(::core::mem::size_of::<ls_byte>() as usize) as u32
         }) as i32,
-        b"opcodes\0" as *const u8 as *const std::ffi::c_char,
+        c"opcodes".as_ptr(),
     ) as *mut ls_byte;
     *((*f).lineinfo).offset(pc as isize) = linedif as ls_byte;
     (*fs).previousline = line;
@@ -6143,7 +6054,7 @@ pub unsafe extern "C-unwind" fn luaK_code(mut fs: *mut FuncState, mut i: Instruc
         } else {
             (!(0 as size_t)).wrapping_div(::core::mem::size_of::<Instruction>() as usize) as u32
         }) as i32,
-        b"opcodes\0" as *const u8 as *const std::ffi::c_char,
+        c"opcodes".as_ptr(),
     ) as *mut Instruction;
     let fresh93 = (*fs).pc;
     (*fs).pc = (*fs).pc + 1;
@@ -6232,8 +6143,7 @@ pub unsafe extern "C-unwind" fn luaK_checkstack(mut fs: *mut FuncState, mut n: i
         if newstack >= 255 as i32 {
             luaX_syntaxerror(
                 (*fs).ls,
-                b"function or expression needs too many registers\0" as *const u8
-                    as *const std::ffi::c_char,
+                c"function or expression needs too many registers".as_ptr(),
             );
         }
         (*(*fs).f).maxstacksize = newstack as lu_byte;
@@ -6326,7 +6236,7 @@ unsafe extern "C-unwind" fn addk(
         } else {
             (!(0 as size_t)).wrapping_div(::core::mem::size_of::<TValue>() as usize) as u32
         }) as i32,
-        b"constants\0" as *const u8 as *const std::ffi::c_char,
+        c"constants".as_ptr(),
     ) as *mut TValue;
     while oldsize < (*f).sizek {
         let fresh94 = oldsize;
@@ -7761,11 +7671,7 @@ pub unsafe extern "C-unwind" fn luaK_finish(mut fs: *mut FuncState) {
 unsafe extern "C-unwind" fn error_expected(mut ls: *mut LexState, mut token: i32) -> ! {
     luaX_syntaxerror(
         ls,
-        luaO_pushfstring(
-            (*ls).L,
-            b"%s expected\0" as *const u8 as *const std::ffi::c_char,
-            luaX_token2str(ls, token),
-        ),
+        luaO_pushfstring((*ls).L, c"%s expected".as_ptr(), luaX_token2str(ls, token)),
     );
 }
 unsafe extern "C-unwind" fn errorlimit(
@@ -7777,17 +7683,13 @@ unsafe extern "C-unwind" fn errorlimit(
     let mut msg: *const std::ffi::c_char = 0 as *const std::ffi::c_char;
     let mut line: i32 = (*(*fs).f).linedefined;
     let mut where_0: *const std::ffi::c_char = if line == 0 {
-        b"main function\0" as *const u8 as *const std::ffi::c_char
+        c"main function".as_ptr()
     } else {
-        luaO_pushfstring(
-            L,
-            b"function at line %d\0" as *const u8 as *const std::ffi::c_char,
-            line,
-        )
+        luaO_pushfstring(L, c"function at line %d".as_ptr(), line)
     };
     msg = luaO_pushfstring(
         L,
-        b"too many %s (limit is %d) in %s\0" as *const u8 as *const std::ffi::c_char,
+        c"too many %s (limit is %d) in %s".as_ptr(),
         what,
         limit,
         where_0,
@@ -7835,8 +7737,7 @@ unsafe extern "C-unwind" fn check_match(
                 ls,
                 luaO_pushfstring(
                     (*ls).L,
-                    b"%s expected (to close %s at line %d)\0" as *const u8
-                        as *const std::ffi::c_char,
+                    c"%s expected (to close %s at line %d)".as_ptr(),
                     luaX_token2str(ls, what),
                     luaX_token2str(ls, who),
                     where_0,
@@ -7887,7 +7788,7 @@ unsafe extern "C-unwind" fn registerlocalvar(
         } else {
             (!(0 as size_t)).wrapping_div(::core::mem::size_of::<LocVar>() as usize) as u32
         }) as i32,
-        b"local variables\0" as *const u8 as *const std::ffi::c_char,
+        c"local variables".as_ptr(),
     ) as *mut LocVar;
     while oldsize < (*f).sizelocvars {
         let fresh95 = oldsize;
@@ -7921,7 +7822,7 @@ unsafe extern "C-unwind" fn new_localvar(mut ls: *mut LexState, mut name: *mut T
         fs,
         (*dyd).actvar.n + 1 as i32 - (*fs).firstlocal,
         200,
-        b"local variables\0" as *const u8 as *const std::ffi::c_char,
+        c"local variables".as_ptr(),
     );
     (*dyd).actvar.arr = luaM_growaux_(
         L,
@@ -7936,7 +7837,7 @@ unsafe extern "C-unwind" fn new_localvar(mut ls: *mut LexState, mut name: *mut T
         } else {
             (!(0 as size_t)).wrapping_div(::core::mem::size_of::<Vardesc>() as usize) as u32
         }) as i32,
-        b"local variables\0" as *const u8 as *const std::ffi::c_char,
+        c"local variables".as_ptr(),
     ) as *mut Vardesc;
     let fresh99 = (*dyd).actvar.n;
     (*dyd).actvar.n = (*dyd).actvar.n + 1;
@@ -8010,7 +7911,7 @@ unsafe extern "C-unwind" fn check_readonly(mut ls: *mut LexState, mut e: *mut ex
     if !varname.is_null() {
         let mut msg: *const std::ffi::c_char = luaO_pushfstring(
             (*ls).L,
-            b"attempt to assign to const variable '%s'\0" as *const u8 as *const std::ffi::c_char,
+            c"attempt to assign to const variable '%s'".as_ptr(),
             ((*varname).contents).as_mut_ptr(),
         );
         luaK_semerror(ls, msg);
@@ -8064,7 +7965,7 @@ unsafe extern "C-unwind" fn allocupvalue(mut fs: *mut FuncState) -> *mut Upvalde
         fs,
         (*fs).nups as i32 + 1 as i32,
         255 as i32,
-        b"upvalues\0" as *const u8 as *const std::ffi::c_char,
+        c"upvalues".as_ptr(),
     );
     (*f).upvalues = luaM_growaux_(
         (*(*fs).ls).L,
@@ -8079,7 +7980,7 @@ unsafe extern "C-unwind" fn allocupvalue(mut fs: *mut FuncState) -> *mut Upvalde
         } else {
             (!(0 as size_t)).wrapping_div(::core::mem::size_of::<Upvaldesc>() as usize) as u32
         }) as i32,
-        b"upvalues\0" as *const u8 as *const std::ffi::c_char,
+        c"upvalues".as_ptr(),
     ) as *mut Upvaldesc;
     while oldsize < (*f).sizeupvalues {
         let fresh103 = oldsize;
@@ -8235,8 +8136,7 @@ unsafe extern "C-unwind" fn jumpscopeerror(mut ls: *mut LexState, mut gt: *mut L
     let mut varname: *const std::ffi::c_char =
         ((*(*getlocalvardesc((*ls).fs, (*gt).nactvar as i32)).vd.name).contents).as_mut_ptr();
     let mut msg: *const std::ffi::c_char =
-        b"<goto %s> at line %d jumps into the scope of local '%s'\0" as *const u8
-            as *const std::ffi::c_char;
+        c"<goto %s> at line %d jumps into the scope of local '%s'".as_ptr();
     msg = luaO_pushfstring(
         (*ls).L,
         msg,
@@ -8307,7 +8207,7 @@ unsafe extern "C-unwind" fn newlabelentry(
         } else {
             (!(0 as size_t)).wrapping_div(::core::mem::size_of::<Labeldesc>() as usize) as u32
         }) as i32,
-        b"labels/gotos\0" as *const u8 as *const std::ffi::c_char,
+        c"labels/gotos".as_ptr(),
     ) as *mut Labeldesc;
     let ref mut fresh106 = (*((*l).arr).offset(n as isize)).name;
     *fresh106 = name;
@@ -8393,17 +8293,16 @@ unsafe extern "C-unwind" fn undefgoto(mut ls: *mut LexState, mut gt: *mut Labeld
     if (*gt).name
         == luaS_newlstr(
             (*ls).L,
-            b"break\0" as *const u8 as *const std::ffi::c_char,
+            c"break".as_ptr(),
             (::core::mem::size_of::<[std::ffi::c_char; 6]>() as usize)
                 .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1 as i32 as usize),
         )
     {
-        msg = b"break outside loop at line %d\0" as *const u8 as *const std::ffi::c_char;
+        msg = c"break outside loop at line %d".as_ptr();
         msg = luaO_pushfstring((*ls).L, msg, (*gt).line);
     } else {
-        msg = b"no visible label '%s' for <goto> at line %d\0" as *const u8
-            as *const std::ffi::c_char;
+        msg = c"no visible label '%s' for <goto> at line %d".as_ptr();
         msg = luaO_pushfstring(
             (*ls).L,
             msg,
@@ -8424,7 +8323,7 @@ unsafe extern "C-unwind" fn leaveblock(mut fs: *mut FuncState) {
             ls,
             luaS_newlstr(
                 (*ls).L,
-                b"break\0" as *const u8 as *const std::ffi::c_char,
+                c"break".as_ptr(),
                 (::core::mem::size_of::<[std::ffi::c_char; 6]>() as usize)
                     .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
                     .wrapping_sub(1 as i32 as usize),
@@ -8468,7 +8367,7 @@ unsafe extern "C-unwind" fn addprototype(mut ls: *mut LexState) -> *mut Proto {
             } else {
                 (!(0 as size_t)).wrapping_div(::core::mem::size_of::<*mut Proto>() as usize) as u32
             }) as i32,
-            b"functions\0" as *const u8 as *const std::ffi::c_char,
+            c"functions".as_ptr(),
         ) as *mut *mut Proto;
         while oldsize < (*f).sizep {
             let fresh107 = oldsize;
@@ -8663,7 +8562,7 @@ unsafe extern "C-unwind" fn recfield(mut ls: *mut LexState, mut cc: *mut ConsCon
             fs,
             (*cc).nh,
             2147483647 as i32,
-            b"items in a constructor\0" as *const u8 as *const std::ffi::c_char,
+            c"items in a constructor".as_ptr(),
         );
         codename(ls, &mut key);
     } else {
@@ -8787,10 +8686,7 @@ unsafe extern "C-unwind" fn parlist(mut ls: *mut LexState) {
                     isvararg = 1 as i32;
                 }
                 _ => {
-                    luaX_syntaxerror(
-                        ls,
-                        b"<name> or '...' expected\0" as *const u8 as *const std::ffi::c_char,
-                    );
+                    luaX_syntaxerror(ls, c"<name> or '...' expected".as_ptr());
                 }
             }
             if !(isvararg == 0 && testnext(ls, ',' as i32) != 0) {
@@ -8849,7 +8745,7 @@ unsafe extern "C-unwind" fn body(
             ls,
             luaX_newstring(
                 ls,
-                b"self\0" as *const u8 as *const std::ffi::c_char,
+                c"self".as_ptr(),
                 (::core::mem::size_of::<[std::ffi::c_char; 5]>() as usize)
                     .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
                     .wrapping_sub(1 as i32 as usize),
@@ -8908,10 +8804,7 @@ unsafe extern "C-unwind" fn funcargs(mut ls: *mut LexState, mut f: *mut expdesc)
             luaX_next(ls);
         }
         _ => {
-            luaX_syntaxerror(
-                ls,
-                b"function arguments expected\0" as *const u8 as *const std::ffi::c_char,
-            );
+            luaX_syntaxerror(ls, c"function arguments expected".as_ptr());
         }
     }
     base = (*f).u.info;
@@ -8946,10 +8839,7 @@ unsafe extern "C-unwind" fn primaryexp(mut ls: *mut LexState, mut v: *mut expdes
             return;
         }
         _ => {
-            luaX_syntaxerror(
-                ls,
-                b"unexpected symbol\0" as *const u8 as *const std::ffi::c_char,
-            );
+            luaX_syntaxerror(ls, c"unexpected symbol".as_ptr());
         }
     };
 }
@@ -9017,11 +8907,7 @@ unsafe extern "C-unwind" fn simpleexp(mut ls: *mut LexState, mut v: *mut expdesc
         280 => {
             let mut fs: *mut FuncState = (*ls).fs;
             if (*(*fs).f).is_vararg == 0 {
-                luaX_syntaxerror(
-                    ls,
-                    b"cannot use '...' outside a vararg function\0" as *const u8
-                        as *const std::ffi::c_char,
-                );
+                luaX_syntaxerror(ls, c"cannot use '...' outside a vararg function".as_ptr());
             }
             init_exp(v, VVARARG, luaK_codeABCk(fs, OP_VARARG, 0, 0, 1 as i32, 0));
         }
@@ -9336,10 +9222,7 @@ unsafe extern "C-unwind" fn restassign(
         f: 0,
     };
     if !(VLOCAL as i32 as u32 <= (*lh).v.k as u32 && (*lh).v.k as u32 <= VINDEXSTR as i32 as u32) {
-        luaX_syntaxerror(
-            ls,
-            b"syntax error\0" as *const u8 as *const std::ffi::c_char,
-        );
+        luaX_syntaxerror(ls, c"syntax error".as_ptr());
     }
     check_readonly(ls, &mut (*lh).v);
     if testnext(ls, ',' as i32) != 0 {
@@ -9412,7 +9295,7 @@ unsafe extern "C-unwind" fn breakstat(mut ls: *mut LexState) {
         ls,
         luaS_newlstr(
             (*ls).L,
-            b"break\0" as *const u8 as *const std::ffi::c_char,
+            c"break".as_ptr(),
             (::core::mem::size_of::<[std::ffi::c_char; 6]>() as usize)
                 .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1 as i32 as usize),
@@ -9424,8 +9307,7 @@ unsafe extern "C-unwind" fn breakstat(mut ls: *mut LexState) {
 unsafe extern "C-unwind" fn checkrepeated(mut ls: *mut LexState, mut name: *mut TString) {
     let mut lb: *mut Labeldesc = findlabel(ls, name);
     if ((lb != 0 as *mut c_void as *mut Labeldesc) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-        let mut msg: *const std::ffi::c_char =
-            b"label '%s' already defined on line %d\0" as *const u8 as *const std::ffi::c_char;
+        let mut msg: *const std::ffi::c_char = c"label '%s' already defined on line %d".as_ptr();
         msg = luaO_pushfstring((*ls).L, msg, ((*name).contents).as_mut_ptr(), (*lb).line);
         luaK_semerror(ls, msg);
     }
@@ -9530,10 +9412,7 @@ unsafe extern "C-unwind" fn fixforjump(
         as std::ffi::c_long
         != 0
     {
-        luaX_syntaxerror(
-            (*fs).ls,
-            b"control structure too long\0" as *const u8 as *const std::ffi::c_char,
-        );
+        luaX_syntaxerror((*fs).ls, c"control structure too long".as_ptr());
     }
     *jmp = *jmp
         & !(!(!(0 as Instruction) << 8 as i32 + 8 as i32 + 1 as i32) << 0 + 7 as i32 + 8 as i32)
@@ -9588,7 +9467,7 @@ unsafe extern "C-unwind" fn fornum(
         ls,
         luaX_newstring(
             ls,
-            b"(for state)\0" as *const u8 as *const std::ffi::c_char,
+            c"(for state)".as_ptr(),
             (::core::mem::size_of::<[std::ffi::c_char; 12]>() as usize)
                 .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1 as i32 as usize),
@@ -9598,7 +9477,7 @@ unsafe extern "C-unwind" fn fornum(
         ls,
         luaX_newstring(
             ls,
-            b"(for state)\0" as *const u8 as *const std::ffi::c_char,
+            c"(for state)".as_ptr(),
             (::core::mem::size_of::<[std::ffi::c_char; 12]>() as usize)
                 .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1 as i32 as usize),
@@ -9608,7 +9487,7 @@ unsafe extern "C-unwind" fn fornum(
         ls,
         luaX_newstring(
             ls,
-            b"(for state)\0" as *const u8 as *const std::ffi::c_char,
+            c"(for state)".as_ptr(),
             (::core::mem::size_of::<[std::ffi::c_char; 12]>() as usize)
                 .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1 as i32 as usize),
@@ -9643,7 +9522,7 @@ unsafe extern "C-unwind" fn forlist(mut ls: *mut LexState, mut indexname: *mut T
         ls,
         luaX_newstring(
             ls,
-            b"(for state)\0" as *const u8 as *const std::ffi::c_char,
+            c"(for state)".as_ptr(),
             (::core::mem::size_of::<[std::ffi::c_char; 12]>() as usize)
                 .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1 as i32 as usize),
@@ -9653,7 +9532,7 @@ unsafe extern "C-unwind" fn forlist(mut ls: *mut LexState, mut indexname: *mut T
         ls,
         luaX_newstring(
             ls,
-            b"(for state)\0" as *const u8 as *const std::ffi::c_char,
+            c"(for state)".as_ptr(),
             (::core::mem::size_of::<[std::ffi::c_char; 12]>() as usize)
                 .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1 as i32 as usize),
@@ -9663,7 +9542,7 @@ unsafe extern "C-unwind" fn forlist(mut ls: *mut LexState, mut indexname: *mut T
         ls,
         luaX_newstring(
             ls,
-            b"(for state)\0" as *const u8 as *const std::ffi::c_char,
+            c"(for state)".as_ptr(),
             (::core::mem::size_of::<[std::ffi::c_char; 12]>() as usize)
                 .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1 as i32 as usize),
@@ -9673,7 +9552,7 @@ unsafe extern "C-unwind" fn forlist(mut ls: *mut LexState, mut indexname: *mut T
         ls,
         luaX_newstring(
             ls,
-            b"(for state)\0" as *const u8 as *const std::ffi::c_char,
+            c"(for state)".as_ptr(),
             (::core::mem::size_of::<[std::ffi::c_char; 12]>() as usize)
                 .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1 as i32 as usize),
@@ -9716,10 +9595,7 @@ unsafe extern "C-unwind" fn forstat(mut ls: *mut LexState, mut line: i32) {
             forlist(ls, varname);
         }
         _ => {
-            luaX_syntaxerror(
-                ls,
-                b"'=' or 'in' expected\0" as *const u8 as *const std::ffi::c_char,
-            );
+            luaX_syntaxerror(ls, c"'=' or 'in' expected".as_ptr());
         }
     }
     check_match(ls, TK_END as i32, TK_FOR as i32, line);
@@ -9755,7 +9631,7 @@ unsafe extern "C-unwind" fn test_then_block(mut ls: *mut LexState, mut escapelis
             ls,
             luaS_newlstr(
                 (*ls).L,
-                b"break\0" as *const u8 as *const std::ffi::c_char,
+                c"break".as_ptr(),
                 (::core::mem::size_of::<[std::ffi::c_char; 6]>() as usize)
                     .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
                     .wrapping_sub(1 as i32 as usize),
@@ -9813,18 +9689,14 @@ unsafe extern "C-unwind" fn getlocalattribute(mut ls: *mut LexState) -> i32 {
     if testnext(ls, '<' as i32) != 0 {
         let mut attr: *const std::ffi::c_char = ((*str_checkname(ls)).contents).as_mut_ptr();
         checknext(ls, '>' as i32);
-        if strcmp(attr, b"const\0" as *const u8 as *const std::ffi::c_char) == 0 {
+        if strcmp(attr, c"const".as_ptr()) == 0 {
             return 1 as i32;
-        } else if strcmp(attr, b"close\0" as *const u8 as *const std::ffi::c_char) == 0 {
+        } else if strcmp(attr, c"close".as_ptr()) == 0 {
             return 2 as i32;
         } else {
             luaK_semerror(
                 ls,
-                luaO_pushfstring(
-                    (*ls).L,
-                    b"unknown attribute '%s'\0" as *const u8 as *const std::ffi::c_char,
-                    attr,
-                ),
+                luaO_pushfstring((*ls).L, c"unknown attribute '%s'".as_ptr(), attr),
             );
         }
     }
@@ -9858,8 +9730,7 @@ unsafe extern "C-unwind" fn localstat(mut ls: *mut LexState) {
             if toclose != -(1 as i32) {
                 luaK_semerror(
                     ls,
-                    b"multiple to-be-closed variables in local list\0" as *const u8
-                        as *const std::ffi::c_char,
+                    c"multiple to-be-closed variables in local list".as_ptr(),
                 );
             }
             toclose = (*fs).nactvar as i32 + nvars;
@@ -9942,10 +9813,7 @@ unsafe extern "C-unwind" fn exprstat(mut ls: *mut LexState) {
     } else {
         let mut inst: *mut Instruction = 0 as *mut Instruction;
         if !(v.v.k as u32 == VCALL as i32 as u32) {
-            luaX_syntaxerror(
-                ls,
-                b"syntax error\0" as *const u8 as *const std::ffi::c_char,
-            );
+            luaX_syntaxerror(ls, c"syntax error".as_ptr());
         }
         inst = &mut *((*(*fs).f).code).offset(v.v.u.info as isize) as *mut Instruction;
         *inst = *inst
@@ -10320,7 +10188,7 @@ pub unsafe extern "C-unwind" fn lua_getstack(
 unsafe extern "C-unwind" fn upvalname(mut p: *const Proto, mut uv: i32) -> *const std::ffi::c_char {
     let mut s: *mut TString = (*((*p).upvalues).offset(uv as isize)).name;
     if s.is_null() {
-        return b"?\0" as *const u8 as *const std::ffi::c_char;
+        return c"?".as_ptr();
     } else {
         return ((*s).contents).as_mut_ptr();
     };
@@ -10339,7 +10207,7 @@ unsafe extern "C-unwind" fn findvararg(
             *pos = ((*ci).func.p)
                 .offset(-(nextra as isize))
                 .offset(-((n + 1 as i32) as isize));
-            return b"(vararg)\0" as *const u8 as *const std::ffi::c_char;
+            return c"(vararg)".as_ptr();
         }
     }
     return 0 as *const std::ffi::c_char;
@@ -10372,9 +10240,9 @@ pub unsafe extern "C-unwind" fn luaG_findlocal(
         };
         if limit.offset_from(base) as std::ffi::c_long >= n as std::ffi::c_long && n > 0 {
             name = if (*ci).callstatus as i32 & (1 as i32) << 1 as i32 == 0 {
-                b"(temporary)\0" as *const u8 as *const std::ffi::c_char
+                c"(temporary)".as_ptr()
             } else {
-                b"(C temporary)\0" as *const u8 as *const std::ffi::c_char
+                c"(C temporary)".as_ptr()
             };
         } else {
             return 0 as *const std::ffi::c_char;
@@ -10463,13 +10331,13 @@ pub unsafe extern "C-unwind" fn lua_setlocal(
 }
 unsafe extern "C-unwind" fn funcinfo(mut ar: *mut lua_Debug, mut cl: *mut Closure) {
     if !(!cl.is_null() && (*cl).c.tt as i32 == 6 as i32 | (0) << 4 as i32) {
-        (*ar).source = b"=[C]\0" as *const u8 as *const std::ffi::c_char;
+        (*ar).source = c"=[C]".as_ptr();
         (*ar).srclen = (::core::mem::size_of::<[std::ffi::c_char; 5]>() as usize)
             .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
             .wrapping_sub(1 as i32 as usize);
         (*ar).linedefined = -(1 as i32);
         (*ar).lastlinedefined = -(1 as i32);
-        (*ar).what = b"C\0" as *const u8 as *const std::ffi::c_char;
+        (*ar).what = c"C".as_ptr();
     } else {
         let mut p: *const Proto = (*cl).l.p;
         if !((*p).source).is_null() {
@@ -10480,7 +10348,7 @@ unsafe extern "C-unwind" fn funcinfo(mut ar: *mut lua_Debug, mut cl: *mut Closur
                 (*(*p).source).u.lnglen
             };
         } else {
-            (*ar).source = b"=?\0" as *const u8 as *const std::ffi::c_char;
+            (*ar).source = c"=?".as_ptr();
             (*ar).srclen = (::core::mem::size_of::<[std::ffi::c_char; 3]>() as usize)
                 .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1 as i32 as usize);
@@ -10488,9 +10356,9 @@ unsafe extern "C-unwind" fn funcinfo(mut ar: *mut lua_Debug, mut cl: *mut Closur
         (*ar).linedefined = (*p).linedefined;
         (*ar).lastlinedefined = (*p).lastlinedefined;
         (*ar).what = if (*ar).linedefined == 0 {
-            b"main\0" as *const u8 as *const std::ffi::c_char
+            c"main".as_ptr()
         } else {
-            b"Lua\0" as *const u8 as *const std::ffi::c_char
+            c"Lua".as_ptr()
         };
     }
     luaO_chunkid(((*ar).short_src).as_mut_ptr(), (*ar).source, (*ar).srclen);
@@ -10611,7 +10479,7 @@ unsafe extern "C-unwind" fn auxgetinfo(
             110 => {
                 (*ar).namewhat = getfuncname(L, ci, &mut (*ar).name);
                 if ((*ar).namewhat).is_null() {
-                    (*ar).namewhat = b"\0" as *const u8 as *const std::ffi::c_char;
+                    (*ar).namewhat = c"".as_ptr();
                     (*ar).name = 0 as *const std::ffi::c_char;
                 }
             }
@@ -10757,9 +10625,9 @@ unsafe extern "C-unwind" fn kname(
     let mut kvalue: *mut TValue = &mut *((*p).k).offset(index as isize) as *mut TValue;
     if (*kvalue).tt_ as i32 & 0xf as i32 == 4 as i32 {
         *name = ((*&mut (*((*kvalue).value_.gc as *mut GCUnion)).ts).contents).as_mut_ptr();
-        return b"constant\0" as *const u8 as *const std::ffi::c_char;
+        return c"constant".as_ptr();
     } else {
-        *name = b"?\0" as *const u8 as *const std::ffi::c_char;
+        *name = c"?".as_ptr();
         return 0 as *const std::ffi::c_char;
     };
 }
@@ -10772,7 +10640,7 @@ unsafe extern "C-unwind" fn basicgetobjname(
     let mut pc: i32 = *ppc;
     *name = luaF_getlocalname(p, reg + 1 as i32, pc);
     if !(*name).is_null() {
-        return b"local\0" as *const u8 as *const std::ffi::c_char;
+        return c"local".as_ptr();
     }
     pc = findsetreg(p, pc, reg);
     *ppc = pc;
@@ -10794,7 +10662,7 @@ unsafe extern "C-unwind" fn basicgetobjname(
                     (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
                         & !(!(0 as Instruction) << 8 as i32) << 0) as i32,
                 );
-                return b"upvalue\0" as *const u8 as *const std::ffi::c_char;
+                return c"upvalue".as_ptr();
             }
             3 => {
                 return kname(
@@ -10827,7 +10695,7 @@ unsafe extern "C-unwind" fn rname(
 ) {
     let mut what: *const std::ffi::c_char = basicgetobjname(p, &mut pc, c, name);
     if !(!what.is_null() && *what as i32 == 'c' as i32) {
-        *name = b"?\0" as *const u8 as *const std::ffi::c_char;
+        *name = c"?".as_ptr();
     }
 }
 unsafe extern "C-unwind" fn rkname(
@@ -10858,12 +10726,10 @@ unsafe extern "C-unwind" fn isEnv(
     } else {
         basicgetobjname(p, &mut pc, t, &mut name);
     }
-    return if !name.is_null()
-        && strcmp(name, b"_ENV\0" as *const u8 as *const std::ffi::c_char) == 0
-    {
-        b"global\0" as *const u8 as *const std::ffi::c_char
+    return if !name.is_null() && strcmp(name, c"_ENV".as_ptr()) == 0 {
+        c"global".as_ptr()
     } else {
-        b"field\0" as *const u8 as *const std::ffi::c_char
+        c"field".as_ptr()
     };
 }
 unsafe extern "C-unwind" fn getobjname(
@@ -10894,8 +10760,8 @@ unsafe extern "C-unwind" fn getobjname(
                 return isEnv(p, lastpc, i, 0);
             }
             13 => {
-                *name = b"integer index\0" as *const u8 as *const std::ffi::c_char;
-                return b"field\0" as *const u8 as *const std::ffi::c_char;
+                *name = c"integer index".as_ptr();
+                return c"field".as_ptr();
             }
             14 => {
                 let mut k_1: i32 = (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32 + 8 as i32
@@ -10906,7 +10772,7 @@ unsafe extern "C-unwind" fn getobjname(
             }
             20 => {
                 rkname(p, lastpc, i, name);
-                return b"method\0" as *const u8 as *const std::ffi::c_char;
+                return c"method".as_ptr();
             }
             _ => {}
         }
@@ -10931,8 +10797,8 @@ unsafe extern "C-unwind" fn funcnamefromcode(
             );
         }
         76 => {
-            *name = b"for iterator\0" as *const u8 as *const std::ffi::c_char;
-            return b"for iterator\0" as *const u8 as *const std::ffi::c_char;
+            *name = c"for iterator".as_ptr();
+            return c"for iterator".as_ptr();
         }
         20 | 11 | 12 | 13 | 14 => {
             tm = TM_INDEX;
@@ -10973,7 +10839,7 @@ unsafe extern "C-unwind" fn funcnamefromcode(
     *name = ((*(*(*L).l_G).tmname[tm as usize]).contents)
         .as_mut_ptr()
         .offset(2 as i32 as isize);
-    return b"metamethod\0" as *const u8 as *const std::ffi::c_char;
+    return c"metamethod".as_ptr();
 }
 unsafe extern "C-unwind" fn funcnamefromcall(
     mut L: *mut lua_State,
@@ -10981,11 +10847,11 @@ unsafe extern "C-unwind" fn funcnamefromcall(
     mut name: *mut *const std::ffi::c_char,
 ) -> *const std::ffi::c_char {
     if (*ci).callstatus as i32 & (1 as i32) << 3 as i32 != 0 {
-        *name = b"?\0" as *const u8 as *const std::ffi::c_char;
-        return b"hook\0" as *const u8 as *const std::ffi::c_char;
+        *name = c"?".as_ptr();
+        return c"hook".as_ptr();
     } else if (*ci).callstatus as i32 & (1 as i32) << 7 as i32 != 0 {
-        *name = b"__gc\0" as *const u8 as *const std::ffi::c_char;
-        return b"metamethod\0" as *const u8 as *const std::ffi::c_char;
+        *name = c"__gc".as_ptr();
+        return c"metamethod".as_ptr();
     } else if (*ci).callstatus as i32 & (1 as i32) << 1 as i32 == 0 {
         return funcnamefromcode(
             L,
@@ -11021,7 +10887,7 @@ unsafe extern "C-unwind" fn getupvalname(
     while i < (*c).nupvalues as i32 {
         if (**((*c).upvals).as_mut_ptr().offset(i as isize)).v.p == o as *mut TValue {
             *name = upvalname((*c).p, i);
-            return b"upvalue\0" as *const u8 as *const std::ffi::c_char;
+            return c"upvalue".as_ptr();
         }
         i += 1;
         i;
@@ -11034,14 +10900,9 @@ unsafe extern "C-unwind" fn formatvarinfo(
     mut name: *const std::ffi::c_char,
 ) -> *const std::ffi::c_char {
     if kind.is_null() {
-        return b"\0" as *const u8 as *const std::ffi::c_char;
+        return c"".as_ptr();
     } else {
-        return luaO_pushfstring(
-            L,
-            b" (%s '%s')\0" as *const u8 as *const std::ffi::c_char,
-            kind,
-            name,
-        );
+        return luaO_pushfstring(L, c" (%s '%s')".as_ptr(), kind, name);
     };
 }
 unsafe extern "C-unwind" fn varinfo(
@@ -11074,13 +10935,7 @@ unsafe extern "C-unwind" fn typeerror(
     mut extra: *const std::ffi::c_char,
 ) -> ! {
     let mut t: *const std::ffi::c_char = luaT_objtypename(L, o);
-    luaG_runerror(
-        L,
-        b"attempt to %s a %s value%s\0" as *const u8 as *const std::ffi::c_char,
-        op,
-        t,
-        extra,
-    );
+    luaG_runerror(L, c"attempt to %s a %s value%s".as_ptr(), op, t, extra);
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaG_typeerror(
@@ -11100,12 +10955,7 @@ pub unsafe extern "C-unwind" fn luaG_callerror(mut L: *mut lua_State, mut o: *co
     } else {
         varinfo(L, o)
     };
-    typeerror(
-        L,
-        o,
-        b"call\0" as *const u8 as *const std::ffi::c_char,
-        extra,
-    );
+    typeerror(L, o, c"call".as_ptr(), extra);
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaG_forerror(
@@ -11115,7 +10965,7 @@ pub unsafe extern "C-unwind" fn luaG_forerror(
 ) -> ! {
     luaG_runerror(
         L,
-        b"bad 'for' %s (number expected, got %s)\0" as *const u8 as *const std::ffi::c_char,
+        c"bad 'for' %s (number expected, got %s)".as_ptr(),
         what,
         luaT_objtypename(L, o),
     );
@@ -11129,11 +10979,7 @@ pub unsafe extern "C-unwind" fn luaG_concaterror(
     if (*p1).tt_ as i32 & 0xf as i32 == 4 as i32 || (*p1).tt_ as i32 & 0xf as i32 == 3 as i32 {
         p1 = p2;
     }
-    luaG_typeerror(
-        L,
-        p1,
-        b"concatenate\0" as *const u8 as *const std::ffi::c_char,
-    );
+    luaG_typeerror(L, p1, c"concatenate".as_ptr());
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaG_opinterror(
@@ -11159,7 +11005,7 @@ pub unsafe extern "C-unwind" fn luaG_tointerror(
     }
     luaG_runerror(
         L,
-        b"number%s has no integer representation\0" as *const u8 as *const std::ffi::c_char,
+        c"number%s has no integer representation".as_ptr(),
         varinfo(L, p2),
     );
 }
@@ -11172,18 +11018,9 @@ pub unsafe extern "C-unwind" fn luaG_ordererror(
     let mut t1: *const std::ffi::c_char = luaT_objtypename(L, p1);
     let mut t2: *const std::ffi::c_char = luaT_objtypename(L, p2);
     if strcmp(t1, t2) == 0 {
-        luaG_runerror(
-            L,
-            b"attempt to compare two %s values\0" as *const u8 as *const std::ffi::c_char,
-            t1,
-        );
+        luaG_runerror(L, c"attempt to compare two %s values".as_ptr(), t1);
     } else {
-        luaG_runerror(
-            L,
-            b"attempt to compare %s with %s\0" as *const u8 as *const std::ffi::c_char,
-            t1,
-            t2,
-        );
+        luaG_runerror(L, c"attempt to compare %s with %s".as_ptr(), t1, t2);
     };
 }
 #[unsafe(no_mangle)]
@@ -11208,13 +11045,7 @@ pub unsafe extern "C-unwind" fn luaG_addinfo(
         buff[0 as usize] = '?' as i32 as std::ffi::c_char;
         buff[1 as i32 as usize] = '\0' as i32 as std::ffi::c_char;
     }
-    return luaO_pushfstring(
-        L,
-        b"%s:%d: %s\0" as *const u8 as *const std::ffi::c_char,
-        buff.as_mut_ptr(),
-        line,
-        msg,
-    );
+    return luaO_pushfstring(L, c"%s:%d: %s".as_ptr(), buff.as_mut_ptr(), line, msg);
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaG_errormsg(mut L: *mut lua_State) -> ! {
@@ -11574,13 +11405,9 @@ unsafe extern "C-unwind" fn checkclosemth(mut L: *mut lua_State, mut level: StkI
         let mut idx: i32 = level.offset_from((*(*L).ci).func.p) as std::ffi::c_long as i32;
         let mut vname: *const std::ffi::c_char = luaG_findlocal(L, (*L).ci, idx, 0 as *mut StkId);
         if vname.is_null() {
-            vname = b"?\0" as *const u8 as *const std::ffi::c_char;
+            vname = c"?".as_ptr();
         }
-        luaG_runerror(
-            L,
-            b"variable '%s' got a non-closable value\0" as *const u8 as *const std::ffi::c_char,
-            vname,
-        );
+        luaG_runerror(L, c"variable '%s' got a non-closable value".as_ptr(), vname);
     }
 }
 unsafe extern "C-unwind" fn prepcallclosemth(
@@ -12313,8 +12140,7 @@ unsafe extern "C-unwind" fn l_str2d(
     mut result: *mut lua_Number,
 ) -> *const std::ffi::c_char {
     let mut endptr: *const std::ffi::c_char = 0 as *const std::ffi::c_char;
-    let mut pmode: *const std::ffi::c_char =
-        strpbrk(s, b".xXnN\0" as *const u8 as *const std::ffi::c_char);
+    let mut pmode: *const std::ffi::c_char = strpbrk(s, c".xXnN".as_ptr());
     let mut mode: i32 = if !pmode.is_null() {
         *pmode as std::ffi::c_uchar as i32 | 'A' as i32 ^ 'a' as i32
     } else {
@@ -12465,25 +12291,10 @@ unsafe extern "C-unwind" fn tostringbuff(
 ) -> i32 {
     let mut len: i32 = 0;
     if (*obj).tt_ as i32 == 3 as i32 | (0) << 4 as i32 {
-        len = snprintf(
-            buff,
-            44 as i32 as usize,
-            b"%lld\0" as *const u8 as *const std::ffi::c_char,
-            (*obj).value_.i,
-        );
+        len = snprintf(buff, 44 as i32 as usize, c"%lld".as_ptr(), (*obj).value_.i);
     } else {
-        len = snprintf(
-            buff,
-            44 as i32 as usize,
-            b"%.14g\0" as *const u8 as *const std::ffi::c_char,
-            (*obj).value_.n,
-        );
-        if *buff.offset(strspn(
-            buff,
-            b"-0123456789\0" as *const u8 as *const std::ffi::c_char,
-        ) as isize) as i32
-            == '\0' as i32
-        {
+        len = snprintf(buff, 44 as i32 as usize, c"%.14g".as_ptr(), (*obj).value_.n);
+        if *buff.offset(strspn(buff, c"-0123456789".as_ptr()) as isize) as i32 == '\0' as i32 {
             let fresh116 = len;
             len = len + 1;
             *buff.offset(fresh116 as isize) = *((*localeconv()).decimal_point).offset(0 as isize);
@@ -12600,7 +12411,7 @@ pub unsafe extern "C-unwind" fn luaO_pushvfstring(
             115 => {
                 let mut s: *const std::ffi::c_char = argp.arg::<*mut std::ffi::c_char>();
                 if s.is_null() {
-                    s = b"(null)\0" as *const u8 as *const std::ffi::c_char;
+                    s = c"(null)".as_ptr();
                 }
                 addstr2buff(&mut buff, s, strlen(s));
             }
@@ -12655,12 +12466,7 @@ pub unsafe extern "C-unwind" fn luaO_pushvfstring(
                     .wrapping_add(8 as i32 as usize) as i32;
                 let mut bf: *mut std::ffi::c_char = getbuff(&mut buff, sz);
                 let mut p: *mut c_void = argp.arg::<*mut c_void>();
-                let mut len: i32 = snprintf(
-                    bf,
-                    sz as usize,
-                    b"%p\0" as *const u8 as *const std::ffi::c_char,
-                    p,
-                );
+                let mut len: i32 = snprintf(bf, sz as usize, c"%p".as_ptr(), p);
                 buff.blen += len;
             }
             85 => {
@@ -12676,17 +12482,12 @@ pub unsafe extern "C-unwind" fn luaO_pushvfstring(
                 );
             }
             37 => {
-                addstr2buff(
-                    &mut buff,
-                    b"%\0" as *const u8 as *const std::ffi::c_char,
-                    1 as i32 as size_t,
-                );
+                addstr2buff(&mut buff, c"%".as_ptr(), 1 as i32 as size_t);
             }
             _ => {
                 luaG_runerror(
                     L,
-                    b"invalid option '%%%c' to 'lua_pushfstring'\0" as *const u8
-                        as *const std::ffi::c_char,
+                    c"invalid option '%%%c' to 'lua_pushfstring'".as_ptr(),
                     *e.offset(1 as i32 as isize) as i32,
                 );
             }
@@ -12748,7 +12549,7 @@ pub unsafe extern "C-unwind" fn luaO_chunkid(
         } else {
             memcpy(
                 out as *mut c_void,
-                b"...\0" as *const u8 as *const std::ffi::c_char as *const c_void,
+                c"...".as_ptr() as *const c_void,
                 (::core::mem::size_of::<[std::ffi::c_char; 4]>() as usize)
                     .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
                     .wrapping_sub(1 as i32 as usize)
@@ -12777,7 +12578,7 @@ pub unsafe extern "C-unwind" fn luaO_chunkid(
         let mut nl: *const std::ffi::c_char = strchr(source, '\n' as i32);
         memcpy(
             out as *mut c_void,
-            b"[string \"\0" as *const u8 as *const std::ffi::c_char as *const c_void,
+            c"[string \"".as_ptr() as *const c_void,
             (::core::mem::size_of::<[std::ffi::c_char; 10]>() as usize)
                 .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1 as i32 as usize)
@@ -12816,7 +12617,7 @@ pub unsafe extern "C-unwind" fn luaO_chunkid(
             out = out.offset(srclen as isize);
             memcpy(
                 out as *mut c_void,
-                b"...\0" as *const u8 as *const std::ffi::c_char as *const c_void,
+                c"...".as_ptr() as *const c_void,
                 (::core::mem::size_of::<[std::ffi::c_char; 4]>() as usize)
                     .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
                     .wrapping_sub(1 as i32 as usize)
@@ -12830,7 +12631,7 @@ pub unsafe extern "C-unwind" fn luaO_chunkid(
         }
         memcpy(
             out as *mut c_void,
-            b"\"]\0" as *const u8 as *const std::ffi::c_char as *const c_void,
+            c"\"]".as_ptr() as *const c_void,
             (::core::mem::size_of::<[std::ffi::c_char; 3]>() as usize)
                 .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1 as i32 as usize)
@@ -12844,48 +12645,48 @@ static mut udatatypename: [std::ffi::c_char; 9] =
 #[unsafe(no_mangle)]
 pub static mut luaT_typenames_: [*const std::ffi::c_char; 12] = unsafe {
     [
-        b"no value\0" as *const u8 as *const std::ffi::c_char,
-        b"nil\0" as *const u8 as *const std::ffi::c_char,
-        b"boolean\0" as *const u8 as *const std::ffi::c_char,
-        b"userdata\0" as *const u8 as *const std::ffi::c_char,
-        b"number\0" as *const u8 as *const std::ffi::c_char,
-        b"string\0" as *const u8 as *const std::ffi::c_char,
-        b"table\0" as *const u8 as *const std::ffi::c_char,
-        b"function\0" as *const u8 as *const std::ffi::c_char,
-        b"userdata\0" as *const u8 as *const std::ffi::c_char,
-        b"thread\0" as *const u8 as *const std::ffi::c_char,
-        b"upvalue\0" as *const u8 as *const std::ffi::c_char,
-        b"proto\0" as *const u8 as *const std::ffi::c_char,
+        c"no value".as_ptr(),
+        c"nil".as_ptr(),
+        c"boolean".as_ptr(),
+        c"userdata".as_ptr(),
+        c"number".as_ptr(),
+        c"string".as_ptr(),
+        c"table".as_ptr(),
+        c"function".as_ptr(),
+        c"userdata".as_ptr(),
+        c"thread".as_ptr(),
+        c"upvalue".as_ptr(),
+        c"proto".as_ptr(),
     ]
 };
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaT_init(mut L: *mut lua_State) {
     static mut luaT_eventname: [*const std::ffi::c_char; 25] = [
-        b"__index\0" as *const u8 as *const std::ffi::c_char,
-        b"__newindex\0" as *const u8 as *const std::ffi::c_char,
-        b"__gc\0" as *const u8 as *const std::ffi::c_char,
-        b"__mode\0" as *const u8 as *const std::ffi::c_char,
-        b"__len\0" as *const u8 as *const std::ffi::c_char,
-        b"__eq\0" as *const u8 as *const std::ffi::c_char,
-        b"__add\0" as *const u8 as *const std::ffi::c_char,
-        b"__sub\0" as *const u8 as *const std::ffi::c_char,
-        b"__mul\0" as *const u8 as *const std::ffi::c_char,
-        b"__mod\0" as *const u8 as *const std::ffi::c_char,
-        b"__pow\0" as *const u8 as *const std::ffi::c_char,
-        b"__div\0" as *const u8 as *const std::ffi::c_char,
-        b"__idiv\0" as *const u8 as *const std::ffi::c_char,
-        b"__band\0" as *const u8 as *const std::ffi::c_char,
-        b"__bor\0" as *const u8 as *const std::ffi::c_char,
-        b"__bxor\0" as *const u8 as *const std::ffi::c_char,
-        b"__shl\0" as *const u8 as *const std::ffi::c_char,
-        b"__shr\0" as *const u8 as *const std::ffi::c_char,
-        b"__unm\0" as *const u8 as *const std::ffi::c_char,
-        b"__bnot\0" as *const u8 as *const std::ffi::c_char,
-        b"__lt\0" as *const u8 as *const std::ffi::c_char,
-        b"__le\0" as *const u8 as *const std::ffi::c_char,
-        b"__concat\0" as *const u8 as *const std::ffi::c_char,
-        b"__call\0" as *const u8 as *const std::ffi::c_char,
-        b"__close\0" as *const u8 as *const std::ffi::c_char,
+        c"__index".as_ptr(),
+        c"__newindex".as_ptr(),
+        c"__gc".as_ptr(),
+        c"__mode".as_ptr(),
+        c"__len".as_ptr(),
+        c"__eq".as_ptr(),
+        c"__add".as_ptr(),
+        c"__sub".as_ptr(),
+        c"__mul".as_ptr(),
+        c"__mod".as_ptr(),
+        c"__pow".as_ptr(),
+        c"__div".as_ptr(),
+        c"__idiv".as_ptr(),
+        c"__band".as_ptr(),
+        c"__bor".as_ptr(),
+        c"__bxor".as_ptr(),
+        c"__shl".as_ptr(),
+        c"__shr".as_ptr(),
+        c"__unm".as_ptr(),
+        c"__bnot".as_ptr(),
+        c"__lt".as_ptr(),
+        c"__le".as_ptr(),
+        c"__concat".as_ptr(),
+        c"__call".as_ptr(),
+        c"__close".as_ptr(),
     ];
     let mut i: i32 = 0;
     i = 0;
@@ -12951,10 +12752,7 @@ pub unsafe extern "C-unwind" fn luaT_objtypename(
         mt = (*(&mut (*((*o).value_.gc as *mut GCUnion)).u as *mut Udata)).metatable;
         !mt.is_null()
     } {
-        let mut name: *const TValue = luaH_getshortstr(
-            mt,
-            luaS_new(L, b"__name\0" as *const u8 as *const std::ffi::c_char),
-        );
+        let mut name: *const TValue = luaH_getshortstr(mt, luaS_new(L, c"__name".as_ptr()));
         if (*name).tt_ as i32 & 0xf as i32 == 4 as i32 {
             return ((*&mut (*((*name).value_.gc as *mut GCUnion)).ts).contents).as_mut_ptr();
         }
@@ -13142,21 +12940,11 @@ pub unsafe extern "C-unwind" fn luaT_trybinTM(
                 {
                     luaG_tointerror(L, p1, p2);
                 } else {
-                    luaG_opinterror(
-                        L,
-                        p1,
-                        p2,
-                        b"perform bitwise operation on\0" as *const u8 as *const std::ffi::c_char,
-                    );
+                    luaG_opinterror(L, p1, p2, c"perform bitwise operation on".as_ptr());
                 }
             }
             _ => {
-                luaG_opinterror(
-                    L,
-                    p1,
-                    p2,
-                    b"perform arithmetic on\0" as *const u8 as *const std::ffi::c_char,
-                );
+                luaG_opinterror(L, p1, p2, c"perform arithmetic on".as_ptr());
             }
         }
     }
@@ -13504,7 +13292,7 @@ pub unsafe extern "C-unwind" fn luaS_init(mut L: *mut lua_State) {
     (*tb).size = 128 as i32;
     (*g).memerrmsg = luaS_newlstr(
         L,
-        b"not enough memory\0" as *const u8 as *const std::ffi::c_char,
+        c"not enough memory".as_ptr(),
         (::core::mem::size_of::<[std::ffi::c_char; 18]>() as usize)
             .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
             .wrapping_sub(1 as i32 as usize),
@@ -14037,10 +13825,7 @@ unsafe extern "C-unwind" fn findindex(
         if (((*n).tt_ as i32 == 0 | (2 as i32) << 4 as i32) as i32 != 0) as i32 as std::ffi::c_long
             != 0
         {
-            luaG_runerror(
-                L,
-                b"invalid key to 'next'\0" as *const u8 as *const std::ffi::c_char,
-            );
+            luaG_runerror(L, c"invalid key to 'next'".as_ptr());
         }
         i = (n as *mut Node).offset_from(&mut *((*t).node).offset(0 as isize) as *mut Node)
             as std::ffi::c_long as i32 as u32;
@@ -14257,10 +14042,7 @@ unsafe extern "C-unwind" fn setnodevector(mut L: *mut lua_State, mut t: *mut Tab
                     (!(0 as size_t)).wrapping_div(::core::mem::size_of::<Node>() as usize) as u32
                 })
         {
-            luaG_runerror(
-                L,
-                b"table overflow\0" as *const u8 as *const std::ffi::c_char,
-            );
+            luaG_runerror(L, c"table overflow".as_ptr());
         }
         size = ((1 as i32) << lsize) as u32;
         (*t).node = luaM_malloc_(
@@ -14490,10 +14272,7 @@ unsafe extern "C-unwind" fn luaH_newkey(
         tt_: 0,
     };
     if (((*key).tt_ as i32 & 0xf as i32 == 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-        luaG_runerror(
-            L,
-            b"table index is nil\0" as *const u8 as *const std::ffi::c_char,
-        );
+        luaG_runerror(L, c"table index is nil".as_ptr());
     } else if (*key).tt_ as i32 == 3 as i32 | (1 as i32) << 4 as i32 {
         let mut f: lua_Number = (*key).value_.n;
         let mut k: lua_Integer = 0;
@@ -14503,10 +14282,7 @@ unsafe extern "C-unwind" fn luaH_newkey(
             (*io).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
             key = &mut aux;
         } else if (!(f == f) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-            luaG_runerror(
-                L,
-                b"table index is NaN\0" as *const u8 as *const std::ffi::c_char,
-            );
+            luaG_runerror(L, c"table index is NaN".as_ptr());
         }
     }
     if (*value).tt_ as i32 & 0xf as i32 == 0 {
@@ -14985,7 +14761,7 @@ unsafe extern "C-unwind" fn forlimit(
             luaV_tonumber_(lim, &mut flim)
         } == 0
         {
-            luaG_forerror(L, lim, b"limit\0" as *const u8 as *const std::ffi::c_char);
+            luaG_forerror(L, lim, c"limit".as_ptr());
         }
         if (0 as lua_Number) < flim {
             if step < 0 as lua_Integer {
@@ -15016,10 +14792,7 @@ unsafe extern "C-unwind" fn forprep(mut L: *mut lua_State, mut ra: StkId) -> i32
         let mut step: lua_Integer = (*pstep).value_.i;
         let mut limit: lua_Integer = 0;
         if step == 0 as lua_Integer {
-            luaG_runerror(
-                L,
-                b"'for' step is zero\0" as *const u8 as *const std::ffi::c_char,
-            );
+            luaG_runerror(L, c"'for' step is zero".as_ptr());
         }
         let mut io: *mut TValue = &mut (*ra.offset(3 as i32 as isize)).val;
         (*io).value_.i = init;
@@ -15056,11 +14829,7 @@ unsafe extern "C-unwind" fn forprep(mut L: *mut lua_State, mut ra: StkId) -> i32
             != 0) as i32 as std::ffi::c_long
             != 0
         {
-            luaG_forerror(
-                L,
-                plimit,
-                b"limit\0" as *const u8 as *const std::ffi::c_char,
-            );
+            luaG_forerror(L, plimit, c"limit".as_ptr());
         }
         if (((if (*pstep).tt_ as i32 == 3 as i32 | (1 as i32) << 4 as i32 {
             step_0 = (*pstep).value_.n;
@@ -15071,7 +14840,7 @@ unsafe extern "C-unwind" fn forprep(mut L: *mut lua_State, mut ra: StkId) -> i32
             != 0) as i32 as std::ffi::c_long
             != 0
         {
-            luaG_forerror(L, pstep, b"step\0" as *const u8 as *const std::ffi::c_char);
+            luaG_forerror(L, pstep, c"step".as_ptr());
         }
         if (((if (*pinit).tt_ as i32 == 3 as i32 | (1 as i32) << 4 as i32 {
             init_0 = (*pinit).value_.n;
@@ -15082,17 +14851,10 @@ unsafe extern "C-unwind" fn forprep(mut L: *mut lua_State, mut ra: StkId) -> i32
             != 0) as i32 as std::ffi::c_long
             != 0
         {
-            luaG_forerror(
-                L,
-                pinit,
-                b"initial value\0" as *const u8 as *const std::ffi::c_char,
-            );
+            luaG_forerror(L, pinit, c"initial value".as_ptr());
         }
         if step_0 == 0 as lua_Number {
-            luaG_runerror(
-                L,
-                b"'for' step is zero\0" as *const u8 as *const std::ffi::c_char,
-            );
+            luaG_runerror(L, c"'for' step is zero".as_ptr());
         }
         if if (0 as lua_Number) < step_0 {
             (limit_0 < init_0) as i32
@@ -15154,7 +14916,7 @@ pub unsafe extern "C-unwind" fn luaV_finishget(
         if slot.is_null() {
             tm = luaT_gettmbyobj(L, t, TM_INDEX);
             if (((*tm).tt_ as i32 & 0xf as i32 == 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-                luaG_typeerror(L, t, b"index\0" as *const u8 as *const std::ffi::c_char);
+                luaG_typeerror(L, t, c"index".as_ptr());
             }
         } else {
             tm = if ((*(&mut (*((*t).value_.gc as *mut GCUnion)).h as *mut Table)).metatable)
@@ -15211,10 +14973,7 @@ pub unsafe extern "C-unwind" fn luaV_finishget(
         loop_0 += 1;
         loop_0;
     }
-    luaG_runerror(
-        L,
-        b"'__index' chain too long; possible loop\0" as *const u8 as *const std::ffi::c_char,
-    );
+    luaG_runerror(L, c"'__index' chain too long; possible loop".as_ptr());
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaV_finishset(
@@ -15263,7 +15022,7 @@ pub unsafe extern "C-unwind" fn luaV_finishset(
         } else {
             tm = luaT_gettmbyobj(L, t, TM_NEWINDEX);
             if (((*tm).tt_ as i32 & 0xf as i32 == 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-                luaG_typeerror(L, t, b"index\0" as *const u8 as *const std::ffi::c_char);
+                luaG_typeerror(L, t, c"index".as_ptr());
             }
         }
         if (*tm).tt_ as i32 & 0xf as i32 == 6 as i32 {
@@ -15309,10 +15068,7 @@ pub unsafe extern "C-unwind" fn luaV_finishset(
         loop_0 += 1;
         loop_0;
     }
-    luaG_runerror(
-        L,
-        b"'__newindex' chain too long; possible loop\0" as *const u8 as *const std::ffi::c_char,
-    );
+    luaG_runerror(L, c"'__newindex' chain too long; possible loop".as_ptr());
 }
 unsafe extern "C-unwind" fn l_strcmp(mut ts1: *const TString, mut ts2: *const TString) -> i32 {
     let mut s1: *const std::ffi::c_char = ((*ts1).contents).as_ptr();
@@ -15782,10 +15538,7 @@ pub unsafe extern "C-unwind" fn luaV_concat(mut L: *mut lua_State, mut total: i3
                     != 0
                 {
                     (*L).top.p = top.offset(-(total as isize));
-                    luaG_runerror(
-                        L,
-                        b"string length overflow\0" as *const u8 as *const std::ffi::c_char,
-                    );
+                    luaG_runerror(L, c"string length overflow".as_ptr());
                 }
                 tl = tl.wrapping_add(l);
                 n += 1;
@@ -15866,11 +15619,7 @@ pub unsafe extern "C-unwind" fn luaV_objlen(
         _ => {
             tm = luaT_gettmbyobj(L, rb, TM_LEN);
             if (((*tm).tt_ as i32 & 0xf as i32 == 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-                luaG_typeerror(
-                    L,
-                    rb,
-                    b"get length of\0" as *const u8 as *const std::ffi::c_char,
-                );
+                luaG_typeerror(L, rb, c"get length of".as_ptr());
             }
         }
     }
@@ -15888,10 +15637,7 @@ pub unsafe extern "C-unwind" fn luaV_idiv(
         != 0
     {
         if n == 0 as lua_Integer {
-            luaG_runerror(
-                L,
-                b"attempt to divide by zero\0" as *const u8 as *const std::ffi::c_char,
-            );
+            luaG_runerror(L, c"attempt to divide by zero".as_ptr());
         }
         return (0 as lua_Unsigned).wrapping_sub(m as lua_Unsigned) as lua_Integer;
     } else {
@@ -15914,10 +15660,7 @@ pub unsafe extern "C-unwind" fn luaV_mod(
         != 0
     {
         if n == 0 as lua_Integer {
-            luaG_runerror(
-                L,
-                b"attempt to perform 'n%%0'\0" as *const u8 as *const std::ffi::c_char,
-            );
+            luaG_runerror(L, c"attempt to perform 'n%%0'".as_ptr());
         }
         return 0 as lua_Integer;
     } else {
@@ -20280,7 +20023,7 @@ pub unsafe extern "C-unwind" fn lua_pushlstring(
 ) -> *const std::ffi::c_char {
     let mut ts: *mut TString = 0 as *mut TString;
     ts = if len == 0 as size_t {
-        luaS_new(L, b"\0" as *const u8 as *const std::ffi::c_char)
+        luaS_new(L, c"".as_ptr())
     } else {
         luaS_newlstr(L, s, len)
     };
@@ -21310,7 +21053,7 @@ pub unsafe extern "C-unwind" fn lua_load(
     };
     let mut status: i32 = 0;
     if chunkname.is_null() {
-        chunkname = b"?\0" as *const u8 as *const std::ffi::c_char;
+        chunkname = c"?".as_ptr();
     }
     luaZ_init(L, &mut z, reader, data);
     status = luaD_protectedparser(L, &mut z, chunkname, mode);
@@ -21531,11 +21274,7 @@ pub unsafe extern "C-unwind" fn lua_concat(mut L: *mut lua_State, mut n: i32) {
         luaV_concat(L, n);
     } else {
         let mut io: *mut TValue = &mut (*(*L).top.p).val;
-        let mut x_: *mut TString = luaS_newlstr(
-            L,
-            b"\0" as *const u8 as *const std::ffi::c_char,
-            0 as size_t,
-        );
+        let mut x_: *mut TString = luaS_newlstr(L, c"".as_ptr(), 0 as size_t);
         (*io).value_.gc = &mut (*(x_ as *mut GCUnion)).gc;
         (*io).tt_ = ((*x_).tt as i32 | (1 as i32) << 6 as i32) as lu_byte;
         if (*io).tt_ as i32 & (1 as i32) << 6 as i32 == 0
@@ -21654,7 +21393,7 @@ unsafe extern "C-unwind" fn aux_upvalue(
             if !owner.is_null() {
                 *owner = &mut (*(f as *mut GCUnion)).gc;
             }
-            return b"\0" as *const u8 as *const std::ffi::c_char;
+            return c"".as_ptr();
         }
         6 => {
             let mut f_0: *mut LClosure = &mut (*((*fi).value_.gc as *mut GCUnion)).cl.l;
@@ -21673,7 +21412,7 @@ unsafe extern "C-unwind" fn aux_upvalue(
             }
             name = (*((*p).upvalues).offset((n - 1 as i32) as isize)).name;
             return if name.is_null() {
-                b"(no name)\0" as *const u8 as *const std::ffi::c_char
+                c"(no name)".as_ptr()
             } else {
                 ((*name).contents).as_mut_ptr() as *const std::ffi::c_char
             };
@@ -21842,7 +21581,7 @@ unsafe extern "C-unwind" fn findfield(
                 lua_settop(L, -(1 as i32) - 1 as i32);
                 return 1 as i32;
             } else if findfield(L, objidx, level - 1 as i32) != 0 {
-                lua_pushstring(L, b".\0" as *const u8 as *const std::ffi::c_char);
+                lua_pushstring(L, c".".as_ptr());
                 lua_copy(L, -(1 as i32), -(3 as i32));
                 lua_settop(L, -(1 as i32) - 1 as i32);
                 lua_concat(L, 3 as i32);
@@ -21858,25 +21597,12 @@ unsafe extern "C-unwind" fn pushglobalfuncname(
     mut ar: *mut lua_Debug,
 ) -> i32 {
     let mut top: i32 = lua_gettop(L);
-    lua_getinfo(L, b"f\0" as *const u8 as *const std::ffi::c_char, ar);
-    lua_getfield(
-        L,
-        -(1000000) - 1000,
-        b"_LOADED\0" as *const u8 as *const std::ffi::c_char,
-    );
-    luaL_checkstack(
-        L,
-        6 as i32,
-        b"not enough stack\0" as *const u8 as *const std::ffi::c_char,
-    );
+    lua_getinfo(L, c"f".as_ptr(), ar);
+    lua_getfield(L, -(1000000) - 1000, c"_LOADED".as_ptr());
+    luaL_checkstack(L, 6 as i32, c"not enough stack".as_ptr());
     if findfield(L, top + 1 as i32, 2 as i32) != 0 {
         let mut name: *const std::ffi::c_char = lua_tolstring(L, -(1 as i32), 0 as *mut size_t);
-        if strncmp(
-            name,
-            b"_G.\0" as *const u8 as *const std::ffi::c_char,
-            3 as i32 as usize,
-        ) == 0
-        {
+        if strncmp(name, c"_G.".as_ptr(), 3 as i32 as usize) == 0 {
             lua_pushstring(L, name.offset(3 as i32 as isize));
             lua_rotate(L, -(2 as i32), -(1 as i32));
             lua_settop(L, -(1 as i32) - 1 as i32);
@@ -21893,29 +21619,24 @@ unsafe extern "C-unwind" fn pushfuncname(mut L: *mut lua_State, mut ar: *mut lua
     if pushglobalfuncname(L, ar) != 0 {
         lua_pushfstring(
             L,
-            b"function '%s'\0" as *const u8 as *const std::ffi::c_char,
+            c"function '%s'".as_ptr(),
             lua_tolstring(L, -(1 as i32), 0 as *mut size_t),
         );
         lua_rotate(L, -(2 as i32), -(1 as i32));
         lua_settop(L, -(1 as i32) - 1 as i32);
     } else if *(*ar).namewhat as i32 != '\0' as i32 {
-        lua_pushfstring(
-            L,
-            b"%s '%s'\0" as *const u8 as *const std::ffi::c_char,
-            (*ar).namewhat,
-            (*ar).name,
-        );
+        lua_pushfstring(L, c"%s '%s'".as_ptr(), (*ar).namewhat, (*ar).name);
     } else if *(*ar).what as i32 == 'm' as i32 {
-        lua_pushstring(L, b"main chunk\0" as *const u8 as *const std::ffi::c_char);
+        lua_pushstring(L, c"main chunk".as_ptr());
     } else if *(*ar).what as i32 != 'C' as i32 {
         lua_pushfstring(
             L,
-            b"function <%s:%d>\0" as *const u8 as *const std::ffi::c_char,
+            c"function <%s:%d>".as_ptr(),
             ((*ar).short_src).as_mut_ptr(),
             (*ar).linedefined,
         );
     } else {
-        lua_pushstring(L, b"?\0" as *const u8 as *const std::ffi::c_char);
+        lua_pushstring(L, c"?".as_ptr());
     };
 }
 unsafe extern "C-unwind" fn lastlevel(mut L: *mut lua_State) -> i32 {
@@ -22001,10 +21722,7 @@ pub unsafe extern "C-unwind" fn luaL_traceback(
         b.n = (b.n).wrapping_add(1);
         *(b.b).offset(fresh145 as isize) = '\n' as i32 as std::ffi::c_char;
     }
-    luaL_addstring(
-        &mut b,
-        b"stack traceback:\0" as *const u8 as *const std::ffi::c_char,
-    );
+    luaL_addstring(&mut b, c"stack traceback:".as_ptr());
     loop {
         let fresh146 = level;
         level = level + 1;
@@ -22015,29 +21733,17 @@ pub unsafe extern "C-unwind" fn luaL_traceback(
         limit2show = limit2show - 1;
         if fresh147 == 0 {
             let mut n: i32 = last - level - 11 as i32 + 1 as i32;
-            lua_pushfstring(
-                L,
-                b"\n\t...\t(skipping %d levels)\0" as *const u8 as *const std::ffi::c_char,
-                n,
-            );
+            lua_pushfstring(L, c"\n\t...\t(skipping %d levels)".as_ptr(), n);
             luaL_addvalue(&mut b);
             level += n;
         } else {
-            lua_getinfo(
-                L1,
-                b"Slnt\0" as *const u8 as *const std::ffi::c_char,
-                &mut ar,
-            );
+            lua_getinfo(L1, c"Slnt".as_ptr(), &mut ar);
             if ar.currentline <= 0 {
-                lua_pushfstring(
-                    L,
-                    b"\n\t%s: in \0" as *const u8 as *const std::ffi::c_char,
-                    (ar.short_src).as_mut_ptr(),
-                );
+                lua_pushfstring(L, c"\n\t%s: in ".as_ptr(), (ar.short_src).as_mut_ptr());
             } else {
                 lua_pushfstring(
                     L,
-                    b"\n\t%s:%d: in \0" as *const u8 as *const std::ffi::c_char,
+                    c"\n\t%s:%d: in ".as_ptr(),
                     (ar.short_src).as_mut_ptr(),
                     ar.currentline,
                 );
@@ -22046,10 +21752,7 @@ pub unsafe extern "C-unwind" fn luaL_traceback(
             pushfuncname(L, &mut ar);
             luaL_addvalue(&mut b);
             if ar.istailcall != 0 {
-                luaL_addstring(
-                    &mut b,
-                    b"\n\t(...tail calls...)\0" as *const u8 as *const std::ffi::c_char,
-                );
+                luaL_addstring(&mut b, c"\n\t(...tail calls...)".as_ptr());
             }
         }
     }
@@ -22081,25 +21784,16 @@ pub unsafe extern "C-unwind" fn luaL_argerror(
         i_ci: 0 as *mut CallInfo,
     };
     if lua_getstack(L, 0, &mut ar) == 0 {
-        return luaL_error(
-            L,
-            b"bad argument #%d (%s)\0" as *const u8 as *const std::ffi::c_char,
-            arg,
-            extramsg,
-        );
+        return luaL_error(L, c"bad argument #%d (%s)".as_ptr(), arg, extramsg);
     }
-    lua_getinfo(L, b"n\0" as *const u8 as *const std::ffi::c_char, &mut ar);
-    if strcmp(
-        ar.namewhat,
-        b"method\0" as *const u8 as *const std::ffi::c_char,
-    ) == 0
-    {
+    lua_getinfo(L, c"n".as_ptr(), &mut ar);
+    if strcmp(ar.namewhat, c"method".as_ptr()) == 0 {
         arg -= 1;
         arg;
         if arg == 0 {
             return luaL_error(
                 L,
-                b"calling '%s' on bad self (%s)\0" as *const u8 as *const std::ffi::c_char,
+                c"calling '%s' on bad self (%s)".as_ptr(),
                 ar.name,
                 extramsg,
             );
@@ -22109,12 +21803,12 @@ pub unsafe extern "C-unwind" fn luaL_argerror(
         ar.name = if pushglobalfuncname(L, &mut ar) != 0 {
             lua_tolstring(L, -(1 as i32), 0 as *mut size_t)
         } else {
-            b"?\0" as *const u8 as *const std::ffi::c_char
+            c"?".as_ptr()
         };
     }
     return luaL_error(
         L,
-        b"bad argument #%d to '%s' (%s)\0" as *const u8 as *const std::ffi::c_char,
+        c"bad argument #%d to '%s' (%s)".as_ptr(),
         arg,
         ar.name,
         extramsg,
@@ -22128,19 +21822,14 @@ pub unsafe extern "C-unwind" fn luaL_typeerror(
 ) -> i32 {
     let mut msg: *const std::ffi::c_char = 0 as *const std::ffi::c_char;
     let mut typearg: *const std::ffi::c_char = 0 as *const std::ffi::c_char;
-    if luaL_getmetafield(L, arg, b"__name\0" as *const u8 as *const std::ffi::c_char) == 4 as i32 {
+    if luaL_getmetafield(L, arg, c"__name".as_ptr()) == 4 as i32 {
         typearg = lua_tolstring(L, -(1 as i32), 0 as *mut size_t);
     } else if lua_type(L, arg) == 2 as i32 {
-        typearg = b"light userdata\0" as *const u8 as *const std::ffi::c_char;
+        typearg = c"light userdata".as_ptr();
     } else {
         typearg = lua_typename(L, lua_type(L, arg));
     }
-    msg = lua_pushfstring(
-        L,
-        b"%s expected, got %s\0" as *const u8 as *const std::ffi::c_char,
-        tname,
-        typearg,
-    );
+    msg = lua_pushfstring(L, c"%s expected, got %s".as_ptr(), tname, typearg);
     return luaL_argerror(L, arg, msg);
 }
 unsafe extern "C-unwind" fn tag_error(mut L: *mut lua_State, mut arg: i32, mut tag: i32) {
@@ -22168,18 +21857,18 @@ pub unsafe extern "C-unwind" fn luaL_where(mut L: *mut lua_State, mut level: i32
         i_ci: 0 as *mut CallInfo,
     };
     if lua_getstack(L, level, &mut ar) != 0 {
-        lua_getinfo(L, b"Sl\0" as *const u8 as *const std::ffi::c_char, &mut ar);
+        lua_getinfo(L, c"Sl".as_ptr(), &mut ar);
         if ar.currentline > 0 {
             lua_pushfstring(
                 L,
-                b"%s:%d: \0" as *const u8 as *const std::ffi::c_char,
+                c"%s:%d: ".as_ptr(),
                 (ar.short_src).as_mut_ptr(),
                 ar.currentline,
             );
             return;
         }
     }
-    lua_pushfstring(L, b"\0" as *const u8 as *const std::ffi::c_char);
+    lua_pushfstring(L, c"".as_ptr());
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaL_error(
@@ -22210,15 +21899,10 @@ pub unsafe extern "C-unwind" fn luaL_fileresult(
         msg = if en != 0 {
             strerror(en) as *const std::ffi::c_char
         } else {
-            b"(no extra info)\0" as *const u8 as *const std::ffi::c_char
+            c"(no extra info)".as_ptr()
         };
         if !fname.is_null() {
-            lua_pushfstring(
-                L,
-                b"%s: %s\0" as *const u8 as *const std::ffi::c_char,
-                fname,
-                msg,
-            );
+            lua_pushfstring(L, c"%s: %s".as_ptr(), fname, msg);
         } else {
             lua_pushstring(L, msg);
         }
@@ -22231,12 +21915,12 @@ pub unsafe extern "C-unwind" fn luaL_execresult(mut L: *mut lua_State, mut stat:
     if stat != 0 && *__errno_location() != 0 {
         return luaL_fileresult(L, 0, 0 as *const std::ffi::c_char);
     } else {
-        let mut what: *const std::ffi::c_char = b"exit\0" as *const u8 as *const std::ffi::c_char;
+        let mut what: *const std::ffi::c_char = c"exit".as_ptr();
         if stat & 0x7f as i32 == 0 {
             stat = (stat & 0xff00) >> 8 as i32;
         } else if ((stat & 0x7f as i32) + 1 as i32) as std::ffi::c_schar as i32 >> 1 as i32 > 0 {
             stat = stat & 0x7f as i32;
-            what = b"signal\0" as *const u8 as *const std::ffi::c_char;
+            what = c"signal".as_ptr();
         }
         if *what as i32 == 'e' as i32 && stat == 0 {
             lua_pushboolean(L, 1 as i32);
@@ -22259,11 +21943,7 @@ pub unsafe extern "C-unwind" fn luaL_newmetatable(
     lua_settop(L, -(1 as i32) - 1 as i32);
     lua_createtable(L, 0, 2 as i32);
     lua_pushstring(L, tname);
-    lua_setfield(
-        L,
-        -(2 as i32),
-        b"__name\0" as *const u8 as *const std::ffi::c_char,
-    );
+    lua_setfield(L, -(2 as i32), c"__name".as_ptr());
     lua_pushvalue(L, -(1 as i32));
     lua_setfield(L, -(1000000) - 1000, tname);
     return 1 as i32;
@@ -22330,11 +22010,7 @@ pub unsafe extern "C-unwind" fn luaL_checkoption(
     return luaL_argerror(
         L,
         arg,
-        lua_pushfstring(
-            L,
-            b"invalid option '%s'\0" as *const u8 as *const std::ffi::c_char,
-            name,
-        ),
+        lua_pushfstring(L, c"invalid option '%s'".as_ptr(), name),
     );
 }
 #[unsafe(no_mangle)]
@@ -22345,16 +22021,9 @@ pub unsafe extern "C-unwind" fn luaL_checkstack(
 ) {
     if ((lua_checkstack(L, space) == 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
         if !msg.is_null() {
-            luaL_error(
-                L,
-                b"stack overflow (%s)\0" as *const u8 as *const std::ffi::c_char,
-                msg,
-            );
+            luaL_error(L, c"stack overflow (%s)".as_ptr(), msg);
         } else {
-            luaL_error(
-                L,
-                b"stack overflow\0" as *const u8 as *const std::ffi::c_char,
-            );
+            luaL_error(L, c"stack overflow".as_ptr());
         }
     }
 }
@@ -22367,11 +22036,7 @@ pub unsafe extern "C-unwind" fn luaL_checktype(mut L: *mut lua_State, mut arg: i
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaL_checkany(mut L: *mut lua_State, mut arg: i32) {
     if ((lua_type(L, arg) == -(1 as i32)) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-        luaL_argerror(
-            L,
-            arg,
-            b"value expected\0" as *const u8 as *const std::ffi::c_char,
-        );
+        luaL_argerror(L, arg, c"value expected".as_ptr());
     }
 }
 #[unsafe(no_mangle)]
@@ -22432,11 +22097,7 @@ pub unsafe extern "C-unwind" fn luaL_optnumber(
 }
 unsafe extern "C-unwind" fn interror(mut L: *mut lua_State, mut arg: i32) {
     if lua_isnumber(L, arg) != 0 {
-        luaL_argerror(
-            L,
-            arg,
-            b"number has no integer representation\0" as *const u8 as *const std::ffi::c_char,
-        );
+        luaL_argerror(L, arg, c"number has no integer representation".as_ptr());
     } else {
         tag_error(L, arg, 3 as i32);
     };
@@ -22476,10 +22137,7 @@ unsafe extern "C-unwind" fn resizebox(
     let mut temp: *mut c_void =
         allocf.expect("non-null function pointer")(ud, (*box_0).box_0, (*box_0).bsize, newsize);
     if ((temp.is_null() && newsize > 0 as size_t) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-        lua_pushstring(
-            L,
-            b"not enough memory\0" as *const u8 as *const std::ffi::c_char,
-        );
+        lua_pushstring(L, c"not enough memory".as_ptr());
         lua_error(L);
     }
     (*box_0).box_0 = temp;
@@ -22494,14 +22152,14 @@ static mut boxmt: [luaL_Reg; 3] = unsafe {
     [
         {
             let mut init = luaL_Reg {
-                name: b"__gc\0" as *const u8 as *const std::ffi::c_char,
+                name: c"__gc".as_ptr(),
                 func: Some(boxgc as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"__close\0" as *const u8 as *const std::ffi::c_char,
+                name: c"__close".as_ptr(),
                 func: Some(boxgc as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
@@ -22520,7 +22178,7 @@ unsafe extern "C-unwind" fn newbox(mut L: *mut lua_State) {
         lua_newuserdatauv(L, ::core::mem::size_of::<UBox>() as usize, 0) as *mut UBox;
     (*box_0).box_0 = 0 as *mut c_void;
     (*box_0).bsize = 0 as size_t;
-    if luaL_newmetatable(L, b"_UBOX*\0" as *const u8 as *const std::ffi::c_char) != 0 {
+    if luaL_newmetatable(L, c"_UBOX*".as_ptr()) != 0 {
         luaL_setfuncs(L, (&raw const boxmt).cast(), 0);
     }
     lua_setmetatable(L, -(2 as i32));
@@ -22528,10 +22186,7 @@ unsafe extern "C-unwind" fn newbox(mut L: *mut lua_State) {
 unsafe extern "C-unwind" fn newbuffsize(mut B: *mut luaL_Buffer, mut sz: size_t) -> size_t {
     let mut newsize: size_t = (*B).size / 2 as i32 as size_t * 3 as i32 as size_t;
     if (((!(0 as size_t)).wrapping_sub(sz) < (*B).n) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-        return luaL_error(
-            (*B).L,
-            b"buffer too large\0" as *const u8 as *const std::ffi::c_char,
-        ) as size_t;
+        return luaL_error((*B).L, c"buffer too large".as_ptr()) as size_t;
     }
     if newsize < ((*B).n).wrapping_add(sz) {
         newsize = ((*B).n).wrapping_add(sz);
@@ -22716,18 +22371,13 @@ unsafe extern "C-unwind" fn errfile(
     if err != 0 {
         lua_pushfstring(
             L,
-            b"cannot %s %s: %s\0" as *const u8 as *const std::ffi::c_char,
+            c"cannot %s %s: %s".as_ptr(),
             what,
             filename,
             strerror(err),
         );
     } else {
-        lua_pushfstring(
-            L,
-            b"cannot %s %s\0" as *const u8 as *const std::ffi::c_char,
-            what,
-            filename,
-        );
+        lua_pushfstring(L, c"cannot %s %s".as_ptr(), what, filename);
     }
     lua_rotate(L, fnameindex, -(1 as i32));
     lua_settop(L, -(1 as i32) - 1 as i32);
@@ -22773,22 +22423,14 @@ pub unsafe extern "C-unwind" fn luaL_loadfilex(
     let mut c: i32 = 0;
     let mut fnameindex: i32 = lua_gettop(L) + 1 as i32;
     if filename.is_null() {
-        lua_pushstring(L, b"=stdin\0" as *const u8 as *const std::ffi::c_char);
+        lua_pushstring(L, c"=stdin".as_ptr());
         lf.f = stdin;
     } else {
-        lua_pushfstring(
-            L,
-            b"@%s\0" as *const u8 as *const std::ffi::c_char,
-            filename,
-        );
+        lua_pushfstring(L, c"@%s".as_ptr(), filename);
         *__errno_location() = 0;
-        lf.f = fopen(filename, b"r\0" as *const u8 as *const std::ffi::c_char);
+        lf.f = fopen(filename, c"r".as_ptr());
         if (lf.f).is_null() {
-            return errfile(
-                L,
-                b"open\0" as *const u8 as *const std::ffi::c_char,
-                fnameindex,
-            );
+            return errfile(L, c"open".as_ptr(), fnameindex);
         }
     }
     lf.n = 0;
@@ -22803,17 +22445,9 @@ pub unsafe extern "C-unwind" fn luaL_loadfilex(
         lf.n = 0;
         if !filename.is_null() {
             *__errno_location() = 0;
-            lf.f = freopen(
-                filename,
-                b"rb\0" as *const u8 as *const std::ffi::c_char,
-                lf.f,
-            );
+            lf.f = freopen(filename, c"rb".as_ptr(), lf.f);
             if (lf.f).is_null() {
-                return errfile(
-                    L,
-                    b"reopen\0" as *const u8 as *const std::ffi::c_char,
-                    fnameindex,
-                );
+                return errfile(L, c"reopen".as_ptr(), fnameindex);
             }
             skipcomment(lf.f, &mut c);
         }
@@ -22843,11 +22477,7 @@ pub unsafe extern "C-unwind" fn luaL_loadfilex(
     }
     if readstatus != 0 {
         lua_settop(L, fnameindex);
-        return errfile(
-            L,
-            b"read\0" as *const u8 as *const std::ffi::c_char,
-            fnameindex,
-        );
+        return errfile(L, c"read".as_ptr(), fnameindex);
     }
     lua_rotate(L, fnameindex, -(1 as i32));
     lua_settop(L, -(1 as i32) - 1 as i32);
@@ -22943,10 +22573,7 @@ pub unsafe extern "C-unwind" fn luaL_len(mut L: *mut lua_State, mut idx: i32) ->
     lua_len(L, idx);
     l = lua_tointegerx(L, -(1 as i32), &mut isnum);
     if ((isnum == 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-        luaL_error(
-            L,
-            b"object length is not an integer\0" as *const u8 as *const std::ffi::c_char,
-        );
+        luaL_error(L, c"object length is not an integer".as_ptr());
     }
     lua_settop(L, -(1 as i32) - 1 as i32);
     return l;
@@ -22958,33 +22585,17 @@ pub unsafe extern "C-unwind" fn luaL_tolstring(
     mut len: *mut size_t,
 ) -> *const std::ffi::c_char {
     idx = lua_absindex(L, idx);
-    if luaL_callmeta(
-        L,
-        idx,
-        b"__tostring\0" as *const u8 as *const std::ffi::c_char,
-    ) != 0
-    {
+    if luaL_callmeta(L, idx, c"__tostring".as_ptr()) != 0 {
         if lua_isstring(L, -(1 as i32)) == 0 {
-            luaL_error(
-                L,
-                b"'__tostring' must return a string\0" as *const u8 as *const std::ffi::c_char,
-            );
+            luaL_error(L, c"'__tostring' must return a string".as_ptr());
         }
     } else {
         match lua_type(L, idx) {
             3 => {
                 if lua_isinteger(L, idx) != 0 {
-                    lua_pushfstring(
-                        L,
-                        b"%I\0" as *const u8 as *const std::ffi::c_char,
-                        lua_tointegerx(L, idx, 0 as *mut i32),
-                    );
+                    lua_pushfstring(L, c"%I".as_ptr(), lua_tointegerx(L, idx, 0 as *mut i32));
                 } else {
-                    lua_pushfstring(
-                        L,
-                        b"%f\0" as *const u8 as *const std::ffi::c_char,
-                        lua_tonumberx(L, idx, 0 as *mut i32),
-                    );
+                    lua_pushfstring(L, c"%f".as_ptr(), lua_tonumberx(L, idx, 0 as *mut i32));
                 }
             }
             4 => {
@@ -22994,29 +22605,23 @@ pub unsafe extern "C-unwind" fn luaL_tolstring(
                 lua_pushstring(
                     L,
                     if lua_toboolean(L, idx) != 0 {
-                        b"true\0" as *const u8 as *const std::ffi::c_char
+                        c"true".as_ptr()
                     } else {
-                        b"false\0" as *const u8 as *const std::ffi::c_char
+                        c"false".as_ptr()
                     },
                 );
             }
             0 => {
-                lua_pushstring(L, b"nil\0" as *const u8 as *const std::ffi::c_char);
+                lua_pushstring(L, c"nil".as_ptr());
             }
             _ => {
-                let mut tt: i32 =
-                    luaL_getmetafield(L, idx, b"__name\0" as *const u8 as *const std::ffi::c_char);
+                let mut tt: i32 = luaL_getmetafield(L, idx, c"__name".as_ptr());
                 let mut kind: *const std::ffi::c_char = if tt == 4 as i32 {
                     lua_tolstring(L, -(1 as i32), 0 as *mut size_t)
                 } else {
                     lua_typename(L, lua_type(L, idx))
                 };
-                lua_pushfstring(
-                    L,
-                    b"%s: %p\0" as *const u8 as *const std::ffi::c_char,
-                    kind,
-                    lua_topointer(L, idx),
-                );
+                lua_pushfstring(L, c"%s: %p".as_ptr(), kind, lua_topointer(L, idx));
                 if tt != 0 {
                     lua_rotate(L, -(2 as i32), -(1 as i32));
                     lua_settop(L, -(1 as i32) - 1 as i32);
@@ -23032,11 +22637,7 @@ pub unsafe extern "C-unwind" fn luaL_setfuncs(
     mut l: *const luaL_Reg,
     mut nup: i32,
 ) {
-    luaL_checkstack(
-        L,
-        nup,
-        b"too many upvalues\0" as *const u8 as *const std::ffi::c_char,
-    );
+    luaL_checkstack(L, nup, c"too many upvalues".as_ptr());
     while !((*l).name).is_null() {
         if ((*l).func).is_none() {
             lua_pushboolean(L, 0);
@@ -23080,11 +22681,7 @@ pub unsafe extern "C-unwind" fn luaL_requiref(
     mut openf: lua_CFunction,
     mut glb: i32,
 ) {
-    luaL_getsubtable(
-        L,
-        -(1000000) - 1000,
-        b"_LOADED\0" as *const u8 as *const std::ffi::c_char,
-    );
+    luaL_getsubtable(L, -(1000000) - 1000, c"_LOADED".as_ptr());
     lua_getfield(L, -(1 as i32), modname);
     if lua_toboolean(L, -(1 as i32)) == 0 {
         lua_settop(L, -(1 as i32) - 1 as i32);
@@ -23157,12 +22754,11 @@ unsafe extern "C-unwind" fn panic(mut L: *mut lua_State) -> i32 {
     let mut msg: *const std::ffi::c_char = if lua_type(L, -(1 as i32)) == 4 as i32 {
         lua_tolstring(L, -(1 as i32), 0 as *mut size_t)
     } else {
-        b"error object is not a string\0" as *const u8 as *const std::ffi::c_char
+        c"error object is not a string".as_ptr()
     };
     fprintf(
         stderr,
-        b"PANIC: unprotected error in call to Lua API (%s)\n\0" as *const u8
-            as *const std::ffi::c_char,
+        c"PANIC: unprotected error in call to Lua API (%s)\n".as_ptr(),
         msg,
     );
     fflush(stderr);
@@ -23180,7 +22776,7 @@ unsafe extern "C-unwind" fn checkcontrol(
     } {
         return 0;
     } else {
-        if strcmp(message, b"off\0" as *const u8 as *const std::ffi::c_char) == 0 {
+        if strcmp(message, c"off".as_ptr()) == 0 {
             lua_setwarnf(
                 L,
                 Some(
@@ -23193,7 +22789,7 @@ unsafe extern "C-unwind" fn checkcontrol(
                 ),
                 L as *mut c_void,
             );
-        } else if strcmp(message, b"on\0" as *const u8 as *const std::ffi::c_char) == 0 {
+        } else if strcmp(message, c"on".as_ptr()) == 0 {
             lua_setwarnf(
                 L,
                 Some(
@@ -23223,11 +22819,7 @@ unsafe extern "C-unwind" fn warnfcont(
     mut tocont: i32,
 ) {
     let mut L: *mut lua_State = ud as *mut lua_State;
-    fprintf(
-        stderr,
-        b"%s\0" as *const u8 as *const std::ffi::c_char,
-        message,
-    );
+    fprintf(stderr, c"%s".as_ptr(), message);
     fflush(stderr);
     if tocont != 0 {
         lua_setwarnf(
@@ -23239,11 +22831,7 @@ unsafe extern "C-unwind" fn warnfcont(
             L as *mut c_void,
         );
     } else {
-        fprintf(
-            stderr,
-            b"%s\0" as *const u8 as *const std::ffi::c_char,
-            b"\n\0" as *const u8 as *const std::ffi::c_char,
-        );
+        fprintf(stderr, c"%s".as_ptr(), c"\n".as_ptr());
         fflush(stderr);
         lua_setwarnf(
             L,
@@ -23263,11 +22851,7 @@ unsafe extern "C-unwind" fn warnfon(
     if checkcontrol(ud as *mut lua_State, message, tocont) != 0 {
         return;
     }
-    fprintf(
-        stderr,
-        b"%s\0" as *const u8 as *const std::ffi::c_char,
-        b"Lua warning: \0" as *const u8 as *const std::ffi::c_char,
-    );
+    fprintf(stderr, c"%s".as_ptr(), c"Lua warning: ".as_ptr());
     fflush(stderr);
     warnfcont(ud, message, tocont);
 }
@@ -23315,14 +22899,12 @@ pub unsafe extern "C-unwind" fn luaL_checkversion_(
     {
         luaL_error(
             L,
-            b"core and library have incompatible numeric types\0" as *const u8
-                as *const std::ffi::c_char,
+            c"core and library have incompatible numeric types".as_ptr(),
         );
     } else if v != ver {
         luaL_error(
             L,
-            b"version mismatch: app. needs %f, Lua core provides %f\0" as *const u8
-                as *const std::ffi::c_char,
+            c"version mismatch: app. needs %f, Lua core provides %f".as_ptr(),
             ver,
             v,
         );
@@ -23337,7 +22919,7 @@ unsafe extern "C-unwind" fn luaB_print(mut L: *mut lua_State) -> i32 {
         let mut s: *const std::ffi::c_char = luaL_tolstring(L, i, &mut l);
         if i > 1 as i32 {
             fwrite(
-                b"\t\0" as *const u8 as *const std::ffi::c_char as *const c_void,
+                c"\t".as_ptr() as *const c_void,
                 ::core::mem::size_of::<std::ffi::c_char>() as usize,
                 1 as i32 as usize,
                 stdout,
@@ -23354,7 +22936,7 @@ unsafe extern "C-unwind" fn luaB_print(mut L: *mut lua_State) -> i32 {
         i;
     }
     fwrite(
-        b"\n\0" as *const u8 as *const std::ffi::c_char as *const c_void,
+        c"\n".as_ptr() as *const c_void,
         ::core::mem::size_of::<std::ffi::c_char>() as usize,
         1 as i32 as usize,
         stdout,
@@ -23388,10 +22970,7 @@ unsafe extern "C-unwind" fn b_str2int(
 ) -> *const std::ffi::c_char {
     let mut n: lua_Unsigned = 0 as lua_Unsigned;
     let mut neg: i32 = 0;
-    s = s.offset(strspn(
-        s,
-        b" \x0C\n\r\t\x0B\0" as *const u8 as *const std::ffi::c_char,
-    ) as isize);
+    s = s.offset(strspn(s, c" \x0C\n\r\t\x0B".as_ptr()) as isize);
     if *s as i32 == '-' as i32 {
         s = s.offset(1);
         s;
@@ -23429,10 +23008,7 @@ unsafe extern "C-unwind" fn b_str2int(
             break;
         }
     }
-    s = s.offset(strspn(
-        s,
-        b" \x0C\n\r\t\x0B\0" as *const u8 as *const std::ffi::c_char,
-    ) as isize);
+    s = s.offset(strspn(s, c" \x0C\n\r\t\x0B".as_ptr()) as isize);
     *pn = (if neg != 0 {
         (0 as u32 as lua_Unsigned).wrapping_sub(n)
     } else {
@@ -23463,11 +23039,7 @@ unsafe extern "C-unwind" fn luaB_tonumber(mut L: *mut lua_State) -> i32 {
         (((2 as i32 as lua_Integer <= base && base <= 36 as i32 as lua_Integer) as i32 != 0) as i32
             as std::ffi::c_long
             != 0
-            || luaL_argerror(
-                L,
-                2 as i32,
-                b"base out of range\0" as *const u8 as *const std::ffi::c_char,
-            ) != 0) as i32;
+            || luaL_argerror(L, 2 as i32, c"base out of range".as_ptr()) != 0) as i32;
         if b_str2int(s_0, base as i32, &mut n) == s_0.offset(l_0 as isize) {
             lua_pushinteger(L, n);
             return 1 as i32;
@@ -23492,34 +23064,19 @@ unsafe extern "C-unwind" fn luaB_getmetatable(mut L: *mut lua_State) -> i32 {
         lua_pushnil(L);
         return 1 as i32;
     }
-    luaL_getmetafield(
-        L,
-        1 as i32,
-        b"__metatable\0" as *const u8 as *const std::ffi::c_char,
-    );
+    luaL_getmetafield(L, 1 as i32, c"__metatable".as_ptr());
     return 1 as i32;
 }
 unsafe extern "C-unwind" fn luaB_setmetatable(mut L: *mut lua_State) -> i32 {
     let mut t: i32 = lua_type(L, 2 as i32);
     luaL_checktype(L, 1 as i32, 5 as i32);
     (((t == 0 || t == 5 as i32) as i32 != 0) as i32 as std::ffi::c_long != 0
-        || luaL_typeerror(
-            L,
-            2 as i32,
-            b"nil or table\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
-    if ((luaL_getmetafield(
-        L,
-        1 as i32,
-        b"__metatable\0" as *const u8 as *const std::ffi::c_char,
-    ) != 0) as i32
-        != 0) as i32 as std::ffi::c_long
+        || luaL_typeerror(L, 2 as i32, c"nil or table".as_ptr()) != 0) as i32;
+    if ((luaL_getmetafield(L, 1 as i32, c"__metatable".as_ptr()) != 0) as i32 != 0) as i32
+        as std::ffi::c_long
         != 0
     {
-        return luaL_error(
-            L,
-            b"cannot change a protected metatable\0" as *const u8 as *const std::ffi::c_char,
-        );
+        return luaL_error(L, c"cannot change a protected metatable".as_ptr());
     }
     lua_settop(L, 2 as i32);
     lua_setmetatable(L, 1 as i32);
@@ -23534,11 +23091,7 @@ unsafe extern "C-unwind" fn luaB_rawequal(mut L: *mut lua_State) -> i32 {
 unsafe extern "C-unwind" fn luaB_rawlen(mut L: *mut lua_State) -> i32 {
     let mut t: i32 = lua_type(L, 1 as i32);
     (((t == 5 as i32 || t == 4 as i32) as i32 != 0) as i32 as std::ffi::c_long != 0
-        || luaL_typeerror(
-            L,
-            1 as i32,
-            b"table or string\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_typeerror(L, 1 as i32, c"table or string".as_ptr()) != 0) as i32;
     lua_pushinteger(L, lua_rawlen(L, 1 as i32) as lua_Integer);
     return 1 as i32;
 }
@@ -23564,9 +23117,9 @@ unsafe extern "C-unwind" fn pushmode(mut L: *mut lua_State, mut oldmode: i32) ->
         lua_pushstring(
             L,
             if oldmode == 11 as i32 {
-                b"incremental\0" as *const u8 as *const std::ffi::c_char
+                c"incremental".as_ptr()
             } else {
-                b"generational\0" as *const u8 as *const std::ffi::c_char
+                c"generational".as_ptr()
             },
         );
     }
@@ -23574,27 +23127,23 @@ unsafe extern "C-unwind" fn pushmode(mut L: *mut lua_State, mut oldmode: i32) ->
 }
 unsafe extern "C-unwind" fn luaB_collectgarbage(mut L: *mut lua_State) -> i32 {
     static mut opts: [*const std::ffi::c_char; 11] = [
-        b"stop\0" as *const u8 as *const std::ffi::c_char,
-        b"restart\0" as *const u8 as *const std::ffi::c_char,
-        b"collect\0" as *const u8 as *const std::ffi::c_char,
-        b"count\0" as *const u8 as *const std::ffi::c_char,
-        b"step\0" as *const u8 as *const std::ffi::c_char,
-        b"setpause\0" as *const u8 as *const std::ffi::c_char,
-        b"setstepmul\0" as *const u8 as *const std::ffi::c_char,
-        b"isrunning\0" as *const u8 as *const std::ffi::c_char,
-        b"generational\0" as *const u8 as *const std::ffi::c_char,
-        b"incremental\0" as *const u8 as *const std::ffi::c_char,
+        c"stop".as_ptr(),
+        c"restart".as_ptr(),
+        c"collect".as_ptr(),
+        c"count".as_ptr(),
+        c"step".as_ptr(),
+        c"setpause".as_ptr(),
+        c"setstepmul".as_ptr(),
+        c"isrunning".as_ptr(),
+        c"generational".as_ptr(),
+        c"incremental".as_ptr(),
         0 as *const std::ffi::c_char,
     ];
     static mut optsnum: [i32; 10] = [
         0, 1 as i32, 2 as i32, 3 as i32, 5 as i32, 6 as i32, 7 as i32, 9 as i32, 10, 11 as i32,
     ];
-    let mut o: i32 = optsnum[luaL_checkoption(
-        L,
-        1 as i32,
-        b"collect\0" as *const u8 as *const std::ffi::c_char,
-        (&raw const opts).cast(),
-    ) as usize];
+    let mut o: i32 = optsnum
+        [luaL_checkoption(L, 1 as i32, c"collect".as_ptr(), (&raw const opts).cast()) as usize];
     match o {
         3 => {
             let mut k: i32 = lua_gc(L, o);
@@ -23655,11 +23204,7 @@ unsafe extern "C-unwind" fn luaB_collectgarbage(mut L: *mut lua_State) -> i32 {
 unsafe extern "C-unwind" fn luaB_type(mut L: *mut lua_State) -> i32 {
     let mut t: i32 = lua_type(L, 1 as i32);
     (((t != -(1 as i32)) as i32 != 0) as i32 as std::ffi::c_long != 0
-        || luaL_argerror(
-            L,
-            1 as i32,
-            b"value expected\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_argerror(L, 1 as i32, c"value expected".as_ptr()) != 0) as i32;
     lua_pushstring(L, lua_typename(L, t));
     return 1 as i32;
 }
@@ -23682,12 +23227,7 @@ unsafe extern "C-unwind" fn pairscont(
 }
 unsafe extern "C-unwind" fn luaB_pairs(mut L: *mut lua_State) -> i32 {
     luaL_checkany(L, 1 as i32);
-    if luaL_getmetafield(
-        L,
-        1 as i32,
-        b"__pairs\0" as *const u8 as *const std::ffi::c_char,
-    ) == 0
-    {
+    if luaL_getmetafield(L, 1 as i32, c"__pairs".as_ptr()) == 0 {
         lua_pushcclosure(
             L,
             Some(luaB_next as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
@@ -23767,11 +23307,7 @@ unsafe extern "C-unwind" fn generic_reader(
     mut ud: *mut c_void,
     mut size: *mut size_t,
 ) -> *const std::ffi::c_char {
-    luaL_checkstack(
-        L,
-        2 as i32,
-        b"too many nested functions\0" as *const u8 as *const std::ffi::c_char,
-    );
+    luaL_checkstack(L, 2 as i32, c"too many nested functions".as_ptr());
     lua_pushvalue(L, 1 as i32);
     lua_callk(L, 0, 1 as i32, 0 as lua_KContext, None);
     if lua_type(L, -(1 as i32)) == 0 {
@@ -23779,10 +23315,7 @@ unsafe extern "C-unwind" fn generic_reader(
         *size = 0 as size_t;
         return 0 as *const std::ffi::c_char;
     } else if ((lua_isstring(L, -(1 as i32)) == 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-        luaL_error(
-            L,
-            b"reader function must return a string\0" as *const u8 as *const std::ffi::c_char,
-        );
+        luaL_error(L, c"reader function must return a string".as_ptr());
     }
     lua_copy(L, -(1 as i32), 5 as i32);
     lua_settop(L, -(1 as i32) - 1 as i32);
@@ -23792,12 +23325,8 @@ unsafe extern "C-unwind" fn luaB_load(mut L: *mut lua_State) -> i32 {
     let mut status: i32 = 0;
     let mut l: size_t = 0;
     let mut s: *const std::ffi::c_char = lua_tolstring(L, 1 as i32, &mut l);
-    let mut mode: *const std::ffi::c_char = luaL_optlstring(
-        L,
-        3 as i32,
-        b"bt\0" as *const u8 as *const std::ffi::c_char,
-        0 as *mut size_t,
-    );
+    let mut mode: *const std::ffi::c_char =
+        luaL_optlstring(L, 3 as i32, c"bt".as_ptr(), 0 as *mut size_t);
     let mut env: i32 = if !(lua_type(L, 4 as i32) == -(1 as i32)) {
         4 as i32
     } else {
@@ -23808,12 +23337,8 @@ unsafe extern "C-unwind" fn luaB_load(mut L: *mut lua_State) -> i32 {
             luaL_optlstring(L, 2 as i32, s, 0 as *mut size_t);
         status = luaL_loadbufferx(L, s, l, chunkname, mode);
     } else {
-        let mut chunkname_0: *const std::ffi::c_char = luaL_optlstring(
-            L,
-            2 as i32,
-            b"=(load)\0" as *const u8 as *const std::ffi::c_char,
-            0 as *mut size_t,
-        );
+        let mut chunkname_0: *const std::ffi::c_char =
+            luaL_optlstring(L, 2 as i32, c"=(load)".as_ptr(), 0 as *mut size_t);
         luaL_checktype(L, 1 as i32, 6 as i32);
         lua_settop(L, 5 as i32);
         status = lua_load(
@@ -23866,10 +23391,7 @@ unsafe extern "C-unwind" fn luaB_assert(mut L: *mut lua_State) -> i32 {
         luaL_checkany(L, 1 as i32);
         lua_rotate(L, 1 as i32, -(1 as i32));
         lua_settop(L, -(1 as i32) - 1 as i32);
-        lua_pushstring(
-            L,
-            b"assertion failed!\0" as *const u8 as *const std::ffi::c_char,
-        );
+        lua_pushstring(L, c"assertion failed!".as_ptr());
         lua_settop(L, 1 as i32);
         return luaB_error(L);
     };
@@ -23889,11 +23411,7 @@ unsafe extern "C-unwind" fn luaB_select(mut L: *mut lua_State) -> i32 {
             i = n as lua_Integer;
         }
         (((1 as i32 as lua_Integer <= i) as i32 != 0) as i32 as std::ffi::c_long != 0
-            || luaL_argerror(
-                L,
-                1 as i32,
-                b"index out of range\0" as *const u8 as *const std::ffi::c_char,
-            ) != 0) as i32;
+            || luaL_argerror(L, 1 as i32, c"index out of range".as_ptr()) != 0) as i32;
         return n - i as i32;
     };
 }
@@ -23951,14 +23469,14 @@ static mut base_funcs: [luaL_Reg; 26] = unsafe {
     [
         {
             let mut init = luaL_Reg {
-                name: b"assert\0" as *const u8 as *const std::ffi::c_char,
+                name: c"assert".as_ptr(),
                 func: Some(luaB_assert as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"collectgarbage\0" as *const u8 as *const std::ffi::c_char,
+                name: c"collectgarbage".as_ptr(),
                 func: Some(
                     luaB_collectgarbage as unsafe extern "C-unwind" fn(*mut lua_State) -> i32,
                 ),
@@ -23967,161 +23485,161 @@ static mut base_funcs: [luaL_Reg; 26] = unsafe {
         },
         {
             let mut init = luaL_Reg {
-                name: b"dofile\0" as *const u8 as *const std::ffi::c_char,
+                name: c"dofile".as_ptr(),
                 func: Some(luaB_dofile as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"error\0" as *const u8 as *const std::ffi::c_char,
+                name: c"error".as_ptr(),
                 func: Some(luaB_error as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"getmetatable\0" as *const u8 as *const std::ffi::c_char,
+                name: c"getmetatable".as_ptr(),
                 func: Some(luaB_getmetatable as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"ipairs\0" as *const u8 as *const std::ffi::c_char,
+                name: c"ipairs".as_ptr(),
                 func: Some(luaB_ipairs as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"loadfile\0" as *const u8 as *const std::ffi::c_char,
+                name: c"loadfile".as_ptr(),
                 func: Some(luaB_loadfile as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"load\0" as *const u8 as *const std::ffi::c_char,
+                name: c"load".as_ptr(),
                 func: Some(luaB_load as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"next\0" as *const u8 as *const std::ffi::c_char,
+                name: c"next".as_ptr(),
                 func: Some(luaB_next as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"pairs\0" as *const u8 as *const std::ffi::c_char,
+                name: c"pairs".as_ptr(),
                 func: Some(luaB_pairs as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"pcall\0" as *const u8 as *const std::ffi::c_char,
+                name: c"pcall".as_ptr(),
                 func: Some(luaB_pcall as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"print\0" as *const u8 as *const std::ffi::c_char,
+                name: c"print".as_ptr(),
                 func: Some(luaB_print as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"warn\0" as *const u8 as *const std::ffi::c_char,
+                name: c"warn".as_ptr(),
                 func: Some(luaB_warn as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"rawequal\0" as *const u8 as *const std::ffi::c_char,
+                name: c"rawequal".as_ptr(),
                 func: Some(luaB_rawequal as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"rawlen\0" as *const u8 as *const std::ffi::c_char,
+                name: c"rawlen".as_ptr(),
                 func: Some(luaB_rawlen as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"rawget\0" as *const u8 as *const std::ffi::c_char,
+                name: c"rawget".as_ptr(),
                 func: Some(luaB_rawget as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"rawset\0" as *const u8 as *const std::ffi::c_char,
+                name: c"rawset".as_ptr(),
                 func: Some(luaB_rawset as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"select\0" as *const u8 as *const std::ffi::c_char,
+                name: c"select".as_ptr(),
                 func: Some(luaB_select as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"setmetatable\0" as *const u8 as *const std::ffi::c_char,
+                name: c"setmetatable".as_ptr(),
                 func: Some(luaB_setmetatable as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"tonumber\0" as *const u8 as *const std::ffi::c_char,
+                name: c"tonumber".as_ptr(),
                 func: Some(luaB_tonumber as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"tostring\0" as *const u8 as *const std::ffi::c_char,
+                name: c"tostring".as_ptr(),
                 func: Some(luaB_tostring as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"type\0" as *const u8 as *const std::ffi::c_char,
+                name: c"type".as_ptr(),
                 func: Some(luaB_type as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"xpcall\0" as *const u8 as *const std::ffi::c_char,
+                name: c"xpcall".as_ptr(),
                 func: Some(luaB_xpcall as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"_G\0" as *const u8 as *const std::ffi::c_char,
+                name: c"_G".as_ptr(),
                 func: None,
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"_VERSION\0" as *const u8 as *const std::ffi::c_char,
+                name: c"_VERSION".as_ptr(),
                 func: None,
             };
             init
@@ -24140,27 +23658,15 @@ pub unsafe extern "C-unwind" fn luaopen_base(mut L: *mut lua_State) -> i32 {
     lua_rawgeti(L, -(1000000) - 1000, 2 as i32 as lua_Integer);
     luaL_setfuncs(L, (&raw const base_funcs).cast(), 0);
     lua_pushvalue(L, -(1 as i32));
-    lua_setfield(
-        L,
-        -(2 as i32),
-        b"_G\0" as *const u8 as *const std::ffi::c_char,
-    );
-    lua_pushstring(L, b"Lua 5.4\0" as *const u8 as *const std::ffi::c_char);
-    lua_setfield(
-        L,
-        -(2 as i32),
-        b"_VERSION\0" as *const u8 as *const std::ffi::c_char,
-    );
+    lua_setfield(L, -(2 as i32), c"_G".as_ptr());
+    lua_pushstring(L, c"Lua 5.4".as_ptr());
+    lua_setfield(L, -(2 as i32), c"_VERSION".as_ptr());
     return 1 as i32;
 }
 unsafe extern "C-unwind" fn getco(mut L: *mut lua_State) -> *mut lua_State {
     let mut co: *mut lua_State = lua_tothread(L, 1 as i32);
     ((co != 0 as *mut lua_State) as i32 as std::ffi::c_long != 0
-        || luaL_typeerror(
-            L,
-            1 as i32,
-            b"thread\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_typeerror(L, 1 as i32, c"thread".as_ptr()) != 0) as i32;
     return co;
 }
 unsafe extern "C-unwind" fn auxresume(
@@ -24171,10 +23677,7 @@ unsafe extern "C-unwind" fn auxresume(
     let mut status: i32 = 0;
     let mut nres: i32 = 0;
     if ((lua_checkstack(co, narg) == 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-        lua_pushstring(
-            L,
-            b"too many arguments to resume\0" as *const u8 as *const std::ffi::c_char,
-        );
+        lua_pushstring(L, c"too many arguments to resume".as_ptr());
         return -(1 as i32);
     }
     lua_xmove(L, co, narg);
@@ -24182,10 +23685,7 @@ unsafe extern "C-unwind" fn auxresume(
     if ((status == 0 || status == 1 as i32) as i32 != 0) as i32 as std::ffi::c_long != 0 {
         if ((lua_checkstack(L, nres + 1 as i32) == 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
             lua_settop(co, -nres - 1 as i32);
-            lua_pushstring(
-                L,
-                b"too many results to resume\0" as *const u8 as *const std::ffi::c_char,
-            );
+            lua_pushstring(L, c"too many results to resume".as_ptr());
             return -(1 as i32);
         }
         lua_xmove(co, L, nres);
@@ -24248,10 +23748,10 @@ unsafe extern "C-unwind" fn luaB_yield(mut L: *mut lua_State) -> i32 {
     return lua_yieldk(L, lua_gettop(L), 0 as lua_KContext, None);
 }
 static mut statname: [*const std::ffi::c_char; 4] = [
-    b"running\0" as *const u8 as *const std::ffi::c_char,
-    b"dead\0" as *const u8 as *const std::ffi::c_char,
-    b"suspended\0" as *const u8 as *const std::ffi::c_char,
-    b"normal\0" as *const u8 as *const std::ffi::c_char,
+    c"running".as_ptr(),
+    c"dead".as_ptr(),
+    c"suspended".as_ptr(),
+    c"normal".as_ptr(),
 ];
 unsafe extern "C-unwind" fn auxstatus(mut L: *mut lua_State, mut co: *mut lua_State) -> i32 {
     if L == co {
@@ -24328,7 +23828,7 @@ unsafe extern "C-unwind" fn luaB_close(mut L: *mut lua_State) -> i32 {
         _ => {
             return luaL_error(
                 L,
-                b"cannot close a %s coroutine\0" as *const u8 as *const std::ffi::c_char,
+                c"cannot close a %s coroutine".as_ptr(),
                 statname[status as usize],
             );
         }
@@ -24338,56 +23838,56 @@ static mut co_funcs: [luaL_Reg; 9] = unsafe {
     [
         {
             let mut init = luaL_Reg {
-                name: b"create\0" as *const u8 as *const std::ffi::c_char,
+                name: c"create".as_ptr(),
                 func: Some(luaB_cocreate as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"resume\0" as *const u8 as *const std::ffi::c_char,
+                name: c"resume".as_ptr(),
                 func: Some(luaB_coresume as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"running\0" as *const u8 as *const std::ffi::c_char,
+                name: c"running".as_ptr(),
                 func: Some(luaB_corunning as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"status\0" as *const u8 as *const std::ffi::c_char,
+                name: c"status".as_ptr(),
                 func: Some(luaB_costatus as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"wrap\0" as *const u8 as *const std::ffi::c_char,
+                name: c"wrap".as_ptr(),
                 func: Some(luaB_cowrap as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"yield\0" as *const u8 as *const std::ffi::c_char,
+                name: c"yield".as_ptr(),
                 func: Some(luaB_yield as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"isyieldable\0" as *const u8 as *const std::ffi::c_char,
+                name: c"isyieldable".as_ptr(),
                 func: Some(luaB_yieldable as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"close\0" as *const u8 as *const std::ffi::c_char,
+                name: c"close".as_ptr(),
                 func: Some(luaB_close as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
@@ -24420,13 +23920,10 @@ pub unsafe extern "C-unwind" fn luaopen_coroutine(mut L: *mut lua_State) -> i32 
     luaL_setfuncs(L, (&raw const co_funcs).cast(), 0);
     return 1 as i32;
 }
-static mut HOOKKEY: *const std::ffi::c_char = b"_HOOKKEY\0" as *const u8 as *const std::ffi::c_char;
+static mut HOOKKEY: *const std::ffi::c_char = c"_HOOKKEY".as_ptr();
 unsafe extern "C-unwind" fn checkstack(mut L: *mut lua_State, mut L1: *mut lua_State, mut n: i32) {
     if ((L != L1 && lua_checkstack(L1, n) == 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-        luaL_error(
-            L,
-            b"stack overflow\0" as *const u8 as *const std::ffi::c_char,
-        );
+        luaL_error(L, c"stack overflow".as_ptr());
     }
 }
 unsafe extern "C-unwind" fn db_getregistry(mut L: *mut lua_State) -> i32 {
@@ -24443,11 +23940,7 @@ unsafe extern "C-unwind" fn db_getmetatable(mut L: *mut lua_State) -> i32 {
 unsafe extern "C-unwind" fn db_setmetatable(mut L: *mut lua_State) -> i32 {
     let mut t: i32 = lua_type(L, 2 as i32);
     (((t == 0 || t == 5 as i32) as i32 != 0) as i32 as std::ffi::c_long != 0
-        || luaL_typeerror(
-            L,
-            2 as i32,
-            b"nil or table\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_typeerror(L, 2 as i32, c"nil or table".as_ptr()) != 0) as i32;
     lua_settop(L, 2 as i32);
     lua_setmetatable(L, 1 as i32);
     return 1 as i32;
@@ -24539,22 +24032,14 @@ unsafe extern "C-unwind" fn db_getinfo(mut L: *mut lua_State) -> i32 {
     };
     let mut arg: i32 = 0;
     let mut L1: *mut lua_State = getthread(L, &mut arg);
-    let mut options: *const std::ffi::c_char = luaL_optlstring(
-        L,
-        arg + 2 as i32,
-        b"flnSrtu\0" as *const u8 as *const std::ffi::c_char,
-        0 as *mut size_t,
-    );
+    let mut options: *const std::ffi::c_char =
+        luaL_optlstring(L, arg + 2 as i32, c"flnSrtu".as_ptr(), 0 as *mut size_t);
     checkstack(L, L1, 3 as i32);
     (((*options.offset(0 as isize) as i32 != '>' as i32) as i32 != 0) as i32 as std::ffi::c_long
         != 0
-        || luaL_argerror(
-            L,
-            arg + 2 as i32,
-            b"invalid option '>'\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_argerror(L, arg + 2 as i32, c"invalid option '>'".as_ptr()) != 0) as i32;
     if lua_type(L, arg + 1 as i32) == 6 as i32 {
-        options = lua_pushfstring(L, b">%s\0" as *const u8 as *const std::ffi::c_char, options);
+        options = lua_pushfstring(L, c">%s".as_ptr(), options);
         lua_pushvalue(L, arg + 1 as i32);
         lua_xmove(L, L1, 1 as i32);
     } else if lua_getstack(L1, luaL_checkinteger(L, arg + 1 as i32) as i32, &mut ar) == 0 {
@@ -24562,105 +24047,41 @@ unsafe extern "C-unwind" fn db_getinfo(mut L: *mut lua_State) -> i32 {
         return 1 as i32;
     }
     if lua_getinfo(L1, options, &mut ar) == 0 {
-        return luaL_argerror(
-            L,
-            arg + 2 as i32,
-            b"invalid option\0" as *const u8 as *const std::ffi::c_char,
-        );
+        return luaL_argerror(L, arg + 2 as i32, c"invalid option".as_ptr());
     }
     lua_createtable(L, 0, 0);
     if !(strchr(options, 'S' as i32)).is_null() {
         lua_pushlstring(L, ar.source, ar.srclen);
-        lua_setfield(
-            L,
-            -(2 as i32),
-            b"source\0" as *const u8 as *const std::ffi::c_char,
-        );
-        settabss(
-            L,
-            b"short_src\0" as *const u8 as *const std::ffi::c_char,
-            (ar.short_src).as_mut_ptr(),
-        );
-        settabsi(
-            L,
-            b"linedefined\0" as *const u8 as *const std::ffi::c_char,
-            ar.linedefined,
-        );
-        settabsi(
-            L,
-            b"lastlinedefined\0" as *const u8 as *const std::ffi::c_char,
-            ar.lastlinedefined,
-        );
-        settabss(
-            L,
-            b"what\0" as *const u8 as *const std::ffi::c_char,
-            ar.what,
-        );
+        lua_setfield(L, -(2 as i32), c"source".as_ptr());
+        settabss(L, c"short_src".as_ptr(), (ar.short_src).as_mut_ptr());
+        settabsi(L, c"linedefined".as_ptr(), ar.linedefined);
+        settabsi(L, c"lastlinedefined".as_ptr(), ar.lastlinedefined);
+        settabss(L, c"what".as_ptr(), ar.what);
     }
     if !(strchr(options, 'l' as i32)).is_null() {
-        settabsi(
-            L,
-            b"currentline\0" as *const u8 as *const std::ffi::c_char,
-            ar.currentline,
-        );
+        settabsi(L, c"currentline".as_ptr(), ar.currentline);
     }
     if !(strchr(options, 'u' as i32)).is_null() {
-        settabsi(
-            L,
-            b"nups\0" as *const u8 as *const std::ffi::c_char,
-            ar.nups as i32,
-        );
-        settabsi(
-            L,
-            b"nparams\0" as *const u8 as *const std::ffi::c_char,
-            ar.nparams as i32,
-        );
-        settabsb(
-            L,
-            b"isvararg\0" as *const u8 as *const std::ffi::c_char,
-            ar.isvararg as i32,
-        );
+        settabsi(L, c"nups".as_ptr(), ar.nups as i32);
+        settabsi(L, c"nparams".as_ptr(), ar.nparams as i32);
+        settabsb(L, c"isvararg".as_ptr(), ar.isvararg as i32);
     }
     if !(strchr(options, 'n' as i32)).is_null() {
-        settabss(
-            L,
-            b"name\0" as *const u8 as *const std::ffi::c_char,
-            ar.name,
-        );
-        settabss(
-            L,
-            b"namewhat\0" as *const u8 as *const std::ffi::c_char,
-            ar.namewhat,
-        );
+        settabss(L, c"name".as_ptr(), ar.name);
+        settabss(L, c"namewhat".as_ptr(), ar.namewhat);
     }
     if !(strchr(options, 'r' as i32)).is_null() {
-        settabsi(
-            L,
-            b"ftransfer\0" as *const u8 as *const std::ffi::c_char,
-            ar.ftransfer as i32,
-        );
-        settabsi(
-            L,
-            b"ntransfer\0" as *const u8 as *const std::ffi::c_char,
-            ar.ntransfer as i32,
-        );
+        settabsi(L, c"ftransfer".as_ptr(), ar.ftransfer as i32);
+        settabsi(L, c"ntransfer".as_ptr(), ar.ntransfer as i32);
     }
     if !(strchr(options, 't' as i32)).is_null() {
-        settabsb(
-            L,
-            b"istailcall\0" as *const u8 as *const std::ffi::c_char,
-            ar.istailcall as i32,
-        );
+        settabsb(L, c"istailcall".as_ptr(), ar.istailcall as i32);
     }
     if !(strchr(options, 'L' as i32)).is_null() {
-        treatstackoption(
-            L,
-            L1,
-            b"activelines\0" as *const u8 as *const std::ffi::c_char,
-        );
+        treatstackoption(L, L1, c"activelines".as_ptr());
     }
     if !(strchr(options, 'f' as i32)).is_null() {
-        treatstackoption(L, L1, b"func\0" as *const u8 as *const std::ffi::c_char);
+        treatstackoption(L, L1, c"func".as_ptr());
     }
     return 1 as i32;
 }
@@ -24695,11 +24116,7 @@ unsafe extern "C-unwind" fn db_getlocal(mut L: *mut lua_State) -> i32 {
         let mut name: *const std::ffi::c_char = 0 as *const std::ffi::c_char;
         let mut level: i32 = luaL_checkinteger(L, arg + 1 as i32) as i32;
         if ((lua_getstack(L1, level, &mut ar) == 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-            return luaL_argerror(
-                L,
-                arg + 1 as i32,
-                b"level out of range\0" as *const u8 as *const std::ffi::c_char,
-            );
+            return luaL_argerror(L, arg + 1 as i32, c"level out of range".as_ptr());
         }
         checkstack(L, L1, 1 as i32);
         name = lua_getlocal(L1, &mut ar, nvar);
@@ -24740,11 +24157,7 @@ unsafe extern "C-unwind" fn db_setlocal(mut L: *mut lua_State) -> i32 {
     let mut level: i32 = luaL_checkinteger(L, arg + 1 as i32) as i32;
     let mut nvar: i32 = luaL_checkinteger(L, arg + 2 as i32) as i32;
     if ((lua_getstack(L1, level, &mut ar) == 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-        return luaL_argerror(
-            L,
-            arg + 1 as i32,
-            b"level out of range\0" as *const u8 as *const std::ffi::c_char,
-        );
+        return luaL_argerror(L, arg + 1 as i32, c"level out of range".as_ptr());
     }
     luaL_checkany(L, arg + 3 as i32);
     lua_settop(L, arg + 3 as i32);
@@ -24792,11 +24205,7 @@ unsafe extern "C-unwind" fn checkupval(
     id = lua_upvalueid(L, argf, nup);
     if !pnup.is_null() {
         (((id != 0 as *mut c_void) as i32 != 0) as i32 as std::ffi::c_long != 0
-            || luaL_argerror(
-                L,
-                argnup,
-                b"invalid upvalue index\0" as *const u8 as *const std::ffi::c_char,
-            ) != 0) as i32;
+            || luaL_argerror(L, argnup, c"invalid upvalue index".as_ptr()) != 0) as i32;
         *pnup = nup;
     }
     return id;
@@ -24816,27 +24225,19 @@ unsafe extern "C-unwind" fn db_upvaluejoin(mut L: *mut lua_State) -> i32 {
     checkupval(L, 1 as i32, 2 as i32, &mut n1);
     checkupval(L, 3 as i32, 4 as i32, &mut n2);
     (((lua_iscfunction(L, 1 as i32) == 0) as i32 != 0) as i32 as std::ffi::c_long != 0
-        || luaL_argerror(
-            L,
-            1 as i32,
-            b"Lua function expected\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_argerror(L, 1 as i32, c"Lua function expected".as_ptr()) != 0) as i32;
     (((lua_iscfunction(L, 3 as i32) == 0) as i32 != 0) as i32 as std::ffi::c_long != 0
-        || luaL_argerror(
-            L,
-            3 as i32,
-            b"Lua function expected\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_argerror(L, 3 as i32, c"Lua function expected".as_ptr()) != 0) as i32;
     lua_upvaluejoin(L, 1 as i32, n1, 3 as i32, n2);
     return 0;
 }
 unsafe extern "C-unwind" fn hookf(mut L: *mut lua_State, mut ar: *mut lua_Debug) {
     static mut hooknames: [*const std::ffi::c_char; 5] = [
-        b"call\0" as *const u8 as *const std::ffi::c_char,
-        b"return\0" as *const u8 as *const std::ffi::c_char,
-        b"line\0" as *const u8 as *const std::ffi::c_char,
-        b"count\0" as *const u8 as *const std::ffi::c_char,
-        b"tail call\0" as *const u8 as *const std::ffi::c_char,
+        c"call".as_ptr(),
+        c"return".as_ptr(),
+        c"line".as_ptr(),
+        c"count".as_ptr(),
+        c"tail call".as_ptr(),
     ];
     lua_getfield(L, -(1000000) - 1000, HOOKKEY);
     lua_pushthread(L);
@@ -24909,12 +24310,8 @@ unsafe extern "C-unwind" fn db_sethook(mut L: *mut lua_State) -> i32 {
         mask = makemask(smask, count);
     }
     if luaL_getsubtable(L, -(1000000) - 1000, HOOKKEY) == 0 {
-        lua_pushstring(L, b"k\0" as *const u8 as *const std::ffi::c_char);
-        lua_setfield(
-            L,
-            -(2 as i32),
-            b"__mode\0" as *const u8 as *const std::ffi::c_char,
-        );
+        lua_pushstring(L, c"k".as_ptr());
+        lua_setfield(L, -(2 as i32), c"__mode".as_ptr());
         lua_pushvalue(L, -(1 as i32));
         lua_setmetatable(L, -(2 as i32));
     }
@@ -24938,10 +24335,7 @@ unsafe extern "C-unwind" fn db_gethook(mut L: *mut lua_State) -> i32 {
     } else if hook
         != Some(hookf as unsafe extern "C-unwind" fn(*mut lua_State, *mut lua_Debug) -> ())
     {
-        lua_pushstring(
-            L,
-            b"external hook\0" as *const u8 as *const std::ffi::c_char,
-        );
+        lua_pushstring(L, c"external hook".as_ptr());
     } else {
         lua_getfield(L, -(1000000) - 1000, HOOKKEY);
         checkstack(L, L1, 1 as i32);
@@ -24958,11 +24352,7 @@ unsafe extern "C-unwind" fn db_gethook(mut L: *mut lua_State) -> i32 {
 unsafe extern "C-unwind" fn db_debug(mut L: *mut lua_State) -> i32 {
     loop {
         let mut buffer: [std::ffi::c_char; 250] = [0; 250];
-        fprintf(
-            stderr,
-            b"%s\0" as *const u8 as *const std::ffi::c_char,
-            b"lua_debug> \0" as *const u8 as *const std::ffi::c_char,
-        );
+        fprintf(stderr, c"%s".as_ptr(), c"lua_debug> ".as_ptr());
         fflush(stderr);
         if (fgets(
             buffer.as_mut_ptr(),
@@ -24970,10 +24360,7 @@ unsafe extern "C-unwind" fn db_debug(mut L: *mut lua_State) -> i32 {
             stdin,
         ))
         .is_null()
-            || strcmp(
-                buffer.as_mut_ptr(),
-                b"cont\n\0" as *const u8 as *const std::ffi::c_char,
-            ) == 0
+            || strcmp(buffer.as_mut_ptr(), c"cont\n".as_ptr()) == 0
         {
             return 0;
         }
@@ -24981,14 +24368,14 @@ unsafe extern "C-unwind" fn db_debug(mut L: *mut lua_State) -> i32 {
             L,
             buffer.as_mut_ptr(),
             strlen(buffer.as_mut_ptr()),
-            b"=(debug command)\0" as *const u8 as *const std::ffi::c_char,
+            c"=(debug command)".as_ptr(),
             0 as *const std::ffi::c_char,
         ) != 0
             || lua_pcallk(L, 0, 0, 0, 0 as lua_KContext, None) != 0
         {
             fprintf(
                 stderr,
-                b"%s\n\0" as *const u8 as *const std::ffi::c_char,
+                c"%s\n".as_ptr(),
                 luaL_tolstring(L, -(1 as i32), 0 as *mut size_t),
             );
             fflush(stderr);
@@ -25022,119 +24409,119 @@ static mut dblib: [luaL_Reg; 18] = unsafe {
     [
         {
             let mut init = luaL_Reg {
-                name: b"debug\0" as *const u8 as *const std::ffi::c_char,
+                name: c"debug".as_ptr(),
                 func: Some(db_debug as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"getuservalue\0" as *const u8 as *const std::ffi::c_char,
+                name: c"getuservalue".as_ptr(),
                 func: Some(db_getuservalue as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"gethook\0" as *const u8 as *const std::ffi::c_char,
+                name: c"gethook".as_ptr(),
                 func: Some(db_gethook as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"getinfo\0" as *const u8 as *const std::ffi::c_char,
+                name: c"getinfo".as_ptr(),
                 func: Some(db_getinfo as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"getlocal\0" as *const u8 as *const std::ffi::c_char,
+                name: c"getlocal".as_ptr(),
                 func: Some(db_getlocal as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"getregistry\0" as *const u8 as *const std::ffi::c_char,
+                name: c"getregistry".as_ptr(),
                 func: Some(db_getregistry as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"getmetatable\0" as *const u8 as *const std::ffi::c_char,
+                name: c"getmetatable".as_ptr(),
                 func: Some(db_getmetatable as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"getupvalue\0" as *const u8 as *const std::ffi::c_char,
+                name: c"getupvalue".as_ptr(),
                 func: Some(db_getupvalue as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"upvaluejoin\0" as *const u8 as *const std::ffi::c_char,
+                name: c"upvaluejoin".as_ptr(),
                 func: Some(db_upvaluejoin as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"upvalueid\0" as *const u8 as *const std::ffi::c_char,
+                name: c"upvalueid".as_ptr(),
                 func: Some(db_upvalueid as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"setuservalue\0" as *const u8 as *const std::ffi::c_char,
+                name: c"setuservalue".as_ptr(),
                 func: Some(db_setuservalue as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"sethook\0" as *const u8 as *const std::ffi::c_char,
+                name: c"sethook".as_ptr(),
                 func: Some(db_sethook as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"setlocal\0" as *const u8 as *const std::ffi::c_char,
+                name: c"setlocal".as_ptr(),
                 func: Some(db_setlocal as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"setmetatable\0" as *const u8 as *const std::ffi::c_char,
+                name: c"setmetatable".as_ptr(),
                 func: Some(db_setmetatable as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"setupvalue\0" as *const u8 as *const std::ffi::c_char,
+                name: c"setupvalue".as_ptr(),
                 func: Some(db_setupvalue as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"traceback\0" as *const u8 as *const std::ffi::c_char,
+                name: c"traceback".as_ptr(),
                 func: Some(db_traceback as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"setcstacklimit\0" as *const u8 as *const std::ffi::c_char,
+                name: c"setcstacklimit".as_ptr(),
                 func: Some(db_setcstacklimit as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
@@ -25172,68 +24559,41 @@ unsafe extern "C-unwind" fn l_checkmode(mut mode: *const std::ffi::c_char) -> i3
         && {
             let fresh154 = mode;
             mode = mode.offset(1);
-            !(strchr(
-                b"rwa\0" as *const u8 as *const std::ffi::c_char,
-                *fresh154 as i32,
-            ))
-            .is_null()
+            !(strchr(c"rwa".as_ptr(), *fresh154 as i32)).is_null()
         }
         && (*mode as i32 != '+' as i32 || {
             mode = mode.offset(1);
             mode;
             1 as i32 != 0
         })
-        && strspn(mode, b"b\0" as *const u8 as *const std::ffi::c_char) == strlen(mode))
-        as i32;
+        && strspn(mode, c"b".as_ptr()) == strlen(mode)) as i32;
 }
 unsafe extern "C-unwind" fn io_type(mut L: *mut lua_State) -> i32 {
     let mut p: *mut LStream = 0 as *mut LStream;
     luaL_checkany(L, 1 as i32);
-    p = luaL_testudata(
-        L,
-        1 as i32,
-        b"FILE*\0" as *const u8 as *const std::ffi::c_char,
-    ) as *mut LStream;
+    p = luaL_testudata(L, 1 as i32, c"FILE*".as_ptr()) as *mut LStream;
     if p.is_null() {
         lua_pushnil(L);
     } else if ((*p).closef).is_none() {
-        lua_pushstring(L, b"closed file\0" as *const u8 as *const std::ffi::c_char);
+        lua_pushstring(L, c"closed file".as_ptr());
     } else {
-        lua_pushstring(L, b"file\0" as *const u8 as *const std::ffi::c_char);
+        lua_pushstring(L, c"file".as_ptr());
     }
     return 1 as i32;
 }
 unsafe extern "C-unwind" fn f_tostring(mut L: *mut lua_State) -> i32 {
-    let mut p: *mut LStream = luaL_checkudata(
-        L,
-        1 as i32,
-        b"FILE*\0" as *const u8 as *const std::ffi::c_char,
-    ) as *mut LStream;
+    let mut p: *mut LStream = luaL_checkudata(L, 1 as i32, c"FILE*".as_ptr()) as *mut LStream;
     if ((*p).closef).is_none() {
-        lua_pushstring(
-            L,
-            b"file (closed)\0" as *const u8 as *const std::ffi::c_char,
-        );
+        lua_pushstring(L, c"file (closed)".as_ptr());
     } else {
-        lua_pushfstring(
-            L,
-            b"file (%p)\0" as *const u8 as *const std::ffi::c_char,
-            (*p).f,
-        );
+        lua_pushfstring(L, c"file (%p)".as_ptr(), (*p).f);
     }
     return 1 as i32;
 }
 unsafe extern "C-unwind" fn tofile(mut L: *mut lua_State) -> *mut FILE {
-    let mut p: *mut LStream = luaL_checkudata(
-        L,
-        1 as i32,
-        b"FILE*\0" as *const u8 as *const std::ffi::c_char,
-    ) as *mut LStream;
+    let mut p: *mut LStream = luaL_checkudata(L, 1 as i32, c"FILE*".as_ptr()) as *mut LStream;
     if (((*p).closef).is_none() as i32 != 0) as i32 as std::ffi::c_long != 0 {
-        luaL_error(
-            L,
-            b"attempt to use a closed file\0" as *const u8 as *const std::ffi::c_char,
-        );
+        luaL_error(L, c"attempt to use a closed file".as_ptr());
     }
     return (*p).f;
 }
@@ -25241,15 +24601,11 @@ unsafe extern "C-unwind" fn newprefile(mut L: *mut lua_State) -> *mut LStream {
     let mut p: *mut LStream =
         lua_newuserdatauv(L, ::core::mem::size_of::<LStream>() as usize, 0) as *mut LStream;
     (*p).closef = None;
-    luaL_setmetatable(L, b"FILE*\0" as *const u8 as *const std::ffi::c_char);
+    luaL_setmetatable(L, c"FILE*".as_ptr());
     return p;
 }
 unsafe extern "C-unwind" fn aux_close(mut L: *mut lua_State) -> i32 {
-    let mut p: *mut LStream = luaL_checkudata(
-        L,
-        1 as i32,
-        b"FILE*\0" as *const u8 as *const std::ffi::c_char,
-    ) as *mut LStream;
+    let mut p: *mut LStream = luaL_checkudata(L, 1 as i32, c"FILE*".as_ptr()) as *mut LStream;
     let mut cf: lua_CFunction = (*p).closef;
     (*p).closef = None;
     return (Some(cf.expect("non-null function pointer"))).expect("non-null function pointer")(L);
@@ -25260,31 +24616,19 @@ unsafe extern "C-unwind" fn f_close(mut L: *mut lua_State) -> i32 {
 }
 unsafe extern "C-unwind" fn io_close(mut L: *mut lua_State) -> i32 {
     if lua_type(L, 1 as i32) == -(1 as i32) {
-        lua_getfield(
-            L,
-            -(1000000) - 1000,
-            b"_IO_output\0" as *const u8 as *const std::ffi::c_char,
-        );
+        lua_getfield(L, -(1000000) - 1000, c"_IO_output".as_ptr());
     }
     return f_close(L);
 }
 unsafe extern "C-unwind" fn f_gc(mut L: *mut lua_State) -> i32 {
-    let mut p: *mut LStream = luaL_checkudata(
-        L,
-        1 as i32,
-        b"FILE*\0" as *const u8 as *const std::ffi::c_char,
-    ) as *mut LStream;
+    let mut p: *mut LStream = luaL_checkudata(L, 1 as i32, c"FILE*".as_ptr()) as *mut LStream;
     if ((*p).closef).is_some() && !((*p).f).is_null() {
         aux_close(L);
     }
     return 0;
 }
 unsafe extern "C-unwind" fn io_fclose(mut L: *mut lua_State) -> i32 {
-    let mut p: *mut LStream = luaL_checkudata(
-        L,
-        1 as i32,
-        b"FILE*\0" as *const u8 as *const std::ffi::c_char,
-    ) as *mut LStream;
+    let mut p: *mut LStream = luaL_checkudata(L, 1 as i32, c"FILE*".as_ptr()) as *mut LStream;
     *__errno_location() = 0;
     return luaL_fileresult(
         L,
@@ -25308,7 +24652,7 @@ unsafe extern "C-unwind" fn opencheck(
     if (((*p).f == 0 as *mut c_void as *mut FILE) as i32 != 0) as i32 as std::ffi::c_long != 0 {
         luaL_error(
             L,
-            b"cannot open file '%s' (%s)\0" as *const u8 as *const std::ffi::c_char,
+            c"cannot open file '%s' (%s)".as_ptr(),
             fname,
             strerror(*__errno_location()),
         );
@@ -25316,20 +24660,12 @@ unsafe extern "C-unwind" fn opencheck(
 }
 unsafe extern "C-unwind" fn io_open(mut L: *mut lua_State) -> i32 {
     let mut filename: *const std::ffi::c_char = luaL_checklstring(L, 1 as i32, 0 as *mut size_t);
-    let mut mode: *const std::ffi::c_char = luaL_optlstring(
-        L,
-        2 as i32,
-        b"r\0" as *const u8 as *const std::ffi::c_char,
-        0 as *mut size_t,
-    );
+    let mut mode: *const std::ffi::c_char =
+        luaL_optlstring(L, 2 as i32, c"r".as_ptr(), 0 as *mut size_t);
     let mut p: *mut LStream = newfile(L);
     let mut md: *const std::ffi::c_char = mode;
     ((l_checkmode(md) != 0) as i32 as std::ffi::c_long != 0
-        || luaL_argerror(
-            L,
-            2 as i32,
-            b"invalid mode\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_argerror(L, 2 as i32, c"invalid mode".as_ptr()) != 0) as i32;
     *__errno_location() = 0;
     (*p).f = fopen(filename, mode);
     return if ((*p).f).is_null() {
@@ -25339,33 +24675,21 @@ unsafe extern "C-unwind" fn io_open(mut L: *mut lua_State) -> i32 {
     };
 }
 unsafe extern "C-unwind" fn io_pclose(mut L: *mut lua_State) -> i32 {
-    let mut p: *mut LStream = luaL_checkudata(
-        L,
-        1 as i32,
-        b"FILE*\0" as *const u8 as *const std::ffi::c_char,
-    ) as *mut LStream;
+    let mut p: *mut LStream = luaL_checkudata(L, 1 as i32, c"FILE*".as_ptr()) as *mut LStream;
     *__errno_location() = 0;
     return luaL_execresult(L, pclose((*p).f));
 }
 unsafe extern "C-unwind" fn io_popen(mut L: *mut lua_State) -> i32 {
     let mut filename: *const std::ffi::c_char = luaL_checklstring(L, 1 as i32, 0 as *mut size_t);
-    let mut mode: *const std::ffi::c_char = luaL_optlstring(
-        L,
-        2 as i32,
-        b"r\0" as *const u8 as *const std::ffi::c_char,
-        0 as *mut size_t,
-    );
+    let mut mode: *const std::ffi::c_char =
+        luaL_optlstring(L, 2 as i32, c"r".as_ptr(), 0 as *mut size_t);
     let mut p: *mut LStream = newprefile(L);
     ((((*mode.offset(0 as isize) as i32 == 'r' as i32
         || *mode.offset(0 as isize) as i32 == 'w' as i32)
         && *mode.offset(1 as i32 as isize) as i32 == '\0' as i32) as i32
         != 0) as i32 as std::ffi::c_long
         != 0
-        || luaL_argerror(
-            L,
-            2 as i32,
-            b"invalid mode\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_argerror(L, 2 as i32, c"invalid mode".as_ptr()) != 0) as i32;
     *__errno_location() = 0;
     fflush(0 as *mut FILE);
     (*p).f = popen(filename, mode);
@@ -25396,7 +24720,7 @@ unsafe extern "C-unwind" fn getiofile(
     if (((*p).closef).is_none() as i32 != 0) as i32 as std::ffi::c_long != 0 {
         luaL_error(
             L,
-            b"default %s file is closed\0" as *const u8 as *const std::ffi::c_char,
+            c"default %s file is closed".as_ptr(),
             findex.offset(
                 (::core::mem::size_of::<[std::ffi::c_char; 5]>() as usize)
                     .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
@@ -25425,27 +24749,15 @@ unsafe extern "C-unwind" fn g_iofile(
     return 1 as i32;
 }
 unsafe extern "C-unwind" fn io_input(mut L: *mut lua_State) -> i32 {
-    return g_iofile(
-        L,
-        b"_IO_input\0" as *const u8 as *const std::ffi::c_char,
-        b"r\0" as *const u8 as *const std::ffi::c_char,
-    );
+    return g_iofile(L, c"_IO_input".as_ptr(), c"r".as_ptr());
 }
 unsafe extern "C-unwind" fn io_output(mut L: *mut lua_State) -> i32 {
-    return g_iofile(
-        L,
-        b"_IO_output\0" as *const u8 as *const std::ffi::c_char,
-        b"w\0" as *const u8 as *const std::ffi::c_char,
-    );
+    return g_iofile(L, c"_IO_output".as_ptr(), c"w".as_ptr());
 }
 unsafe extern "C-unwind" fn aux_lines(mut L: *mut lua_State, mut toclose: i32) {
     let mut n: i32 = lua_gettop(L) - 1 as i32;
     (((n <= 250) as i32 != 0) as i32 as std::ffi::c_long != 0
-        || luaL_argerror(
-            L,
-            250 + 2 as i32,
-            b"too many arguments\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_argerror(L, 250 + 2 as i32, c"too many arguments".as_ptr()) != 0) as i32;
     lua_pushvalue(L, 1 as i32);
     lua_pushinteger(L, n as lua_Integer);
     lua_pushboolean(L, toclose);
@@ -25467,11 +24779,7 @@ unsafe extern "C-unwind" fn io_lines(mut L: *mut lua_State) -> i32 {
         lua_pushnil(L);
     }
     if lua_type(L, 1 as i32) == 0 {
-        lua_getfield(
-            L,
-            -(1000000) - 1000,
-            b"_IO_input\0" as *const u8 as *const std::ffi::c_char,
-        );
+        lua_getfield(L, -(1000000) - 1000, c"_IO_input".as_ptr());
         lua_copy(L, -(1 as i32), 1 as i32);
         lua_settop(L, -(1 as i32) - 1 as i32);
         tofile(L);
@@ -25479,7 +24787,7 @@ unsafe extern "C-unwind" fn io_lines(mut L: *mut lua_State) -> i32 {
     } else {
         let mut filename: *const std::ffi::c_char =
             luaL_checklstring(L, 1 as i32, 0 as *mut size_t);
-        opencheck(L, filename, b"r\0" as *const u8 as *const std::ffi::c_char);
+        opencheck(L, filename, c"r".as_ptr());
         lua_copy(L, -(1 as i32), 1 as i32);
         lua_settop(L, -(1 as i32) - 1 as i32);
         toclose = 1 as i32;
@@ -25554,9 +24862,9 @@ unsafe extern "C-unwind" fn read_number(mut L: *mut lua_State, mut f: *mut FILE)
             break;
         }
     }
-    test2(&mut rn, b"-+\0" as *const u8 as *const std::ffi::c_char);
-    if test2(&mut rn, b"00\0" as *const u8 as *const std::ffi::c_char) != 0 {
-        if test2(&mut rn, b"xX\0" as *const u8 as *const std::ffi::c_char) != 0 {
+    test2(&mut rn, c"-+".as_ptr());
+    if test2(&mut rn, c"00".as_ptr()) != 0 {
+        if test2(&mut rn, c"xX".as_ptr()) != 0 {
             hex = 1 as i32;
         } else {
             count = 1 as i32;
@@ -25570,13 +24878,13 @@ unsafe extern "C-unwind" fn read_number(mut L: *mut lua_State, mut f: *mut FILE)
         && test2(
             &mut rn,
             (if hex != 0 {
-                b"pP\0" as *const u8 as *const std::ffi::c_char
+                c"pP".as_ptr()
             } else {
-                b"eE\0" as *const u8 as *const std::ffi::c_char
+                c"eE".as_ptr()
             }),
         ) != 0
     {
-        test2(&mut rn, b"-+\0" as *const u8 as *const std::ffi::c_char);
+        test2(&mut rn, c"-+".as_ptr());
         readdigits(&mut rn, 0);
     }
     ungetc(rn.c, rn.f);
@@ -25594,7 +24902,7 @@ unsafe extern "C-unwind" fn read_number(mut L: *mut lua_State, mut f: *mut FILE)
 unsafe extern "C-unwind" fn test_eof(mut L: *mut lua_State, mut f: *mut FILE) -> i32 {
     let mut c: i32 = getc(f);
     ungetc(c, f);
-    lua_pushstring(L, b"\0" as *const u8 as *const std::ffi::c_char);
+    lua_pushstring(L, c"".as_ptr());
     return (c != -(1 as i32)) as i32;
 }
 unsafe extern "C-unwind" fn read_line(
@@ -25725,11 +25033,7 @@ unsafe extern "C-unwind" fn g_read(mut L: *mut lua_State, mut f: *mut FILE, mut 
         success = read_line(L, f, 1 as i32);
         n = first + 1 as i32;
     } else {
-        luaL_checkstack(
-            L,
-            nargs + 20,
-            b"too many arguments\0" as *const u8 as *const std::ffi::c_char,
-        );
+        luaL_checkstack(L, nargs + 20, c"too many arguments".as_ptr());
         success = 1 as i32;
         n = first;
         loop {
@@ -25766,11 +25070,7 @@ unsafe extern "C-unwind" fn g_read(mut L: *mut lua_State, mut f: *mut FILE, mut 
                         success = 1 as i32;
                     }
                     _ => {
-                        return luaL_argerror(
-                            L,
-                            n,
-                            b"invalid format\0" as *const u8 as *const std::ffi::c_char,
-                        );
+                        return luaL_argerror(L, n, c"invalid format".as_ptr());
                     }
                 }
             }
@@ -25788,11 +25088,7 @@ unsafe extern "C-unwind" fn g_read(mut L: *mut lua_State, mut f: *mut FILE, mut 
     return n - first;
 }
 unsafe extern "C-unwind" fn io_read(mut L: *mut lua_State) -> i32 {
-    return g_read(
-        L,
-        getiofile(L, b"_IO_input\0" as *const u8 as *const std::ffi::c_char),
-        1 as i32,
-    );
+    return g_read(L, getiofile(L, c"_IO_input".as_ptr()), 1 as i32);
 }
 unsafe extern "C-unwind" fn f_read(mut L: *mut lua_State) -> i32 {
     return g_read(L, tofile(L), 2 as i32);
@@ -25802,17 +25098,10 @@ unsafe extern "C-unwind" fn io_readline(mut L: *mut lua_State) -> i32 {
     let mut i: i32 = 0;
     let mut n: i32 = lua_tointegerx(L, -(1000000) - 1000 - 2 as i32, 0 as *mut i32) as i32;
     if ((*p).closef).is_none() {
-        return luaL_error(
-            L,
-            b"file is already closed\0" as *const u8 as *const std::ffi::c_char,
-        );
+        return luaL_error(L, c"file is already closed".as_ptr());
     }
     lua_settop(L, 1 as i32);
-    luaL_checkstack(
-        L,
-        n,
-        b"too many arguments\0" as *const u8 as *const std::ffi::c_char,
-    );
+    luaL_checkstack(L, n, c"too many arguments".as_ptr());
     i = 1 as i32;
     while i <= n {
         lua_pushvalue(L, -(1000000) - 1000 - (3 as i32 + i));
@@ -25826,7 +25115,7 @@ unsafe extern "C-unwind" fn io_readline(mut L: *mut lua_State) -> i32 {
         if n > 1 as i32 {
             return luaL_error(
                 L,
-                b"%s\0" as *const u8 as *const std::ffi::c_char,
+                c"%s".as_ptr(),
                 lua_tolstring(L, -n + 1 as i32, 0 as *mut size_t),
             );
         }
@@ -25850,17 +25139,9 @@ unsafe extern "C-unwind" fn g_write(mut L: *mut lua_State, mut f: *mut FILE, mut
         }
         if lua_type(L, arg) == 3 as i32 {
             let mut len: i32 = if lua_isinteger(L, arg) != 0 {
-                fprintf(
-                    f,
-                    b"%lld\0" as *const u8 as *const std::ffi::c_char,
-                    lua_tointegerx(L, arg, 0 as *mut i32),
-                )
+                fprintf(f, c"%lld".as_ptr(), lua_tointegerx(L, arg, 0 as *mut i32))
             } else {
-                fprintf(
-                    f,
-                    b"%.14g\0" as *const u8 as *const std::ffi::c_char,
-                    lua_tonumberx(L, arg, 0 as *mut i32),
-                )
+                fprintf(f, c"%.14g".as_ptr(), lua_tonumberx(L, arg, 0 as *mut i32))
             };
             status = (status != 0 && len > 0) as i32;
         } else {
@@ -25884,11 +25165,7 @@ unsafe extern "C-unwind" fn g_write(mut L: *mut lua_State, mut f: *mut FILE, mut
     };
 }
 unsafe extern "C-unwind" fn io_write(mut L: *mut lua_State) -> i32 {
-    return g_write(
-        L,
-        getiofile(L, b"_IO_output\0" as *const u8 as *const std::ffi::c_char),
-        1 as i32,
-    );
+    return g_write(L, getiofile(L, c"_IO_output".as_ptr()), 1 as i32);
 }
 unsafe extern "C-unwind" fn f_write(mut L: *mut lua_State) -> i32 {
     let mut f: *mut FILE = tofile(L);
@@ -25898,26 +25175,17 @@ unsafe extern "C-unwind" fn f_write(mut L: *mut lua_State) -> i32 {
 unsafe extern "C-unwind" fn f_seek(mut L: *mut lua_State) -> i32 {
     static mut mode: [i32; 3] = [0, 1 as i32, 2 as i32];
     static mut modenames: [*const std::ffi::c_char; 4] = [
-        b"set\0" as *const u8 as *const std::ffi::c_char,
-        b"cur\0" as *const u8 as *const std::ffi::c_char,
-        b"end\0" as *const u8 as *const std::ffi::c_char,
+        c"set".as_ptr(),
+        c"cur".as_ptr(),
+        c"end".as_ptr(),
         0 as *const std::ffi::c_char,
     ];
     let mut f: *mut FILE = tofile(L);
-    let mut op: i32 = luaL_checkoption(
-        L,
-        2 as i32,
-        b"cur\0" as *const u8 as *const std::ffi::c_char,
-        (&raw const modenames).cast(),
-    );
+    let mut op: i32 = luaL_checkoption(L, 2 as i32, c"cur".as_ptr(), (&raw const modenames).cast());
     let mut p3: lua_Integer = luaL_optinteger(L, 3 as i32, 0 as lua_Integer);
     let mut offset: off_t = p3 as off_t;
     (((offset as lua_Integer == p3) as i32 != 0) as i32 as std::ffi::c_long != 0
-        || luaL_argerror(
-            L,
-            3 as i32,
-            b"not an integer in proper range\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_argerror(L, 3 as i32, c"not an integer in proper range".as_ptr()) != 0) as i32;
     *__errno_location() = 0;
     op = fseeko(f, offset, mode[op as usize]);
     if (op != 0) as i32 as std::ffi::c_long != 0 {
@@ -25930,9 +25198,9 @@ unsafe extern "C-unwind" fn f_seek(mut L: *mut lua_State) -> i32 {
 unsafe extern "C-unwind" fn f_setvbuf(mut L: *mut lua_State) -> i32 {
     static mut mode: [i32; 3] = [2 as i32, 0, 1 as i32];
     static mut modenames: [*const std::ffi::c_char; 4] = [
-        b"no\0" as *const u8 as *const std::ffi::c_char,
-        b"full\0" as *const u8 as *const std::ffi::c_char,
-        b"line\0" as *const u8 as *const std::ffi::c_char,
+        c"no".as_ptr(),
+        c"full".as_ptr(),
+        c"line".as_ptr(),
         0 as *const std::ffi::c_char,
     ];
     let mut f: *mut FILE = tofile(L);
@@ -25961,7 +25229,7 @@ unsafe extern "C-unwind" fn f_setvbuf(mut L: *mut lua_State) -> i32 {
     return luaL_fileresult(L, (res == 0) as i32, 0 as *const std::ffi::c_char);
 }
 unsafe extern "C-unwind" fn io_flush(mut L: *mut lua_State) -> i32 {
-    let mut f: *mut FILE = getiofile(L, b"_IO_output\0" as *const u8 as *const std::ffi::c_char);
+    let mut f: *mut FILE = getiofile(L, c"_IO_output".as_ptr());
     *__errno_location() = 0;
     return luaL_fileresult(L, (fflush(f) == 0) as i32, 0 as *const std::ffi::c_char);
 }
@@ -25974,77 +25242,77 @@ static mut iolib: [luaL_Reg; 12] = unsafe {
     [
         {
             let mut init = luaL_Reg {
-                name: b"close\0" as *const u8 as *const std::ffi::c_char,
+                name: c"close".as_ptr(),
                 func: Some(io_close as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"flush\0" as *const u8 as *const std::ffi::c_char,
+                name: c"flush".as_ptr(),
                 func: Some(io_flush as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"input\0" as *const u8 as *const std::ffi::c_char,
+                name: c"input".as_ptr(),
                 func: Some(io_input as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"lines\0" as *const u8 as *const std::ffi::c_char,
+                name: c"lines".as_ptr(),
                 func: Some(io_lines as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"open\0" as *const u8 as *const std::ffi::c_char,
+                name: c"open".as_ptr(),
                 func: Some(io_open as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"output\0" as *const u8 as *const std::ffi::c_char,
+                name: c"output".as_ptr(),
                 func: Some(io_output as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"popen\0" as *const u8 as *const std::ffi::c_char,
+                name: c"popen".as_ptr(),
                 func: Some(io_popen as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"read\0" as *const u8 as *const std::ffi::c_char,
+                name: c"read".as_ptr(),
                 func: Some(io_read as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"tmpfile\0" as *const u8 as *const std::ffi::c_char,
+                name: c"tmpfile".as_ptr(),
                 func: Some(io_tmpfile as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"type\0" as *const u8 as *const std::ffi::c_char,
+                name: c"type".as_ptr(),
                 func: Some(io_type as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"write\0" as *const u8 as *const std::ffi::c_char,
+                name: c"write".as_ptr(),
                 func: Some(io_write as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
@@ -26062,49 +25330,49 @@ static mut meth: [luaL_Reg; 8] = unsafe {
     [
         {
             let mut init = luaL_Reg {
-                name: b"read\0" as *const u8 as *const std::ffi::c_char,
+                name: c"read".as_ptr(),
                 func: Some(f_read as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"write\0" as *const u8 as *const std::ffi::c_char,
+                name: c"write".as_ptr(),
                 func: Some(f_write as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"lines\0" as *const u8 as *const std::ffi::c_char,
+                name: c"lines".as_ptr(),
                 func: Some(f_lines as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"flush\0" as *const u8 as *const std::ffi::c_char,
+                name: c"flush".as_ptr(),
                 func: Some(f_flush as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"seek\0" as *const u8 as *const std::ffi::c_char,
+                name: c"seek".as_ptr(),
                 func: Some(f_seek as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"close\0" as *const u8 as *const std::ffi::c_char,
+                name: c"close".as_ptr(),
                 func: Some(f_close as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"setvbuf\0" as *const u8 as *const std::ffi::c_char,
+                name: c"setvbuf".as_ptr(),
                 func: Some(f_setvbuf as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
@@ -26122,28 +25390,28 @@ static mut metameth: [luaL_Reg; 5] = unsafe {
     [
         {
             let mut init = luaL_Reg {
-                name: b"__index\0" as *const u8 as *const std::ffi::c_char,
+                name: c"__index".as_ptr(),
                 func: None,
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"__gc\0" as *const u8 as *const std::ffi::c_char,
+                name: c"__gc".as_ptr(),
                 func: Some(f_gc as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"__close\0" as *const u8 as *const std::ffi::c_char,
+                name: c"__close".as_ptr(),
                 func: Some(f_gc as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"__tostring\0" as *const u8 as *const std::ffi::c_char,
+                name: c"__tostring".as_ptr(),
                 func: Some(f_tostring as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
@@ -26158,7 +25426,7 @@ static mut metameth: [luaL_Reg; 5] = unsafe {
     ]
 };
 unsafe extern "C-unwind" fn createmeta(mut L: *mut lua_State) {
-    luaL_newmetatable(L, b"FILE*\0" as *const u8 as *const std::ffi::c_char);
+    luaL_newmetatable(L, c"FILE*".as_ptr());
     luaL_setfuncs(L, (&raw const metameth).cast(), 0);
     lua_createtable(
         L,
@@ -26168,25 +25436,14 @@ unsafe extern "C-unwind" fn createmeta(mut L: *mut lua_State) {
             .wrapping_sub(1 as i32 as usize) as i32,
     );
     luaL_setfuncs(L, (&raw const meth).cast(), 0);
-    lua_setfield(
-        L,
-        -(2 as i32),
-        b"__index\0" as *const u8 as *const std::ffi::c_char,
-    );
+    lua_setfield(L, -(2 as i32), c"__index".as_ptr());
     lua_settop(L, -(1 as i32) - 1 as i32);
 }
 unsafe extern "C-unwind" fn io_noclose(mut L: *mut lua_State) -> i32 {
-    let mut p: *mut LStream = luaL_checkudata(
-        L,
-        1 as i32,
-        b"FILE*\0" as *const u8 as *const std::ffi::c_char,
-    ) as *mut LStream;
+    let mut p: *mut LStream = luaL_checkudata(L, 1 as i32, c"FILE*".as_ptr()) as *mut LStream;
     (*p).closef = Some(io_noclose as unsafe extern "C-unwind" fn(*mut lua_State) -> i32);
     lua_pushnil(L);
-    lua_pushstring(
-        L,
-        b"cannot close standard file\0" as *const u8 as *const std::ffi::c_char,
-    );
+    lua_pushstring(L, c"cannot close standard file".as_ptr());
     return 2 as i32;
 }
 unsafe extern "C-unwind" fn createstdfile(
@@ -26222,24 +25479,9 @@ pub unsafe extern "C-unwind" fn luaopen_io(mut L: *mut lua_State) -> i32 {
     );
     luaL_setfuncs(L, (&raw const iolib).cast(), 0);
     createmeta(L);
-    createstdfile(
-        L,
-        stdin,
-        b"_IO_input\0" as *const u8 as *const std::ffi::c_char,
-        b"stdin\0" as *const u8 as *const std::ffi::c_char,
-    );
-    createstdfile(
-        L,
-        stdout,
-        b"_IO_output\0" as *const u8 as *const std::ffi::c_char,
-        b"stdout\0" as *const u8 as *const std::ffi::c_char,
-    );
-    createstdfile(
-        L,
-        stderr,
-        0 as *const std::ffi::c_char,
-        b"stderr\0" as *const u8 as *const std::ffi::c_char,
-    );
+    createstdfile(L, stdin, c"_IO_input".as_ptr(), c"stdin".as_ptr());
+    createstdfile(L, stdout, c"_IO_output".as_ptr(), c"stdout".as_ptr());
+    createstdfile(L, stderr, 0 as *const std::ffi::c_char, c"stderr".as_ptr());
     return 1 as i32;
 }
 unsafe extern "C-unwind" fn math_abs(mut L: *mut lua_State) -> i32 {
@@ -26330,11 +25572,7 @@ unsafe extern "C-unwind" fn math_fmod(mut L: *mut lua_State) -> i32 {
         let mut d: lua_Integer = lua_tointegerx(L, 2 as i32, 0 as *mut i32);
         if (d as lua_Unsigned).wrapping_add(1 as u32 as lua_Unsigned) <= 1 as u32 as lua_Unsigned {
             (((d != 0 as lua_Integer) as i32 != 0) as i32 as std::ffi::c_long != 0
-                || luaL_argerror(
-                    L,
-                    2 as i32,
-                    b"zero\0" as *const u8 as *const std::ffi::c_char,
-                ) != 0) as i32;
+                || luaL_argerror(L, 2 as i32, c"zero".as_ptr()) != 0) as i32;
             lua_pushinteger(L, 0 as lua_Integer);
         } else {
             lua_pushinteger(L, lua_tointegerx(L, 1 as i32, 0 as *mut i32) % d);
@@ -26414,11 +25652,7 @@ unsafe extern "C-unwind" fn math_min(mut L: *mut lua_State) -> i32 {
     let mut imin: i32 = 1 as i32;
     let mut i: i32 = 0;
     (((n >= 1 as i32) as i32 != 0) as i32 as std::ffi::c_long != 0
-        || luaL_argerror(
-            L,
-            1 as i32,
-            b"value expected\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_argerror(L, 1 as i32, c"value expected".as_ptr()) != 0) as i32;
     i = 2 as i32;
     while i <= n {
         if lua_compare(L, i, imin, 1 as i32) != 0 {
@@ -26435,11 +25669,7 @@ unsafe extern "C-unwind" fn math_max(mut L: *mut lua_State) -> i32 {
     let mut imax: i32 = 1 as i32;
     let mut i: i32 = 0;
     (((n >= 1 as i32) as i32 != 0) as i32 as std::ffi::c_long != 0
-        || luaL_argerror(
-            L,
-            1 as i32,
-            b"value expected\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_argerror(L, 1 as i32, c"value expected".as_ptr()) != 0) as i32;
     i = 2 as i32;
     while i <= n {
         if lua_compare(L, imax, i, 1 as i32) != 0 {
@@ -26456,9 +25686,9 @@ unsafe extern "C-unwind" fn math_type(mut L: *mut lua_State) -> i32 {
         lua_pushstring(
             L,
             if lua_isinteger(L, 1 as i32) != 0 {
-                b"integer\0" as *const u8 as *const std::ffi::c_char
+                c"integer".as_ptr()
             } else {
-                b"float\0" as *const u8 as *const std::ffi::c_char
+                c"float".as_ptr()
             },
         );
     } else {
@@ -26546,18 +25776,11 @@ unsafe extern "C-unwind" fn math_random(mut L: *mut lua_State) -> i32 {
             up = luaL_checkinteger(L, 2 as i32);
         }
         _ => {
-            return luaL_error(
-                L,
-                b"wrong number of arguments\0" as *const u8 as *const std::ffi::c_char,
-            );
+            return luaL_error(L, c"wrong number of arguments".as_ptr());
         }
     }
     (((low <= up) as i32 != 0) as i32 as std::ffi::c_long != 0
-        || luaL_argerror(
-            L,
-            1 as i32,
-            b"interval is empty\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_argerror(L, 1 as i32, c"interval is empty".as_ptr()) != 0) as i32;
     p = project(
         (rv & 0xffffffffffffffff as usize) as lua_Unsigned,
         (up as lua_Unsigned).wrapping_sub(low as lua_Unsigned),
@@ -26611,14 +25834,14 @@ static mut randfuncs: [luaL_Reg; 3] = unsafe {
     [
         {
             let mut init = luaL_Reg {
-                name: b"random\0" as *const u8 as *const std::ffi::c_char,
+                name: c"random".as_ptr(),
                 func: Some(math_random as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"randomseed\0" as *const u8 as *const std::ffi::c_char,
+                name: c"randomseed".as_ptr(),
                 func: Some(math_randomseed as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
@@ -26643,189 +25866,189 @@ static mut mathlib: [luaL_Reg; 28] = unsafe {
     [
         {
             let mut init = luaL_Reg {
-                name: b"abs\0" as *const u8 as *const std::ffi::c_char,
+                name: c"abs".as_ptr(),
                 func: Some(math_abs as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"acos\0" as *const u8 as *const std::ffi::c_char,
+                name: c"acos".as_ptr(),
                 func: Some(math_acos as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"asin\0" as *const u8 as *const std::ffi::c_char,
+                name: c"asin".as_ptr(),
                 func: Some(math_asin as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"atan\0" as *const u8 as *const std::ffi::c_char,
+                name: c"atan".as_ptr(),
                 func: Some(math_atan as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"ceil\0" as *const u8 as *const std::ffi::c_char,
+                name: c"ceil".as_ptr(),
                 func: Some(math_ceil as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"cos\0" as *const u8 as *const std::ffi::c_char,
+                name: c"cos".as_ptr(),
                 func: Some(math_cos as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"deg\0" as *const u8 as *const std::ffi::c_char,
+                name: c"deg".as_ptr(),
                 func: Some(math_deg as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"exp\0" as *const u8 as *const std::ffi::c_char,
+                name: c"exp".as_ptr(),
                 func: Some(math_exp as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"tointeger\0" as *const u8 as *const std::ffi::c_char,
+                name: c"tointeger".as_ptr(),
                 func: Some(math_toint as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"floor\0" as *const u8 as *const std::ffi::c_char,
+                name: c"floor".as_ptr(),
                 func: Some(math_floor as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"fmod\0" as *const u8 as *const std::ffi::c_char,
+                name: c"fmod".as_ptr(),
                 func: Some(math_fmod as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"ult\0" as *const u8 as *const std::ffi::c_char,
+                name: c"ult".as_ptr(),
                 func: Some(math_ult as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"log\0" as *const u8 as *const std::ffi::c_char,
+                name: c"log".as_ptr(),
                 func: Some(math_log as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"max\0" as *const u8 as *const std::ffi::c_char,
+                name: c"max".as_ptr(),
                 func: Some(math_max as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"min\0" as *const u8 as *const std::ffi::c_char,
+                name: c"min".as_ptr(),
                 func: Some(math_min as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"modf\0" as *const u8 as *const std::ffi::c_char,
+                name: c"modf".as_ptr(),
                 func: Some(math_modf as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"rad\0" as *const u8 as *const std::ffi::c_char,
+                name: c"rad".as_ptr(),
                 func: Some(math_rad as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"sin\0" as *const u8 as *const std::ffi::c_char,
+                name: c"sin".as_ptr(),
                 func: Some(math_sin as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"sqrt\0" as *const u8 as *const std::ffi::c_char,
+                name: c"sqrt".as_ptr(),
                 func: Some(math_sqrt as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"tan\0" as *const u8 as *const std::ffi::c_char,
+                name: c"tan".as_ptr(),
                 func: Some(math_tan as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"type\0" as *const u8 as *const std::ffi::c_char,
+                name: c"type".as_ptr(),
                 func: Some(math_type as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"random\0" as *const u8 as *const std::ffi::c_char,
+                name: c"random".as_ptr(),
                 func: None,
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"randomseed\0" as *const u8 as *const std::ffi::c_char,
+                name: c"randomseed".as_ptr(),
                 func: None,
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"pi\0" as *const u8 as *const std::ffi::c_char,
+                name: c"pi".as_ptr(),
                 func: None,
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"huge\0" as *const u8 as *const std::ffi::c_char,
+                name: c"huge".as_ptr(),
                 func: None,
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"maxinteger\0" as *const u8 as *const std::ffi::c_char,
+                name: c"maxinteger".as_ptr(),
                 func: None,
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"mininteger\0" as *const u8 as *const std::ffi::c_char,
+                name: c"mininteger".as_ptr(),
                 func: None,
             };
             init
@@ -26857,36 +26080,20 @@ pub unsafe extern "C-unwind" fn luaopen_math(mut L: *mut lua_State) -> i32 {
     );
     luaL_setfuncs(L, (&raw const mathlib).cast(), 0);
     lua_pushnumber(L, 3.141592653589793238462643383279502884f64);
-    lua_setfield(
-        L,
-        -(2 as i32),
-        b"pi\0" as *const u8 as *const std::ffi::c_char,
-    );
+    lua_setfield(L, -(2 as i32), c"pi".as_ptr());
     lua_pushnumber(L, ::core::f64::INFINITY);
-    lua_setfield(
-        L,
-        -(2 as i32),
-        b"huge\0" as *const u8 as *const std::ffi::c_char,
-    );
+    lua_setfield(L, -(2 as i32), c"huge".as_ptr());
     lua_pushinteger(L, 9223372036854775807 as std::ffi::c_longlong);
-    lua_setfield(
-        L,
-        -(2 as i32),
-        b"maxinteger\0" as *const u8 as *const std::ffi::c_char,
-    );
+    lua_setfield(L, -(2 as i32), c"maxinteger".as_ptr());
     lua_pushinteger(
         L,
         -(9223372036854775807 as std::ffi::c_longlong) - 1 as std::ffi::c_longlong,
     );
-    lua_setfield(
-        L,
-        -(2 as i32),
-        b"mininteger\0" as *const u8 as *const std::ffi::c_char,
-    );
+    lua_setfield(L, -(2 as i32), c"mininteger".as_ptr());
     setrandfunc(L);
     return 1 as i32;
 }
-static mut CLIBS: *const std::ffi::c_char = b"_CLIBS\0" as *const u8 as *const std::ffi::c_char;
+static mut CLIBS: *const std::ffi::c_char = c"_CLIBS".as_ptr();
 unsafe extern "C-unwind" fn lsys_unloadlib(mut lib: *mut c_void) {
     dlclose(lib);
 }
@@ -26915,11 +26122,7 @@ unsafe extern "C-unwind" fn lsys_sym(
 }
 unsafe extern "C-unwind" fn noenv(mut L: *mut lua_State) -> i32 {
     let mut b: i32 = 0;
-    lua_getfield(
-        L,
-        -(1000000) - 1000,
-        b"LUA_NOENV\0" as *const u8 as *const std::ffi::c_char,
-    );
+    lua_getfield(L, -(1000000) - 1000, c"LUA_NOENV".as_ptr());
     b = lua_toboolean(L, -(1 as i32));
     lua_settop(L, -(1 as i32) - 1 as i32);
     return b;
@@ -26931,12 +26134,8 @@ unsafe extern "C-unwind" fn setpath(
     mut dft: *const std::ffi::c_char,
 ) {
     let mut dftmark: *const std::ffi::c_char = 0 as *const std::ffi::c_char;
-    let mut nver: *const std::ffi::c_char = lua_pushfstring(
-        L,
-        b"%s%s\0" as *const u8 as *const std::ffi::c_char,
-        envname,
-        b"_5_4\0" as *const u8 as *const std::ffi::c_char,
-    );
+    let mut nver: *const std::ffi::c_char =
+        lua_pushfstring(L, c"%s%s".as_ptr(), envname, c"_5_4".as_ptr());
     let mut path: *const std::ffi::c_char = getenv(nver);
     if path.is_null() {
         path = getenv(envname);
@@ -26944,7 +26143,7 @@ unsafe extern "C-unwind" fn setpath(
     if path.is_null() || noenv(L) != 0 {
         lua_pushstring(L, dft);
     } else {
-        dftmark = strstr(path, b";;\0" as *const u8 as *const std::ffi::c_char);
+        dftmark = strstr(path, c";;".as_ptr());
         if dftmark.is_null() {
             lua_pushstring(L, path);
         } else {
@@ -26966,16 +26165,14 @@ unsafe extern "C-unwind" fn setpath(
                 (b.n < b.size || !(luaL_prepbuffsize(&mut b, 1 as i32 as size_t)).is_null()) as i32;
                 let fresh160 = b.n;
                 b.n = (b.n).wrapping_add(1);
-                *(b.b).offset(fresh160 as isize) =
-                    *(b";\0" as *const u8 as *const std::ffi::c_char);
+                *(b.b).offset(fresh160 as isize) = *(c";".as_ptr());
             }
             luaL_addstring(&mut b, dft);
             if dftmark < path.offset(len as isize).offset(-(2 as i32 as isize)) {
                 (b.n < b.size || !(luaL_prepbuffsize(&mut b, 1 as i32 as size_t)).is_null()) as i32;
                 let fresh161 = b.n;
                 b.n = (b.n).wrapping_add(1);
-                *(b.b).offset(fresh161 as isize) =
-                    *(b";\0" as *const u8 as *const std::ffi::c_char);
+                *(b.b).offset(fresh161 as isize) = *(c";".as_ptr());
                 luaL_addlstring(
                     &mut b,
                     dftmark.offset(2 as i32 as isize),
@@ -27065,16 +26262,16 @@ unsafe extern "C-unwind" fn ll_loadlib(mut L: *mut lua_State) -> i32 {
         lua_pushstring(
             L,
             if stat == 1 as i32 {
-                b"open\0" as *const u8 as *const std::ffi::c_char
+                c"open".as_ptr()
             } else {
-                b"init\0" as *const u8 as *const std::ffi::c_char
+                c"init".as_ptr()
             },
         );
         return 3 as i32;
     };
 }
 unsafe extern "C-unwind" fn readable(mut filename: *const std::ffi::c_char) -> i32 {
-    let mut f: *mut FILE = fopen(filename, b"r\0" as *const u8 as *const std::ffi::c_char);
+    let mut f: *mut FILE = fopen(filename, c"r".as_ptr());
     if f.is_null() {
         return 0;
     }
@@ -27090,14 +26287,11 @@ unsafe extern "C-unwind" fn getnextfilename(
     if name == end {
         return 0 as *const std::ffi::c_char;
     } else if *name as i32 == '\0' as i32 {
-        *name = *(b";\0" as *const u8 as *const std::ffi::c_char);
+        *name = *(c";".as_ptr());
         name = name.offset(1);
         name;
     }
-    sep = strchr(
-        name,
-        *(b";\0" as *const u8 as *const std::ffi::c_char) as i32,
-    );
+    sep = strchr(name, *(c";".as_ptr()) as i32);
     if sep.is_null() {
         sep = end;
     }
@@ -27117,17 +26311,9 @@ unsafe extern "C-unwind" fn pusherrornotfound(
         init: C2RustUnnamed_15 { n: 0. },
     };
     luaL_buffinit(L, &mut b);
-    luaL_addstring(
-        &mut b,
-        b"no file '\0" as *const u8 as *const std::ffi::c_char,
-    );
-    luaL_addgsub(
-        &mut b,
-        path,
-        b";\0" as *const u8 as *const std::ffi::c_char,
-        b"'\n\tno file '\0" as *const u8 as *const std::ffi::c_char,
-    );
-    luaL_addstring(&mut b, b"'\0" as *const u8 as *const std::ffi::c_char);
+    luaL_addstring(&mut b, c"no file '".as_ptr());
+    luaL_addgsub(&mut b, path, c";".as_ptr(), c"'\n\tno file '".as_ptr());
+    luaL_addstring(&mut b, c"'".as_ptr());
     luaL_pushresult(&mut b);
 }
 unsafe extern "C-unwind" fn searchpath(
@@ -27151,12 +26337,7 @@ unsafe extern "C-unwind" fn searchpath(
         name = luaL_gsub(L, name, sep, dirsep);
     }
     luaL_buffinit(L, &mut buff);
-    luaL_addgsub(
-        &mut buff,
-        path,
-        b"?\0" as *const u8 as *const std::ffi::c_char,
-        name,
-    );
+    luaL_addgsub(&mut buff, path, c"?".as_ptr(), name);
     (buff.n < buff.size || !(luaL_prepbuffsize(&mut buff, 1 as i32 as size_t)).is_null()) as i32;
     let fresh162 = buff.n;
     buff.n = (buff.n).wrapping_add(1);
@@ -27183,18 +26364,8 @@ unsafe extern "C-unwind" fn ll_searchpath(mut L: *mut lua_State) -> i32 {
         L,
         luaL_checklstring(L, 1 as i32, 0 as *mut size_t),
         luaL_checklstring(L, 2 as i32, 0 as *mut size_t),
-        luaL_optlstring(
-            L,
-            3 as i32,
-            b".\0" as *const u8 as *const std::ffi::c_char,
-            0 as *mut size_t,
-        ),
-        luaL_optlstring(
-            L,
-            4 as i32,
-            b"/\0" as *const u8 as *const std::ffi::c_char,
-            0 as *mut size_t,
-        ),
+        luaL_optlstring(L, 3 as i32, c".".as_ptr(), 0 as *mut size_t),
+        luaL_optlstring(L, 4 as i32, c"/".as_ptr(), 0 as *mut size_t),
     );
     if !f.is_null() {
         return 1 as i32;
@@ -27217,19 +26388,9 @@ unsafe extern "C-unwind" fn findfile(
         as std::ffi::c_long
         != 0
     {
-        luaL_error(
-            L,
-            b"'package.%s' must be a string\0" as *const u8 as *const std::ffi::c_char,
-            pname,
-        );
+        luaL_error(L, c"'package.%s' must be a string".as_ptr(), pname);
     }
-    return searchpath(
-        L,
-        name,
-        path,
-        b".\0" as *const u8 as *const std::ffi::c_char,
-        dirsep,
-    );
+    return searchpath(L, name, path, c".".as_ptr(), dirsep);
 }
 unsafe extern "C-unwind" fn checkload(
     mut L: *mut lua_State,
@@ -27242,8 +26403,7 @@ unsafe extern "C-unwind" fn checkload(
     } else {
         return luaL_error(
             L,
-            b"error loading module '%s' from file '%s':\n\t%s\0" as *const u8
-                as *const std::ffi::c_char,
+            c"error loading module '%s' from file '%s':\n\t%s".as_ptr(),
             lua_tolstring(L, 1 as i32, 0 as *mut size_t),
             filename,
             lua_tolstring(L, -(1 as i32), 0 as *mut size_t),
@@ -27253,12 +26413,7 @@ unsafe extern "C-unwind" fn checkload(
 unsafe extern "C-unwind" fn searcher_Lua(mut L: *mut lua_State) -> i32 {
     let mut filename: *const std::ffi::c_char = 0 as *const std::ffi::c_char;
     let mut name: *const std::ffi::c_char = luaL_checklstring(L, 1 as i32, 0 as *mut size_t);
-    filename = findfile(
-        L,
-        name,
-        b"path\0" as *const u8 as *const std::ffi::c_char,
-        b"/\0" as *const u8 as *const std::ffi::c_char,
-    );
+    filename = findfile(L, name, c"path".as_ptr(), c"/".as_ptr());
     if filename.is_null() {
         return 1 as i32;
     }
@@ -27275,16 +26430,8 @@ unsafe extern "C-unwind" fn loadfunc(
 ) -> i32 {
     let mut openfunc: *const std::ffi::c_char = 0 as *const std::ffi::c_char;
     let mut mark: *const std::ffi::c_char = 0 as *const std::ffi::c_char;
-    modname = luaL_gsub(
-        L,
-        modname,
-        b".\0" as *const u8 as *const std::ffi::c_char,
-        b"_\0" as *const u8 as *const std::ffi::c_char,
-    );
-    mark = strchr(
-        modname,
-        *(b"-\0" as *const u8 as *const std::ffi::c_char) as i32,
-    );
+    modname = luaL_gsub(L, modname, c".".as_ptr(), c"_".as_ptr());
+    mark = strchr(modname, *(c"-".as_ptr()) as i32);
     if !mark.is_null() {
         let mut stat: i32 = 0;
         openfunc = lua_pushlstring(
@@ -27292,32 +26439,19 @@ unsafe extern "C-unwind" fn loadfunc(
             modname,
             mark.offset_from(modname) as std::ffi::c_long as size_t,
         );
-        openfunc = lua_pushfstring(
-            L,
-            b"luaopen_%s\0" as *const u8 as *const std::ffi::c_char,
-            openfunc,
-        );
+        openfunc = lua_pushfstring(L, c"luaopen_%s".as_ptr(), openfunc);
         stat = lookforfunc(L, filename, openfunc);
         if stat != 2 as i32 {
             return stat;
         }
         modname = mark.offset(1 as i32 as isize);
     }
-    openfunc = lua_pushfstring(
-        L,
-        b"luaopen_%s\0" as *const u8 as *const std::ffi::c_char,
-        modname,
-    );
+    openfunc = lua_pushfstring(L, c"luaopen_%s".as_ptr(), modname);
     return lookforfunc(L, filename, openfunc);
 }
 unsafe extern "C-unwind" fn searcher_C(mut L: *mut lua_State) -> i32 {
     let mut name: *const std::ffi::c_char = luaL_checklstring(L, 1 as i32, 0 as *mut size_t);
-    let mut filename: *const std::ffi::c_char = findfile(
-        L,
-        name,
-        b"cpath\0" as *const u8 as *const std::ffi::c_char,
-        b"/\0" as *const u8 as *const std::ffi::c_char,
-    );
+    let mut filename: *const std::ffi::c_char = findfile(L, name, c"cpath".as_ptr(), c"/".as_ptr());
     if filename.is_null() {
         return 1 as i32;
     }
@@ -27335,8 +26469,8 @@ unsafe extern "C-unwind" fn searcher_Croot(mut L: *mut lua_State) -> i32 {
     filename = findfile(
         L,
         lua_tolstring(L, -(1 as i32), 0 as *mut size_t),
-        b"cpath\0" as *const u8 as *const std::ffi::c_char,
-        b"/\0" as *const u8 as *const std::ffi::c_char,
+        c"cpath".as_ptr(),
+        c"/".as_ptr(),
     );
     if filename.is_null() {
         return 1 as i32;
@@ -27346,12 +26480,7 @@ unsafe extern "C-unwind" fn searcher_Croot(mut L: *mut lua_State) -> i32 {
         if stat != 2 as i32 {
             return checkload(L, 0, filename);
         } else {
-            lua_pushfstring(
-                L,
-                b"no module '%s' in file '%s'\0" as *const u8 as *const std::ffi::c_char,
-                name,
-                filename,
-            );
+            lua_pushfstring(L, c"no module '%s' in file '%s'".as_ptr(), name, filename);
             return 1 as i32;
         }
     }
@@ -27360,20 +26489,12 @@ unsafe extern "C-unwind" fn searcher_Croot(mut L: *mut lua_State) -> i32 {
 }
 unsafe extern "C-unwind" fn searcher_preload(mut L: *mut lua_State) -> i32 {
     let mut name: *const std::ffi::c_char = luaL_checklstring(L, 1 as i32, 0 as *mut size_t);
-    lua_getfield(
-        L,
-        -(1000000) - 1000,
-        b"_PRELOAD\0" as *const u8 as *const std::ffi::c_char,
-    );
+    lua_getfield(L, -(1000000) - 1000, c"_PRELOAD".as_ptr());
     if lua_getfield(L, -(1 as i32), name) == 0 {
-        lua_pushfstring(
-            L,
-            b"no field package.preload['%s']\0" as *const u8 as *const std::ffi::c_char,
-            name,
-        );
+        lua_pushfstring(L, c"no field package.preload['%s']".as_ptr(), name);
         return 1 as i32;
     } else {
-        lua_pushstring(L, b":preload:\0" as *const u8 as *const std::ffi::c_char);
+        lua_pushstring(L, c":preload:".as_ptr());
         return 2 as i32;
     };
 }
@@ -27386,23 +26507,16 @@ unsafe extern "C-unwind" fn findloader(mut L: *mut lua_State, mut name: *const s
         L: 0 as *mut lua_State,
         init: C2RustUnnamed_15 { n: 0. },
     };
-    if ((lua_getfield(
-        L,
-        -(1000000) - 1000 - 1 as i32,
-        b"searchers\0" as *const u8 as *const std::ffi::c_char,
-    ) != 5 as i32) as i32
+    if ((lua_getfield(L, -(1000000) - 1000 - 1 as i32, c"searchers".as_ptr()) != 5 as i32) as i32
         != 0) as i32 as std::ffi::c_long
         != 0
     {
-        luaL_error(
-            L,
-            b"'package.searchers' must be a table\0" as *const u8 as *const std::ffi::c_char,
-        );
+        luaL_error(L, c"'package.searchers' must be a table".as_ptr());
     }
     luaL_buffinit(L, &mut msg);
     i = 1 as i32;
     loop {
-        luaL_addstring(&mut msg, b"\n\t\0" as *const u8 as *const std::ffi::c_char);
+        luaL_addstring(&mut msg, c"\n\t".as_ptr());
         if ((lua_rawgeti(L, 3 as i32, i as lua_Integer) == 0) as i32 != 0) as i32
             as std::ffi::c_long
             != 0
@@ -27412,7 +26526,7 @@ unsafe extern "C-unwind" fn findloader(mut L: *mut lua_State, mut name: *const s
             luaL_pushresult(&mut msg);
             luaL_error(
                 L,
-                b"module '%s' not found:%s\0" as *const u8 as *const std::ffi::c_char,
+                c"module '%s' not found:%s".as_ptr(),
                 name,
                 lua_tolstring(L, -(1 as i32), 0 as *mut size_t),
             );
@@ -27435,11 +26549,7 @@ unsafe extern "C-unwind" fn findloader(mut L: *mut lua_State, mut name: *const s
 unsafe extern "C-unwind" fn ll_require(mut L: *mut lua_State) -> i32 {
     let mut name: *const std::ffi::c_char = luaL_checklstring(L, 1 as i32, 0 as *mut size_t);
     lua_settop(L, 1 as i32);
-    lua_getfield(
-        L,
-        -(1000000) - 1000,
-        b"_LOADED\0" as *const u8 as *const std::ffi::c_char,
-    );
+    lua_getfield(L, -(1000000) - 1000, c"_LOADED".as_ptr());
     lua_getfield(L, 2 as i32, name);
     if lua_toboolean(L, -(1 as i32)) != 0 {
         return 1 as i32;
@@ -27467,49 +26577,49 @@ static mut pk_funcs: [luaL_Reg; 8] = unsafe {
     [
         {
             let mut init = luaL_Reg {
-                name: b"loadlib\0" as *const u8 as *const std::ffi::c_char,
+                name: c"loadlib".as_ptr(),
                 func: Some(ll_loadlib as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"searchpath\0" as *const u8 as *const std::ffi::c_char,
+                name: c"searchpath".as_ptr(),
                 func: Some(ll_searchpath as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"preload\0" as *const u8 as *const std::ffi::c_char,
+                name: c"preload".as_ptr(),
                 func: None,
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"cpath\0" as *const u8 as *const std::ffi::c_char,
+                name: c"cpath".as_ptr(),
                 func: None,
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"path\0" as *const u8 as *const std::ffi::c_char,
+                name: c"path".as_ptr(),
                 func: None,
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"searchers\0" as *const u8 as *const std::ffi::c_char,
+                name: c"searchers".as_ptr(),
                 func: None,
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"loaded\0" as *const u8 as *const std::ffi::c_char,
+                name: c"loaded".as_ptr(),
                 func: None,
             };
             init
@@ -27527,7 +26637,7 @@ static mut ll_funcs: [luaL_Reg; 2] = unsafe {
     [
         {
             let mut init = luaL_Reg {
-                name: b"require\0" as *const u8 as *const std::ffi::c_char,
+                name: c"require".as_ptr(),
                 func: Some(ll_require as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
@@ -27567,11 +26677,7 @@ unsafe extern "C-unwind" fn createsearcherstable(mut L: *mut lua_State) {
         i += 1;
         i;
     }
-    lua_setfield(
-        L,
-        -(2 as i32),
-        b"searchers\0" as *const u8 as *const std::ffi::c_char,
-    );
+    lua_setfield(L, -(2 as i32), c"searchers".as_ptr());
 }
 unsafe extern "C-unwind" fn createclibstable(mut L: *mut lua_State) {
     luaL_getsubtable(L, -(1000000) - 1000, CLIBS);
@@ -27581,11 +26687,7 @@ unsafe extern "C-unwind" fn createclibstable(mut L: *mut lua_State) {
         Some(gctm as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
         0,
     );
-    lua_setfield(
-        L,
-        -(2 as i32),
-        b"__gc\0" as *const u8 as *const std::ffi::c_char,
-    );
+    lua_setfield(L, -(2 as i32), c"__gc".as_ptr());
     lua_setmetatable(L, -(2 as i32));
 }
 #[unsafe(no_mangle)]
@@ -27609,47 +26711,23 @@ pub unsafe extern "C-unwind" fn luaopen_package(mut L: *mut lua_State) -> i32 {
     createsearcherstable(L);
     setpath(
         L,
-        b"path\0" as *const u8 as *const std::ffi::c_char,
-        b"LUA_PATH\0" as *const u8 as *const std::ffi::c_char,
-        b"/usr/local/share/lua/5.4/?.lua;/usr/local/share/lua/5.4/?/init.lua;/usr/local/lib/lua/5.4/?.lua;/usr/local/lib/lua/5.4/?/init.lua;./?.lua;./?/init.lua\0"
-            as *const u8 as *const std::ffi::c_char,
+        c"path".as_ptr(),
+        c"LUA_PATH".as_ptr(),
+        c"/usr/local/share/lua/5.4/?.lua;/usr/local/share/lua/5.4/?/init.lua;/usr/local/lib/lua/5.4/?.lua;/usr/local/lib/lua/5.4/?/init.lua;./?.lua;./?/init.lua"
+            .as_ptr(),
     );
     setpath(
         L,
-        b"cpath\0" as *const u8 as *const std::ffi::c_char,
-        b"LUA_CPATH\0" as *const u8 as *const std::ffi::c_char,
-        b"/usr/local/lib/lua/5.4/?.so;/usr/local/lib/lua/5.4/loadall.so;./?.so\0" as *const u8
-            as *const std::ffi::c_char,
+        c"cpath".as_ptr(),
+        c"LUA_CPATH".as_ptr(),
+        c"/usr/local/lib/lua/5.4/?.so;/usr/local/lib/lua/5.4/loadall.so;./?.so".as_ptr(),
     );
-    lua_pushstring(
-        L,
-        b"/\n;\n?\n!\n-\n\0" as *const u8 as *const std::ffi::c_char,
-    );
-    lua_setfield(
-        L,
-        -(2 as i32),
-        b"config\0" as *const u8 as *const std::ffi::c_char,
-    );
-    luaL_getsubtable(
-        L,
-        -(1000000) - 1000,
-        b"_LOADED\0" as *const u8 as *const std::ffi::c_char,
-    );
-    lua_setfield(
-        L,
-        -(2 as i32),
-        b"loaded\0" as *const u8 as *const std::ffi::c_char,
-    );
-    luaL_getsubtable(
-        L,
-        -(1000000) - 1000,
-        b"_PRELOAD\0" as *const u8 as *const std::ffi::c_char,
-    );
-    lua_setfield(
-        L,
-        -(2 as i32),
-        b"preload\0" as *const u8 as *const std::ffi::c_char,
-    );
+    lua_pushstring(L, c"/\n;\n?\n!\n-\n".as_ptr());
+    lua_setfield(L, -(2 as i32), c"config".as_ptr());
+    luaL_getsubtable(L, -(1000000) - 1000, c"_LOADED".as_ptr());
+    lua_setfield(L, -(2 as i32), c"loaded".as_ptr());
+    luaL_getsubtable(L, -(1000000) - 1000, c"_PRELOAD".as_ptr());
+    lua_setfield(L, -(2 as i32), c"preload".as_ptr());
     lua_rawgeti(L, -(1000000) - 1000, 2 as i32 as lua_Integer);
     lua_pushvalue(L, -(2 as i32));
     luaL_setfuncs(L, (&raw const ll_funcs).cast(), 1 as i32);
@@ -27687,20 +26765,14 @@ unsafe extern "C-unwind" fn os_rename(mut L: *mut lua_State) -> i32 {
 unsafe extern "C-unwind" fn os_tmpname(mut L: *mut lua_State) -> i32 {
     let mut buff: [std::ffi::c_char; 32] = [0; 32];
     let mut err: i32 = 0;
-    strcpy(
-        buff.as_mut_ptr(),
-        b"/tmp/lua_XXXXXX\0" as *const u8 as *const std::ffi::c_char,
-    );
+    strcpy(buff.as_mut_ptr(), c"/tmp/lua_XXXXXX".as_ptr());
     err = mkstemp(buff.as_mut_ptr());
     if err != -(1 as i32) {
         close(err);
     }
     err = (err == -(1 as i32)) as i32;
     if (err != 0) as i32 as std::ffi::c_long != 0 {
-        return luaL_error(
-            L,
-            b"unable to generate a unique filename\0" as *const u8 as *const std::ffi::c_char,
-        );
+        return luaL_error(L, c"unable to generate a unique filename".as_ptr());
     }
     lua_pushstring(L, buff.as_mut_ptr());
     return 1 as i32;
@@ -27737,59 +26809,15 @@ unsafe extern "C-unwind" fn setboolfield(
     lua_setfield(L, -(2 as i32), key);
 }
 unsafe extern "C-unwind" fn setallfields(mut L: *mut lua_State, mut stm: *mut tm) {
-    setfield(
-        L,
-        b"year\0" as *const u8 as *const std::ffi::c_char,
-        (*stm).tm_year,
-        1900,
-    );
-    setfield(
-        L,
-        b"month\0" as *const u8 as *const std::ffi::c_char,
-        (*stm).tm_mon,
-        1 as i32,
-    );
-    setfield(
-        L,
-        b"day\0" as *const u8 as *const std::ffi::c_char,
-        (*stm).tm_mday,
-        0,
-    );
-    setfield(
-        L,
-        b"hour\0" as *const u8 as *const std::ffi::c_char,
-        (*stm).tm_hour,
-        0,
-    );
-    setfield(
-        L,
-        b"min\0" as *const u8 as *const std::ffi::c_char,
-        (*stm).tm_min,
-        0,
-    );
-    setfield(
-        L,
-        b"sec\0" as *const u8 as *const std::ffi::c_char,
-        (*stm).tm_sec,
-        0,
-    );
-    setfield(
-        L,
-        b"yday\0" as *const u8 as *const std::ffi::c_char,
-        (*stm).tm_yday,
-        1 as i32,
-    );
-    setfield(
-        L,
-        b"wday\0" as *const u8 as *const std::ffi::c_char,
-        (*stm).tm_wday,
-        1 as i32,
-    );
-    setboolfield(
-        L,
-        b"isdst\0" as *const u8 as *const std::ffi::c_char,
-        (*stm).tm_isdst,
-    );
+    setfield(L, c"year".as_ptr(), (*stm).tm_year, 1900);
+    setfield(L, c"month".as_ptr(), (*stm).tm_mon, 1 as i32);
+    setfield(L, c"day".as_ptr(), (*stm).tm_mday, 0);
+    setfield(L, c"hour".as_ptr(), (*stm).tm_hour, 0);
+    setfield(L, c"min".as_ptr(), (*stm).tm_min, 0);
+    setfield(L, c"sec".as_ptr(), (*stm).tm_sec, 0);
+    setfield(L, c"yday".as_ptr(), (*stm).tm_yday, 1 as i32);
+    setfield(L, c"wday".as_ptr(), (*stm).tm_wday, 1 as i32);
+    setboolfield(L, c"isdst".as_ptr(), (*stm).tm_isdst);
 }
 unsafe extern "C-unwind" fn getboolfield(
     mut L: *mut lua_State,
@@ -27815,17 +26843,9 @@ unsafe extern "C-unwind" fn getfield(
     let mut res: lua_Integer = lua_tointegerx(L, -(1 as i32), &mut isnum);
     if isnum == 0 {
         if ((t != 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-            return luaL_error(
-                L,
-                b"field '%s' is not an integer\0" as *const u8 as *const std::ffi::c_char,
-                key,
-            );
+            return luaL_error(L, c"field '%s' is not an integer".as_ptr(), key);
         } else if ((d < 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-            return luaL_error(
-                L,
-                b"field '%s' missing in date table\0" as *const u8 as *const std::ffi::c_char,
-                key,
-            );
+            return luaL_error(L, c"field '%s' missing in date table".as_ptr(), key);
         }
         res = d as lua_Integer;
     } else {
@@ -27835,11 +26855,7 @@ unsafe extern "C-unwind" fn getfield(
             ((-(2147483647 as i32) - 1 as i32 + delta) as lua_Integer <= res) as i32
         } == 0
         {
-            return luaL_error(
-                L,
-                b"field '%s' is out-of-bound\0" as *const u8 as *const std::ffi::c_char,
-                key,
-            );
+            return luaL_error(L, c"field '%s' is out-of-bound".as_ptr(), key);
         }
         res -= delta as lua_Integer;
     }
@@ -27853,8 +26869,7 @@ unsafe extern "C-unwind" fn checkoption(
     mut buff: *mut std::ffi::c_char,
 ) -> *const std::ffi::c_char {
     let mut option: *const std::ffi::c_char =
-        b"aAbBcCdDeFgGhHIjmMnprRStTuUVwWxXyYzZ%||EcECExEXEyEYOdOeOHOIOmOMOSOuOUOVOwOWOy\0"
-            as *const u8 as *const std::ffi::c_char;
+        c"aAbBcCdDeFgGhHIjmMnprRStTuUVwWxXyYzZ%||EcECExEXEyEYOdOeOHOIOmOMOSOuOUOVOwOWOy".as_ptr();
     let mut oplen: i32 = 1 as i32;
     while *option as i32 != '\0' as i32 && oplen as ptrdiff_t <= convlen {
         if *option as i32 == '|' as i32 {
@@ -27875,32 +26890,19 @@ unsafe extern "C-unwind" fn checkoption(
     luaL_argerror(
         L,
         1 as i32,
-        lua_pushfstring(
-            L,
-            b"invalid conversion specifier '%%%s'\0" as *const u8 as *const std::ffi::c_char,
-            conv,
-        ),
+        lua_pushfstring(L, c"invalid conversion specifier '%%%s'".as_ptr(), conv),
     );
     return conv;
 }
 unsafe extern "C-unwind" fn l_checktime(mut L: *mut lua_State, mut arg: i32) -> time_t {
     let mut t: lua_Integer = luaL_checkinteger(L, arg);
     (((t as time_t as lua_Integer == t) as i32 != 0) as i32 as std::ffi::c_long != 0
-        || luaL_argerror(
-            L,
-            arg,
-            b"time out-of-bounds\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_argerror(L, arg, c"time out-of-bounds".as_ptr()) != 0) as i32;
     return t as time_t;
 }
 unsafe extern "C-unwind" fn os_date(mut L: *mut lua_State) -> i32 {
     let mut slen: size_t = 0;
-    let mut s: *const std::ffi::c_char = luaL_optlstring(
-        L,
-        1 as i32,
-        b"%c\0" as *const u8 as *const std::ffi::c_char,
-        &mut slen,
-    );
+    let mut s: *const std::ffi::c_char = luaL_optlstring(L, 1 as i32, c"%c".as_ptr(), &mut slen);
     let mut t: time_t = if lua_type(L, 2 as i32) <= 0 {
         time(0 as *mut time_t)
     } else {
@@ -27931,11 +26933,10 @@ unsafe extern "C-unwind" fn os_date(mut L: *mut lua_State) -> i32 {
     if stm.is_null() {
         return luaL_error(
             L,
-            b"date result cannot be represented in this installation\0" as *const u8
-                as *const std::ffi::c_char,
+            c"date result cannot be represented in this installation".as_ptr(),
         );
     }
-    if strcmp(s, b"*t\0" as *const u8 as *const std::ffi::c_char) == 0 {
+    if strcmp(s, c"*t".as_ptr()) == 0 {
         lua_createtable(L, 0, 9 as i32);
         setallfields(L, stm);
     } else {
@@ -27996,41 +26997,20 @@ unsafe extern "C-unwind" fn os_time(mut L: *mut lua_State) -> i32 {
         };
         luaL_checktype(L, 1 as i32, 5 as i32);
         lua_settop(L, 1 as i32);
-        ts.tm_year = getfield(
-            L,
-            b"year\0" as *const u8 as *const std::ffi::c_char,
-            -(1 as i32),
-            1900,
-        );
-        ts.tm_mon = getfield(
-            L,
-            b"month\0" as *const u8 as *const std::ffi::c_char,
-            -(1 as i32),
-            1 as i32,
-        );
-        ts.tm_mday = getfield(
-            L,
-            b"day\0" as *const u8 as *const std::ffi::c_char,
-            -(1 as i32),
-            0,
-        );
-        ts.tm_hour = getfield(
-            L,
-            b"hour\0" as *const u8 as *const std::ffi::c_char,
-            12 as i32,
-            0,
-        );
-        ts.tm_min = getfield(L, b"min\0" as *const u8 as *const std::ffi::c_char, 0, 0);
-        ts.tm_sec = getfield(L, b"sec\0" as *const u8 as *const std::ffi::c_char, 0, 0);
-        ts.tm_isdst = getboolfield(L, b"isdst\0" as *const u8 as *const std::ffi::c_char);
+        ts.tm_year = getfield(L, c"year".as_ptr(), -(1 as i32), 1900);
+        ts.tm_mon = getfield(L, c"month".as_ptr(), -(1 as i32), 1 as i32);
+        ts.tm_mday = getfield(L, c"day".as_ptr(), -(1 as i32), 0);
+        ts.tm_hour = getfield(L, c"hour".as_ptr(), 12 as i32, 0);
+        ts.tm_min = getfield(L, c"min".as_ptr(), 0, 0);
+        ts.tm_sec = getfield(L, c"sec".as_ptr(), 0, 0);
+        ts.tm_isdst = getboolfield(L, c"isdst".as_ptr());
         t = mktime(&mut ts);
         setallfields(L, &mut ts);
     }
     if t != t as lua_Integer as time_t || t == -(1 as i32) as time_t {
         return luaL_error(
             L,
-            b"time result cannot be represented in this installation\0" as *const u8
-                as *const std::ffi::c_char,
+            c"time result cannot be represented in this installation".as_ptr(),
         );
     }
     lua_pushinteger(L, t as lua_Integer);
@@ -28045,22 +27025,17 @@ unsafe extern "C-unwind" fn os_difftime(mut L: *mut lua_State) -> i32 {
 unsafe extern "C-unwind" fn os_setlocale(mut L: *mut lua_State) -> i32 {
     static mut cat: [i32; 6] = [6 as i32, 3 as i32, 0, 4 as i32, 1 as i32, 2 as i32];
     static mut catnames: [*const std::ffi::c_char; 7] = [
-        b"all\0" as *const u8 as *const std::ffi::c_char,
-        b"collate\0" as *const u8 as *const std::ffi::c_char,
-        b"ctype\0" as *const u8 as *const std::ffi::c_char,
-        b"monetary\0" as *const u8 as *const std::ffi::c_char,
-        b"numeric\0" as *const u8 as *const std::ffi::c_char,
-        b"time\0" as *const u8 as *const std::ffi::c_char,
+        c"all".as_ptr(),
+        c"collate".as_ptr(),
+        c"ctype".as_ptr(),
+        c"monetary".as_ptr(),
+        c"numeric".as_ptr(),
+        c"time".as_ptr(),
         0 as *const std::ffi::c_char,
     ];
     let mut l: *const std::ffi::c_char =
         luaL_optlstring(L, 1 as i32, 0 as *const std::ffi::c_char, 0 as *mut size_t);
-    let mut op: i32 = luaL_checkoption(
-        L,
-        2 as i32,
-        b"all\0" as *const u8 as *const std::ffi::c_char,
-        (&raw const catnames).cast(),
-    );
+    let mut op: i32 = luaL_checkoption(L, 2 as i32, c"all".as_ptr(), (&raw const catnames).cast());
     lua_pushstring(L, setlocale(cat[op as usize], l));
     return 1 as i32;
 }
@@ -28087,77 +27062,77 @@ static mut syslib: [luaL_Reg; 12] = unsafe {
     [
         {
             let mut init = luaL_Reg {
-                name: b"clock\0" as *const u8 as *const std::ffi::c_char,
+                name: c"clock".as_ptr(),
                 func: Some(os_clock as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"date\0" as *const u8 as *const std::ffi::c_char,
+                name: c"date".as_ptr(),
                 func: Some(os_date as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"difftime\0" as *const u8 as *const std::ffi::c_char,
+                name: c"difftime".as_ptr(),
                 func: Some(os_difftime as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"execute\0" as *const u8 as *const std::ffi::c_char,
+                name: c"execute".as_ptr(),
                 func: Some(os_execute as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"exit\0" as *const u8 as *const std::ffi::c_char,
+                name: c"exit".as_ptr(),
                 func: Some(os_exit as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"getenv\0" as *const u8 as *const std::ffi::c_char,
+                name: c"getenv".as_ptr(),
                 func: Some(os_getenv as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"remove\0" as *const u8 as *const std::ffi::c_char,
+                name: c"remove".as_ptr(),
                 func: Some(os_remove as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"rename\0" as *const u8 as *const std::ffi::c_char,
+                name: c"rename".as_ptr(),
                 func: Some(os_rename as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"setlocale\0" as *const u8 as *const std::ffi::c_char,
+                name: c"setlocale".as_ptr(),
                 func: Some(os_setlocale as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"time\0" as *const u8 as *const std::ffi::c_char,
+                name: c"time".as_ptr(),
                 func: Some(os_time as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"tmpname\0" as *const u8 as *const std::ffi::c_char,
+                name: c"tmpname".as_ptr(),
                 func: Some(os_tmpname as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
@@ -28240,7 +27215,7 @@ unsafe extern "C-unwind" fn str_sub(mut L: *mut lua_State) -> i32 {
             end.wrapping_sub(start).wrapping_add(1 as i32 as size_t),
         );
     } else {
-        lua_pushstring(L, b"\0" as *const u8 as *const std::ffi::c_char);
+        lua_pushstring(L, c"".as_ptr());
     }
     return 1 as i32;
 }
@@ -28315,14 +27290,9 @@ unsafe extern "C-unwind" fn str_rep(mut L: *mut lua_State) -> i32 {
     let mut lsep: size_t = 0;
     let mut s: *const std::ffi::c_char = luaL_checklstring(L, 1 as i32, &mut l);
     let mut n: lua_Integer = luaL_checkinteger(L, 2 as i32);
-    let mut sep: *const std::ffi::c_char = luaL_optlstring(
-        L,
-        3 as i32,
-        b"\0" as *const u8 as *const std::ffi::c_char,
-        &mut lsep,
-    );
+    let mut sep: *const std::ffi::c_char = luaL_optlstring(L, 3 as i32, c"".as_ptr(), &mut lsep);
     if n <= 0 as lua_Integer {
-        lua_pushstring(L, b"\0" as *const u8 as *const std::ffi::c_char);
+        lua_pushstring(L, c"".as_ptr());
     } else if ((l.wrapping_add(lsep) < l
         || l.wrapping_add(lsep) as u64
             > ((if (::core::mem::size_of::<size_t>() as usize)
@@ -28336,10 +27306,7 @@ unsafe extern "C-unwind" fn str_rep(mut L: *mut lua_State) -> i32 {
         != 0) as i32 as std::ffi::c_long
         != 0
     {
-        return luaL_error(
-            L,
-            b"resulting string too large\0" as *const u8 as *const std::ffi::c_char,
-        );
+        return luaL_error(L, c"resulting string too large".as_ptr());
     } else {
         let mut totallen: size_t =
             (n as size_t * l).wrapping_add((n - 1 as i32 as lua_Integer) as size_t * lsep);
@@ -28396,17 +27363,10 @@ unsafe extern "C-unwind" fn str_byte(mut L: *mut lua_State) -> i32 {
         as std::ffi::c_long
         != 0
     {
-        return luaL_error(
-            L,
-            b"string slice too long\0" as *const u8 as *const std::ffi::c_char,
-        );
+        return luaL_error(L, c"string slice too long".as_ptr());
     }
     n = pose.wrapping_sub(posi) as i32 + 1 as i32;
-    luaL_checkstack(
-        L,
-        n,
-        b"string slice too long\0" as *const u8 as *const std::ffi::c_char,
-    );
+    luaL_checkstack(L, n, c"string slice too long".as_ptr());
     i = 0;
     while i < n {
         lua_pushinteger(
@@ -28438,11 +27398,7 @@ unsafe extern "C-unwind" fn str_char(mut L: *mut lua_State) -> i32 {
         (((c <= (127 as i32 * 2 as i32 + 1 as i32) as lua_Unsigned) as i32 != 0) as i32
             as std::ffi::c_long
             != 0
-            || luaL_argerror(
-                L,
-                i,
-                b"value out of range\0" as *const u8 as *const std::ffi::c_char,
-            ) != 0) as i32;
+            || luaL_argerror(L, i, c"value out of range".as_ptr()) != 0) as i32;
         *p.offset((i - 1 as i32) as isize) = c as std::ffi::c_uchar as std::ffi::c_char;
         i += 1;
         i;
@@ -28496,10 +27452,7 @@ unsafe extern "C-unwind" fn str_dump(mut L: *mut lua_State) -> i32 {
         != 0) as i32 as std::ffi::c_long
         != 0
     {
-        return luaL_error(
-            L,
-            b"unable to dump given function\0" as *const u8 as *const std::ffi::c_char,
-        );
+        return luaL_error(L, c"unable to dump given function".as_ptr());
     }
     luaL_pushresult(&mut state.B);
     return 1 as i32;
@@ -28523,7 +27476,7 @@ unsafe extern "C-unwind" fn trymt(mut L: *mut lua_State, mut mtname: *const std:
     {
         luaL_error(
             L,
-            b"attempt to %s a '%s' with a '%s'\0" as *const u8 as *const std::ffi::c_char,
+            c"attempt to %s a '%s' with a '%s'".as_ptr(),
             mtname.offset(2 as i32 as isize),
             lua_typename(L, lua_type(L, -(2 as i32))),
             lua_typename(L, lua_type(L, -(1 as i32))),
@@ -28545,118 +27498,90 @@ unsafe extern "C-unwind" fn arith(
     return 1 as i32;
 }
 unsafe extern "C-unwind" fn arith_add(mut L: *mut lua_State) -> i32 {
-    return arith(L, 0, b"__add\0" as *const u8 as *const std::ffi::c_char);
+    return arith(L, 0, c"__add".as_ptr());
 }
 unsafe extern "C-unwind" fn arith_sub(mut L: *mut lua_State) -> i32 {
-    return arith(
-        L,
-        1 as i32,
-        b"__sub\0" as *const u8 as *const std::ffi::c_char,
-    );
+    return arith(L, 1 as i32, c"__sub".as_ptr());
 }
 unsafe extern "C-unwind" fn arith_mul(mut L: *mut lua_State) -> i32 {
-    return arith(
-        L,
-        2 as i32,
-        b"__mul\0" as *const u8 as *const std::ffi::c_char,
-    );
+    return arith(L, 2 as i32, c"__mul".as_ptr());
 }
 unsafe extern "C-unwind" fn arith_mod(mut L: *mut lua_State) -> i32 {
-    return arith(
-        L,
-        3 as i32,
-        b"__mod\0" as *const u8 as *const std::ffi::c_char,
-    );
+    return arith(L, 3 as i32, c"__mod".as_ptr());
 }
 unsafe extern "C-unwind" fn arith_pow(mut L: *mut lua_State) -> i32 {
-    return arith(
-        L,
-        4 as i32,
-        b"__pow\0" as *const u8 as *const std::ffi::c_char,
-    );
+    return arith(L, 4 as i32, c"__pow".as_ptr());
 }
 unsafe extern "C-unwind" fn arith_div(mut L: *mut lua_State) -> i32 {
-    return arith(
-        L,
-        5 as i32,
-        b"__div\0" as *const u8 as *const std::ffi::c_char,
-    );
+    return arith(L, 5 as i32, c"__div".as_ptr());
 }
 unsafe extern "C-unwind" fn arith_idiv(mut L: *mut lua_State) -> i32 {
-    return arith(
-        L,
-        6 as i32,
-        b"__idiv\0" as *const u8 as *const std::ffi::c_char,
-    );
+    return arith(L, 6 as i32, c"__idiv".as_ptr());
 }
 unsafe extern "C-unwind" fn arith_unm(mut L: *mut lua_State) -> i32 {
-    return arith(
-        L,
-        12 as i32,
-        b"__unm\0" as *const u8 as *const std::ffi::c_char,
-    );
+    return arith(L, 12 as i32, c"__unm".as_ptr());
 }
 static mut stringmetamethods: [luaL_Reg; 10] = unsafe {
     [
         {
             let mut init = luaL_Reg {
-                name: b"__add\0" as *const u8 as *const std::ffi::c_char,
+                name: c"__add".as_ptr(),
                 func: Some(arith_add as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"__sub\0" as *const u8 as *const std::ffi::c_char,
+                name: c"__sub".as_ptr(),
                 func: Some(arith_sub as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"__mul\0" as *const u8 as *const std::ffi::c_char,
+                name: c"__mul".as_ptr(),
                 func: Some(arith_mul as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"__mod\0" as *const u8 as *const std::ffi::c_char,
+                name: c"__mod".as_ptr(),
                 func: Some(arith_mod as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"__pow\0" as *const u8 as *const std::ffi::c_char,
+                name: c"__pow".as_ptr(),
                 func: Some(arith_pow as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"__div\0" as *const u8 as *const std::ffi::c_char,
+                name: c"__div".as_ptr(),
                 func: Some(arith_div as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"__idiv\0" as *const u8 as *const std::ffi::c_char,
+                name: c"__idiv".as_ptr(),
                 func: Some(arith_idiv as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"__unm\0" as *const u8 as *const std::ffi::c_char,
+                name: c"__unm".as_ptr(),
                 func: Some(arith_unm as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"__index\0" as *const u8 as *const std::ffi::c_char,
+                name: c"__index".as_ptr(),
                 func: None,
             };
             init
@@ -28680,7 +27605,7 @@ unsafe extern "C-unwind" fn check_capture(mut ms: *mut MatchState, mut l: i32) -
     {
         return luaL_error(
             (*ms).L,
-            b"invalid capture index %%%d\0" as *const u8 as *const std::ffi::c_char,
+            c"invalid capture index %%%d".as_ptr(),
             l + 1 as i32,
         );
     }
@@ -28697,10 +27622,7 @@ unsafe extern "C-unwind" fn capture_to_close(mut ms: *mut MatchState) -> i32 {
         level -= 1;
         level;
     }
-    return luaL_error(
-        (*ms).L,
-        b"invalid pattern capture\0" as *const u8 as *const std::ffi::c_char,
-    );
+    return luaL_error((*ms).L, c"invalid pattern capture".as_ptr());
 }
 unsafe extern "C-unwind" fn classend(
     mut ms: *mut MatchState,
@@ -28711,10 +27633,7 @@ unsafe extern "C-unwind" fn classend(
     match *fresh166 as i32 {
         37 => {
             if ((p == (*ms).p_end) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-                luaL_error(
-                    (*ms).L,
-                    b"malformed pattern (ends with '%%')\0" as *const u8 as *const std::ffi::c_char,
-                );
+                luaL_error((*ms).L, c"malformed pattern (ends with '%%')".as_ptr());
             }
             return p.offset(1 as i32 as isize);
         }
@@ -28725,11 +27644,7 @@ unsafe extern "C-unwind" fn classend(
             }
             loop {
                 if ((p == (*ms).p_end) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-                    luaL_error(
-                        (*ms).L,
-                        b"malformed pattern (missing ']')\0" as *const u8
-                            as *const std::ffi::c_char,
-                    );
+                    luaL_error((*ms).L, c"malformed pattern (missing ']')".as_ptr());
                 }
                 let fresh167 = p;
                 p = p.offset(1);
@@ -28874,8 +27789,7 @@ unsafe extern "C-unwind" fn matchbalance(
     {
         luaL_error(
             (*ms).L,
-            b"malformed pattern (missing arguments to '%%b')\0" as *const u8
-                as *const std::ffi::c_char,
+            c"malformed pattern (missing arguments to '%%b')".as_ptr(),
         );
     }
     if *s as i32 != *p as i32 {
@@ -28951,10 +27865,7 @@ unsafe extern "C-unwind" fn start_capture(
     let mut res: *const std::ffi::c_char = 0 as *const std::ffi::c_char;
     let mut level: i32 = (*ms).level as i32;
     if level >= 32 as i32 {
-        luaL_error(
-            (*ms).L,
-            b"too many captures\0" as *const u8 as *const std::ffi::c_char,
-        );
+        luaL_error((*ms).L, c"too many captures".as_ptr());
     }
     (*ms).capture[level as usize].init = s;
     (*ms).capture[level as usize].len = what as ptrdiff_t;
@@ -29010,10 +27921,7 @@ unsafe extern "C-unwind" fn match_0(
     let fresh168 = (*ms).matchdepth;
     (*ms).matchdepth = (*ms).matchdepth - 1;
     if ((fresh168 == 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-        luaL_error(
-            (*ms).L,
-            b"pattern too complex\0" as *const u8 as *const std::ffi::c_char,
-        );
+        luaL_error((*ms).L, c"pattern too complex".as_ptr());
     }
     loop {
         if !(p != (*ms).p_end) {
@@ -29066,11 +27974,7 @@ unsafe extern "C-unwind" fn match_0(
                             if ((*p as i32 != '[' as i32) as i32 != 0) as i32 as std::ffi::c_long
                                 != 0
                             {
-                                luaL_error(
-                                    (*ms).L,
-                                    b"missing '[' after '%%f' in pattern\0" as *const u8
-                                        as *const std::ffi::c_char,
-                                );
+                                luaL_error((*ms).L, c"missing '[' after '%%f' in pattern".as_ptr());
                             }
                             ep = classend(ms, p);
                             previous = (if s == (*ms).src_init {
@@ -29131,11 +28035,7 @@ unsafe extern "C-unwind" fn match_0(
                             if ((*p as i32 != '[' as i32) as i32 != 0) as i32 as std::ffi::c_long
                                 != 0
                             {
-                                luaL_error(
-                                    (*ms).L,
-                                    b"missing '[' after '%%f' in pattern\0" as *const u8
-                                        as *const std::ffi::c_char,
-                                );
+                                luaL_error((*ms).L, c"missing '[' after '%%f' in pattern".as_ptr());
                             }
                             ep = classend(ms, p);
                             previous = (if s == (*ms).src_init {
@@ -29196,11 +28096,7 @@ unsafe extern "C-unwind" fn match_0(
                             if ((*p as i32 != '[' as i32) as i32 != 0) as i32 as std::ffi::c_long
                                 != 0
                             {
-                                luaL_error(
-                                    (*ms).L,
-                                    b"missing '[' after '%%f' in pattern\0" as *const u8
-                                        as *const std::ffi::c_char,
-                                );
+                                luaL_error((*ms).L, c"missing '[' after '%%f' in pattern".as_ptr());
                             }
                             ep = classend(ms, p);
                             previous = (if s == (*ms).src_init {
@@ -29355,7 +28251,7 @@ unsafe extern "C-unwind" fn get_onecapture(
         if ((i != 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
             luaL_error(
                 (*ms).L,
-                b"invalid capture index %%%d\0" as *const u8 as *const std::ffi::c_char,
+                c"invalid capture index %%%d".as_ptr(),
                 i + 1 as i32,
             );
         }
@@ -29365,10 +28261,7 @@ unsafe extern "C-unwind" fn get_onecapture(
         let mut capl: ptrdiff_t = (*ms).capture[i as usize].len;
         *cap = (*ms).capture[i as usize].init;
         if ((capl == -(1 as i32) as ptrdiff_t) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-            luaL_error(
-                (*ms).L,
-                b"unfinished capture\0" as *const u8 as *const std::ffi::c_char,
-            );
+            luaL_error((*ms).L, c"unfinished capture".as_ptr());
         } else if capl == -(2 as i32) as ptrdiff_t {
             lua_pushinteger(
                 (*ms).L,
@@ -29401,11 +28294,7 @@ unsafe extern "C-unwind" fn push_captures(
     } else {
         (*ms).level as i32
     };
-    luaL_checkstack(
-        (*ms).L,
-        nlevels,
-        b"too many captures\0" as *const u8 as *const std::ffi::c_char,
-    );
+    luaL_checkstack((*ms).L, nlevels, c"too many captures".as_ptr());
     i = 0;
     while i < nlevels {
         push_onecapture(ms, i, s, e);
@@ -29417,12 +28306,7 @@ unsafe extern "C-unwind" fn push_captures(
 unsafe extern "C-unwind" fn nospecials(mut p: *const std::ffi::c_char, mut l: size_t) -> i32 {
     let mut upto: size_t = 0 as size_t;
     loop {
-        if !(strpbrk(
-            p.offset(upto as isize),
-            b"^$*+?.([%-\0" as *const u8 as *const std::ffi::c_char,
-        ))
-        .is_null()
-        {
+        if !(strpbrk(p.offset(upto as isize), c"^$*+?.([%-".as_ptr())).is_null() {
             return 0;
         }
         upto = (upto as usize)
@@ -29613,8 +28497,7 @@ unsafe extern "C-unwind" fn add_s(
         } else {
             luaL_error(
                 L,
-                b"invalid use of '%c' in replacement string\0" as *const u8
-                    as *const std::ffi::c_char,
+                c"invalid use of '%c' in replacement string".as_ptr(),
                 '%' as i32,
             );
         }
@@ -29656,7 +28539,7 @@ unsafe extern "C-unwind" fn add_value(
     } else if ((lua_isstring(L, -(1 as i32)) == 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
         return luaL_error(
             L,
-            b"invalid replacement value (a %s)\0" as *const u8 as *const std::ffi::c_char,
+            c"invalid replacement value (a %s)".as_ptr(),
             lua_typename(L, lua_type(L, -(1 as i32))),
         );
     } else {
@@ -29701,11 +28584,7 @@ unsafe extern "C-unwind" fn str_gsub(mut L: *mut lua_State) -> i32 {
     (((tr == 3 as i32 || tr == 4 as i32 || tr == 6 as i32 || tr == 5 as i32) as i32 != 0) as i32
         as std::ffi::c_long
         != 0
-        || luaL_typeerror(
-            L,
-            3 as i32,
-            b"string/function/table\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_typeerror(L, 3 as i32, c"string/function/table".as_ptr()) != 0) as i32;
     luaL_buffinit(L, &mut b);
     if anchor != 0 {
         p = p.offset(1);
@@ -29790,14 +28669,14 @@ unsafe extern "C-unwind" fn addquoted(
                 snprintf(
                     buff.as_mut_ptr(),
                     ::core::mem::size_of::<[std::ffi::c_char; 10]>() as usize,
-                    b"\\%d\0" as *const u8 as *const std::ffi::c_char,
+                    c"\\%d".as_ptr(),
                     *s as std::ffi::c_uchar as i32,
                 );
             } else {
                 snprintf(
                     buff.as_mut_ptr(),
                     ::core::mem::size_of::<[std::ffi::c_char; 10]>() as usize,
-                    b"\\%03d\0" as *const u8 as *const std::ffi::c_char,
+                    c"\\%03d".as_ptr(),
                     *s as std::ffi::c_uchar as i32,
                 );
             }
@@ -29823,18 +28702,13 @@ unsafe extern "C-unwind" fn quotefloat(
 ) -> i32 {
     let mut s: *const std::ffi::c_char = 0 as *const std::ffi::c_char;
     if n == ::core::f64::INFINITY {
-        s = b"1e9999\0" as *const u8 as *const std::ffi::c_char;
+        s = c"1e9999".as_ptr();
     } else if n == -::core::f64::INFINITY {
-        s = b"-1e9999\0" as *const u8 as *const std::ffi::c_char;
+        s = c"-1e9999".as_ptr();
     } else if n != n {
-        s = b"(0/0)\0" as *const u8 as *const std::ffi::c_char;
+        s = c"(0/0)".as_ptr();
     } else {
-        let mut nb: i32 = snprintf(
-            buff,
-            120 as usize,
-            b"%a\0" as *const u8 as *const std::ffi::c_char,
-            n,
-        );
+        let mut nb: i32 = snprintf(buff, 120 as usize, c"%a".as_ptr(), n);
         if (memchr(buff as *const c_void, '.' as i32, nb as usize)).is_null() {
             let mut point: std::ffi::c_char = *((*localeconv()).decimal_point).offset(0 as isize);
             let mut ppoint: *mut std::ffi::c_char =
@@ -29845,12 +28719,7 @@ unsafe extern "C-unwind" fn quotefloat(
         }
         return nb;
     }
-    return snprintf(
-        buff,
-        120 as usize,
-        b"%s\0" as *const u8 as *const std::ffi::c_char,
-        s,
-    );
+    return snprintf(buff, 120 as usize, c"%s".as_ptr(), s);
 }
 unsafe extern "C-unwind" fn addliteral(
     mut L: *mut lua_State,
@@ -29873,9 +28742,9 @@ unsafe extern "C-unwind" fn addliteral(
                 let mut format: *const std::ffi::c_char = if n
                     == -(9223372036854775807 as std::ffi::c_longlong) - 1 as std::ffi::c_longlong
                 {
-                    b"0x%llx\0" as *const u8 as *const std::ffi::c_char
+                    c"0x%llx".as_ptr()
                 } else {
-                    b"%lld\0" as *const u8 as *const std::ffi::c_char
+                    c"%lld".as_ptr()
                 };
                 nb = snprintf(buff, 120 as usize, format, n);
             }
@@ -29886,11 +28755,7 @@ unsafe extern "C-unwind" fn addliteral(
             luaL_addvalue(b);
         }
         _ => {
-            luaL_argerror(
-                L,
-                arg,
-                b"value has no literal form\0" as *const u8 as *const std::ffi::c_char,
-            );
+            luaL_argerror(L, arg, c"value has no literal form".as_ptr());
         }
     };
 }
@@ -29931,11 +28796,7 @@ unsafe extern "C-unwind" fn checkformat(
         & _ISalpha as i32 as std::ffi::c_ushort as i32
         == 0
     {
-        luaL_error(
-            L,
-            b"invalid conversion specification: '%s'\0" as *const u8 as *const std::ffi::c_char,
-            form,
-        );
+        luaL_error(L, c"invalid conversion specification: '%s'".as_ptr(), form);
     }
 }
 unsafe extern "C-unwind" fn getformat(
@@ -29943,17 +28804,11 @@ unsafe extern "C-unwind" fn getformat(
     mut strfrmt: *const std::ffi::c_char,
     mut form: *mut std::ffi::c_char,
 ) -> *const std::ffi::c_char {
-    let mut len: size_t = strspn(
-        strfrmt,
-        b"-+#0 123456789.\0" as *const u8 as *const std::ffi::c_char,
-    );
+    let mut len: size_t = strspn(strfrmt, c"-+#0 123456789.".as_ptr());
     len = len.wrapping_add(1);
     len;
     if len >= (32 as i32 - 10) as size_t {
-        luaL_error(
-            L,
-            b"invalid format (too long)\0" as *const u8 as *const std::ffi::c_char,
-        );
+        luaL_error(L, c"invalid format (too long)".as_ptr());
     }
     let fresh179 = form;
     form = form.offset(1);
@@ -30017,23 +28872,14 @@ unsafe extern "C-unwind" fn str_format(mut L: *mut lua_State) -> i32 {
                 let mut nb: i32 = 0;
                 arg += 1;
                 if arg > top {
-                    return luaL_argerror(
-                        L,
-                        arg,
-                        b"no value\0" as *const u8 as *const std::ffi::c_char,
-                    );
+                    return luaL_argerror(L, arg, c"no value".as_ptr());
                 }
                 strfrmt = getformat(L, strfrmt, form.as_mut_ptr());
                 let fresh184 = strfrmt;
                 strfrmt = strfrmt.offset(1);
                 match *fresh184 as i32 {
                     99 => {
-                        checkformat(
-                            L,
-                            form.as_mut_ptr(),
-                            b"-\0" as *const u8 as *const std::ffi::c_char,
-                            0,
-                        );
+                        checkformat(L, form.as_mut_ptr(), c"-".as_ptr(), 0);
                         nb = snprintf(
                             buff,
                             maxitem as usize,
@@ -30043,28 +28889,20 @@ unsafe extern "C-unwind" fn str_format(mut L: *mut lua_State) -> i32 {
                         current_block = 11793792312832361944;
                     }
                     100 | 105 => {
-                        flags = b"-+0 \0" as *const u8 as *const std::ffi::c_char;
+                        flags = c"-+0 ".as_ptr();
                         current_block = 5689001924483802034;
                     }
                     117 => {
-                        flags = b"-0\0" as *const u8 as *const std::ffi::c_char;
+                        flags = c"-0".as_ptr();
                         current_block = 5689001924483802034;
                     }
                     111 | 120 | 88 => {
-                        flags = b"-#0\0" as *const u8 as *const std::ffi::c_char;
+                        flags = c"-#0".as_ptr();
                         current_block = 5689001924483802034;
                     }
                     97 | 65 => {
-                        checkformat(
-                            L,
-                            form.as_mut_ptr(),
-                            b"-+#0 \0" as *const u8 as *const std::ffi::c_char,
-                            1 as i32,
-                        );
-                        addlenmod(
-                            form.as_mut_ptr(),
-                            b"\0" as *const u8 as *const std::ffi::c_char,
-                        );
+                        checkformat(L, form.as_mut_ptr(), c"-+#0 ".as_ptr(), 1 as i32);
+                        addlenmod(form.as_mut_ptr(), c"".as_ptr());
                         nb = snprintf(
                             buff,
                             maxitem as usize,
@@ -30083,15 +28921,9 @@ unsafe extern "C-unwind" fn str_format(mut L: *mut lua_State) -> i32 {
                     }
                     112 => {
                         let mut p: *const c_void = lua_topointer(L, arg);
-                        checkformat(
-                            L,
-                            form.as_mut_ptr(),
-                            b"-\0" as *const u8 as *const std::ffi::c_char,
-                            0,
-                        );
+                        checkformat(L, form.as_mut_ptr(), c"-".as_ptr(), 0);
                         if p.is_null() {
-                            p = b"(null)\0" as *const u8 as *const std::ffi::c_char
-                                as *const c_void;
+                            p = c"(null)".as_ptr() as *const c_void;
                             form[(strlen(form.as_mut_ptr())).wrapping_sub(1 as i32 as usize)
                                 as usize] = 's' as i32 as std::ffi::c_char;
                         }
@@ -30102,8 +28934,7 @@ unsafe extern "C-unwind" fn str_format(mut L: *mut lua_State) -> i32 {
                         if form[2 as i32 as usize] as i32 != '\0' as i32 {
                             return luaL_error(
                                 L,
-                                b"specifier '%%q' cannot have modifiers\0" as *const u8
-                                    as *const std::ffi::c_char,
+                                c"specifier '%%q' cannot have modifiers".as_ptr(),
                             );
                         }
                         addliteral(L, &mut b, arg);
@@ -30116,18 +28947,9 @@ unsafe extern "C-unwind" fn str_format(mut L: *mut lua_State) -> i32 {
                             luaL_addvalue(&mut b);
                         } else {
                             (((l == strlen(s)) as i32 != 0) as i32 as std::ffi::c_long != 0
-                                || luaL_argerror(
-                                    L,
-                                    arg,
-                                    b"string contains zeros\0" as *const u8
-                                        as *const std::ffi::c_char,
-                                ) != 0) as i32;
-                            checkformat(
-                                L,
-                                form.as_mut_ptr(),
-                                b"-\0" as *const u8 as *const std::ffi::c_char,
-                                1 as i32,
-                            );
+                                || luaL_argerror(L, arg, c"string contains zeros".as_ptr()) != 0)
+                                as i32;
+                            checkformat(L, form.as_mut_ptr(), c"-".as_ptr(), 1 as i32);
                             if (strchr(form.as_mut_ptr(), '.' as i32)).is_null()
                                 && l >= 100 as size_t
                             {
@@ -30142,8 +28964,7 @@ unsafe extern "C-unwind" fn str_format(mut L: *mut lua_State) -> i32 {
                     _ => {
                         return luaL_error(
                             L,
-                            b"invalid conversion '%s' to 'format'\0" as *const u8
-                                as *const std::ffi::c_char,
+                            c"invalid conversion '%s' to 'format'".as_ptr(),
                             form.as_mut_ptr(),
                         );
                     }
@@ -30152,24 +28973,13 @@ unsafe extern "C-unwind" fn str_format(mut L: *mut lua_State) -> i32 {
                     5689001924483802034 => {
                         let mut n: lua_Integer = luaL_checkinteger(L, arg);
                         checkformat(L, form.as_mut_ptr(), flags, 1 as i32);
-                        addlenmod(
-                            form.as_mut_ptr(),
-                            b"ll\0" as *const u8 as *const std::ffi::c_char,
-                        );
+                        addlenmod(form.as_mut_ptr(), c"ll".as_ptr());
                         nb = snprintf(buff, maxitem as usize, form.as_mut_ptr(), n);
                     }
                     6669252993407410313 => {
                         let mut n_0: lua_Number = luaL_checknumber(L, arg);
-                        checkformat(
-                            L,
-                            form.as_mut_ptr(),
-                            b"-+#0 \0" as *const u8 as *const std::ffi::c_char,
-                            1 as i32,
-                        );
-                        addlenmod(
-                            form.as_mut_ptr(),
-                            b"\0" as *const u8 as *const std::ffi::c_char,
-                        );
+                        checkformat(L, form.as_mut_ptr(), c"-+#0 ".as_ptr(), 1 as i32);
+                        addlenmod(form.as_mut_ptr(), c"".as_ptr());
                         nb = snprintf(buff, maxitem as usize, form.as_mut_ptr(), n_0);
                     }
                     _ => {}
@@ -30220,7 +29030,7 @@ unsafe extern "C-unwind" fn getnumlimit(
     if ((sz > 16 as i32 || sz <= 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
         return luaL_error(
             (*h).L,
-            b"integral size (%d) out of limits [1,%d]\0" as *const u8 as *const std::ffi::c_char,
+            c"integral size (%d) out of limits [1,%d]".as_ptr(),
             sz,
             16 as i32,
         );
@@ -30305,10 +29115,7 @@ unsafe extern "C-unwind" fn getoption(
         99 => {
             *size = getnum(fmt, -(1 as i32));
             if ((*size == -(1 as i32)) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-                luaL_error(
-                    (*h).L,
-                    b"missing size for format option 'c'\0" as *const u8 as *const std::ffi::c_char,
-                );
+                luaL_error((*h).L, c"missing size for format option 'c'".as_ptr());
             }
             return Kchar;
         }
@@ -30333,11 +29140,7 @@ unsafe extern "C-unwind" fn getoption(
             (*h).maxalign = getnumlimit(h, fmt, maxalign);
         }
         _ => {
-            luaL_error(
-                (*h).L,
-                b"invalid format option '%c'\0" as *const u8 as *const std::ffi::c_char,
-                opt,
-            );
+            luaL_error((*h).L, c"invalid format option '%c'".as_ptr(), opt);
         }
     }
     return Knop;
@@ -30359,7 +29162,7 @@ unsafe extern "C-unwind" fn getdetails(
             luaL_argerror(
                 (*h).L,
                 1 as i32,
-                b"invalid next option for option 'X'\0" as *const u8 as *const std::ffi::c_char,
+                c"invalid next option for option 'X'".as_ptr(),
             );
         }
     }
@@ -30373,8 +29176,7 @@ unsafe extern "C-unwind" fn getdetails(
             luaL_argerror(
                 (*h).L,
                 1 as i32,
-                b"format asks for alignment not power of 2\0" as *const u8
-                    as *const std::ffi::c_char,
+                c"format asks for alignment not power of 2".as_ptr(),
             );
         }
         *ntoalign = align - (totalsize & (align - 1 as i32) as size_t) as i32 & align - 1 as i32;
@@ -30490,11 +29292,8 @@ unsafe extern "C-unwind" fn str_pack(mut L: *mut lua_State) -> i32 {
                     let mut lim: lua_Integer =
                         (1 as i32 as lua_Integer) << size * 8 as i32 - 1 as i32;
                     (((-lim <= n && n < lim) as i32 != 0) as i32 as std::ffi::c_long != 0
-                        || luaL_argerror(
-                            L,
-                            arg,
-                            b"integer overflow\0" as *const u8 as *const std::ffi::c_char,
-                        ) != 0) as i32;
+                        || luaL_argerror(L, arg, c"integer overflow".as_ptr()) != 0)
+                        as i32;
                 }
                 packint(
                     &mut b,
@@ -30512,11 +29311,8 @@ unsafe extern "C-unwind" fn str_pack(mut L: *mut lua_State) -> i32 {
                         as i32
                         != 0) as i32 as std::ffi::c_long
                         != 0
-                        || luaL_argerror(
-                            L,
-                            arg,
-                            b"unsigned overflow\0" as *const u8 as *const std::ffi::c_char,
-                        ) != 0) as i32;
+                        || luaL_argerror(L, arg, c"unsigned overflow".as_ptr()) != 0)
+                        as i32;
                 }
                 packint(&mut b, n_0 as lua_Unsigned, h.islittle, size, 0);
                 current_block_33 = 3222590281903869779;
@@ -30566,11 +29362,8 @@ unsafe extern "C-unwind" fn str_pack(mut L: *mut lua_State) -> i32 {
                 let mut len: size_t = 0;
                 let mut s: *const std::ffi::c_char = luaL_checklstring(L, arg, &mut len);
                 (((len <= size as size_t) as i32 != 0) as i32 as std::ffi::c_long != 0
-                    || luaL_argerror(
-                        L,
-                        arg,
-                        b"string longer than given size\0" as *const u8 as *const std::ffi::c_char,
-                    ) != 0) as i32;
+                    || luaL_argerror(L, arg, c"string longer than given size".as_ptr()) != 0)
+                    as i32;
                 luaL_addlstring(&mut b, s, len);
                 loop {
                     let fresh192 = len;
@@ -30593,12 +29386,8 @@ unsafe extern "C-unwind" fn str_pack(mut L: *mut lua_State) -> i32 {
                     || len_0 < (1 as i32 as size_t) << size * 8 as i32) as i32
                     != 0) as i32 as std::ffi::c_long
                     != 0
-                    || luaL_argerror(
-                        L,
-                        arg,
-                        b"string length does not fit in given size\0" as *const u8
-                            as *const std::ffi::c_char,
-                    ) != 0) as i32;
+                    || luaL_argerror(L, arg, c"string length does not fit in given size".as_ptr())
+                        != 0) as i32;
                 packint(&mut b, len_0 as lua_Unsigned, h.islittle, size, 0);
                 luaL_addlstring(&mut b, s_0, len_0);
                 totalsize = totalsize.wrapping_add(len_0);
@@ -30608,11 +29397,8 @@ unsafe extern "C-unwind" fn str_pack(mut L: *mut lua_State) -> i32 {
                 let mut len_1: size_t = 0;
                 let mut s_1: *const std::ffi::c_char = luaL_checklstring(L, arg, &mut len_1);
                 (((strlen(s_1) == len_1) as i32 != 0) as i32 as std::ffi::c_long != 0
-                    || luaL_argerror(
-                        L,
-                        arg,
-                        b"string contains zeros\0" as *const u8 as *const std::ffi::c_char,
-                    ) != 0) as i32;
+                    || luaL_argerror(L, arg, c"string contains zeros".as_ptr()) != 0)
+                    as i32;
                 luaL_addlstring(&mut b, s_1, len_1);
                 (b.n < b.size || !(luaL_prepbuffsize(&mut b, 1 as i32 as size_t)).is_null()) as i32;
                 let fresh194 = b.n;
@@ -30662,11 +29448,7 @@ unsafe extern "C-unwind" fn str_packsize(mut L: *mut lua_State) -> i32 {
         (((opt as u32 != Kstring as i32 as u32 && opt as u32 != Kzstr as i32 as u32) as i32 != 0)
             as i32 as std::ffi::c_long
             != 0
-            || luaL_argerror(
-                L,
-                1 as i32,
-                b"variable-length format\0" as *const u8 as *const std::ffi::c_char,
-            ) != 0) as i32;
+            || luaL_argerror(L, 1 as i32, c"variable-length format".as_ptr()) != 0) as i32;
         size += ntoalign;
         (((totalsize
             <= (if (::core::mem::size_of::<size_t>() as usize)
@@ -30679,11 +29461,7 @@ unsafe extern "C-unwind" fn str_packsize(mut L: *mut lua_State) -> i32 {
             .wrapping_sub(size as size_t)) as i32
             != 0) as i32 as std::ffi::c_long
             != 0
-            || luaL_argerror(
-                L,
-                1 as i32,
-                b"format result too large\0" as *const u8 as *const std::ffi::c_char,
-            ) != 0) as i32;
+            || luaL_argerror(L, 1 as i32, c"format result too large".as_ptr()) != 0) as i32;
         totalsize = totalsize.wrapping_add(size as size_t);
     }
     lua_pushinteger(L, totalsize as lua_Integer);
@@ -30742,8 +29520,7 @@ unsafe extern "C-unwind" fn unpackint(
             {
                 luaL_error(
                     L,
-                    b"%d-byte integer does not fit into Lua Integer\0" as *const u8
-                        as *const std::ffi::c_char,
+                    c"%d-byte integer does not fit into Lua Integer".as_ptr(),
                     size,
                 );
             }
@@ -30766,11 +29543,7 @@ unsafe extern "C-unwind" fn str_unpack(mut L: *mut lua_State) -> i32 {
         .wrapping_sub(1 as i32 as size_t);
     let mut n: i32 = 0;
     (((pos <= ld) as i32 != 0) as i32 as std::ffi::c_long != 0
-        || luaL_argerror(
-            L,
-            3 as i32,
-            b"initial position out of string\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_argerror(L, 3 as i32, c"initial position out of string".as_ptr()) != 0) as i32;
     initheader(L, &mut h);
     while *fmt as i32 != '\0' as i32 {
         let mut size: i32 = 0;
@@ -30779,17 +29552,9 @@ unsafe extern "C-unwind" fn str_unpack(mut L: *mut lua_State) -> i32 {
         ((((ntoalign as size_t).wrapping_add(size as size_t) <= ld.wrapping_sub(pos)) as i32 != 0)
             as i32 as std::ffi::c_long
             != 0
-            || luaL_argerror(
-                L,
-                2 as i32,
-                b"data string too short\0" as *const u8 as *const std::ffi::c_char,
-            ) != 0) as i32;
+            || luaL_argerror(L, 2 as i32, c"data string too short".as_ptr()) != 0) as i32;
         pos = pos.wrapping_add(ntoalign as size_t);
-        luaL_checkstack(
-            L,
-            2 as i32,
-            b"too many results\0" as *const u8 as *const std::ffi::c_char,
-        );
+        luaL_checkstack(L, 2 as i32, c"too many results".as_ptr());
         n += 1;
         n;
         match opt as u32 {
@@ -30842,23 +29607,16 @@ unsafe extern "C-unwind" fn str_unpack(mut L: *mut lua_State) -> i32 {
                 (((len <= ld.wrapping_sub(pos).wrapping_sub(size as size_t)) as i32 != 0) as i32
                     as std::ffi::c_long
                     != 0
-                    || luaL_argerror(
-                        L,
-                        2 as i32,
-                        b"data string too short\0" as *const u8 as *const std::ffi::c_char,
-                    ) != 0) as i32;
+                    || luaL_argerror(L, 2 as i32, c"data string too short".as_ptr()) != 0)
+                    as i32;
                 lua_pushlstring(L, data.offset(pos as isize).offset(size as isize), len);
                 pos = pos.wrapping_add(len);
             }
             7 => {
                 let mut len_0: size_t = strlen(data.offset(pos as isize));
                 (((pos.wrapping_add(len_0) < ld) as i32 != 0) as i32 as std::ffi::c_long != 0
-                    || luaL_argerror(
-                        L,
-                        2 as i32,
-                        b"unfinished string for format 'z'\0" as *const u8
-                            as *const std::ffi::c_char,
-                    ) != 0) as i32;
+                    || luaL_argerror(L, 2 as i32, c"unfinished string for format 'z'".as_ptr())
+                        != 0) as i32;
                 lua_pushlstring(L, data.offset(pos as isize), len_0);
                 pos = pos.wrapping_add(len_0.wrapping_add(1 as i32 as size_t));
             }
@@ -30877,119 +29635,119 @@ static mut strlib: [luaL_Reg; 18] = unsafe {
     [
         {
             let mut init = luaL_Reg {
-                name: b"byte\0" as *const u8 as *const std::ffi::c_char,
+                name: c"byte".as_ptr(),
                 func: Some(str_byte as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"char\0" as *const u8 as *const std::ffi::c_char,
+                name: c"char".as_ptr(),
                 func: Some(str_char as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"dump\0" as *const u8 as *const std::ffi::c_char,
+                name: c"dump".as_ptr(),
                 func: Some(str_dump as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"find\0" as *const u8 as *const std::ffi::c_char,
+                name: c"find".as_ptr(),
                 func: Some(str_find as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"format\0" as *const u8 as *const std::ffi::c_char,
+                name: c"format".as_ptr(),
                 func: Some(str_format as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"gmatch\0" as *const u8 as *const std::ffi::c_char,
+                name: c"gmatch".as_ptr(),
                 func: Some(gmatch as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"gsub\0" as *const u8 as *const std::ffi::c_char,
+                name: c"gsub".as_ptr(),
                 func: Some(str_gsub as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"len\0" as *const u8 as *const std::ffi::c_char,
+                name: c"len".as_ptr(),
                 func: Some(str_len as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"lower\0" as *const u8 as *const std::ffi::c_char,
+                name: c"lower".as_ptr(),
                 func: Some(str_lower as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"match\0" as *const u8 as *const std::ffi::c_char,
+                name: c"match".as_ptr(),
                 func: Some(str_match as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"rep\0" as *const u8 as *const std::ffi::c_char,
+                name: c"rep".as_ptr(),
                 func: Some(str_rep as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"reverse\0" as *const u8 as *const std::ffi::c_char,
+                name: c"reverse".as_ptr(),
                 func: Some(str_reverse as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"sub\0" as *const u8 as *const std::ffi::c_char,
+                name: c"sub".as_ptr(),
                 func: Some(str_sub as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"upper\0" as *const u8 as *const std::ffi::c_char,
+                name: c"upper".as_ptr(),
                 func: Some(str_upper as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"pack\0" as *const u8 as *const std::ffi::c_char,
+                name: c"pack".as_ptr(),
                 func: Some(str_pack as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"packsize\0" as *const u8 as *const std::ffi::c_char,
+                name: c"packsize".as_ptr(),
                 func: Some(str_packsize as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"unpack\0" as *const u8 as *const std::ffi::c_char,
+                name: c"unpack".as_ptr(),
                 func: Some(str_unpack as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
@@ -31012,16 +29770,12 @@ unsafe extern "C-unwind" fn createmetatable(mut L: *mut lua_State) {
             .wrapping_sub(1 as i32 as usize) as i32,
     );
     luaL_setfuncs(L, (&raw const stringmetamethods).cast(), 0);
-    lua_pushstring(L, b"\0" as *const u8 as *const std::ffi::c_char);
+    lua_pushstring(L, c"".as_ptr());
     lua_pushvalue(L, -(2 as i32));
     lua_setmetatable(L, -(2 as i32));
     lua_settop(L, -(1 as i32) - 1 as i32);
     lua_pushvalue(L, -(2 as i32));
-    lua_setfield(
-        L,
-        -(2 as i32),
-        b"__index\0" as *const u8 as *const std::ffi::c_char,
-    );
+    lua_setfield(L, -(2 as i32), c"__index".as_ptr());
     lua_settop(L, -(1 as i32) - 1 as i32);
 }
 #[unsafe(no_mangle)]
@@ -31058,19 +29812,15 @@ unsafe extern "C-unwind" fn checktab(mut L: *mut lua_State, mut arg: i32, mut wh
         if lua_getmetatable(L, arg) != 0
             && (what & 1 as i32 == 0 || {
                 n += 1;
-                checkfield(L, b"__index\0" as *const u8 as *const std::ffi::c_char, n) != 0
+                checkfield(L, c"__index".as_ptr(), n) != 0
             })
             && (what & 2 as i32 == 0 || {
                 n += 1;
-                checkfield(
-                    L,
-                    b"__newindex\0" as *const u8 as *const std::ffi::c_char,
-                    n,
-                ) != 0
+                checkfield(L, c"__newindex".as_ptr(), n) != 0
             })
             && (what & 4 as i32 == 0 || {
                 n += 1;
-                checkfield(L, b"__len\0" as *const u8 as *const std::ffi::c_char, n) != 0
+                checkfield(L, c"__len".as_ptr(), n) != 0
             })
         {
             lua_settop(L, -n - 1 as i32);
@@ -31095,11 +29845,8 @@ unsafe extern "C-unwind" fn tinsert(mut L: *mut lua_State) -> i32 {
                 as i32
                 != 0) as i32 as std::ffi::c_long
                 != 0
-                || luaL_argerror(
-                    L,
-                    2 as i32,
-                    b"position out of bounds\0" as *const u8 as *const std::ffi::c_char,
-                ) != 0) as i32;
+                || luaL_argerror(L, 2 as i32, c"position out of bounds".as_ptr()) != 0)
+                as i32;
             i = e;
             while i > pos {
                 lua_geti(L, 1 as i32, i - 1 as i32 as lua_Integer);
@@ -31109,10 +29856,7 @@ unsafe extern "C-unwind" fn tinsert(mut L: *mut lua_State) -> i32 {
             }
         }
         _ => {
-            return luaL_error(
-                L,
-                b"wrong number of arguments to 'insert'\0" as *const u8 as *const std::ffi::c_char,
-            );
+            return luaL_error(L, c"wrong number of arguments to 'insert'".as_ptr());
         }
     }
     lua_seti(L, 1 as i32, pos);
@@ -31127,11 +29871,7 @@ unsafe extern "C-unwind" fn tremove(mut L: *mut lua_State) -> i32 {
             as i32
             != 0) as i32 as std::ffi::c_long
             != 0
-            || luaL_argerror(
-                L,
-                2 as i32,
-                b"position out of bounds\0" as *const u8 as *const std::ffi::c_char,
-            ) != 0) as i32;
+            || luaL_argerror(L, 2 as i32, c"position out of bounds".as_ptr()) != 0) as i32;
     }
     lua_geti(L, 1 as i32, pos);
     while pos < size {
@@ -31161,21 +29901,14 @@ unsafe extern "C-unwind" fn tmove(mut L: *mut lua_State) -> i32 {
         (((f > 0 as lua_Integer || e < 9223372036854775807 as std::ffi::c_longlong + f) as i32 != 0)
             as i32 as std::ffi::c_long
             != 0
-            || luaL_argerror(
-                L,
-                3 as i32,
-                b"too many elements to move\0" as *const u8 as *const std::ffi::c_char,
-            ) != 0) as i32;
+            || luaL_argerror(L, 3 as i32, c"too many elements to move".as_ptr()) != 0)
+            as i32;
         n = e - f + 1 as i32 as lua_Integer;
         (((t <= 9223372036854775807 as std::ffi::c_longlong - n + 1 as i32 as std::ffi::c_longlong)
             as i32
             != 0) as i32 as std::ffi::c_long
             != 0
-            || luaL_argerror(
-                L,
-                4 as i32,
-                b"destination wrap around\0" as *const u8 as *const std::ffi::c_char,
-            ) != 0) as i32;
+            || luaL_argerror(L, 4 as i32, c"destination wrap around".as_ptr()) != 0) as i32;
         if t > e || t <= f || tt != 1 as i32 && lua_compare(L, 1 as i32, tt, 0) == 0 {
             i = 0 as lua_Integer;
             while i < n {
@@ -31206,8 +29939,7 @@ unsafe extern "C-unwind" fn addfield(
     if ((lua_isstring(L, -(1 as i32)) == 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
         luaL_error(
             L,
-            b"invalid value (%s) at index %I in table for 'concat'\0" as *const u8
-                as *const std::ffi::c_char,
+            c"invalid value (%s) at index %I in table for 'concat'".as_ptr(),
             lua_typename(L, lua_type(L, -(1 as i32))),
             i,
         );
@@ -31225,12 +29957,7 @@ unsafe extern "C-unwind" fn tconcat(mut L: *mut lua_State) -> i32 {
     checktab(L, 1 as i32, 1 as i32 | 4 as i32);
     let mut last: lua_Integer = luaL_len(L, 1 as i32);
     let mut lsep: size_t = 0;
-    let mut sep: *const std::ffi::c_char = luaL_optlstring(
-        L,
-        2 as i32,
-        b"\0" as *const u8 as *const std::ffi::c_char,
-        &mut lsep,
-    );
+    let mut sep: *const std::ffi::c_char = luaL_optlstring(L, 2 as i32, c"".as_ptr(), &mut lsep);
     let mut i: lua_Integer = luaL_optinteger(L, 3 as i32, 1 as i32 as lua_Integer);
     last = luaL_optinteger(L, 4 as i32, last);
     luaL_buffinit(L, &mut b);
@@ -31258,7 +29985,7 @@ unsafe extern "C-unwind" fn tpack(mut L: *mut lua_State) -> i32 {
         i;
     }
     lua_pushinteger(L, n as lua_Integer);
-    lua_setfield(L, 1 as i32, b"n\0" as *const u8 as *const std::ffi::c_char);
+    lua_setfield(L, 1 as i32, c"n".as_ptr());
     return 1 as i32;
 }
 unsafe extern "C-unwind" fn tunpack(mut L: *mut lua_State) -> i32 {
@@ -31280,10 +30007,7 @@ unsafe extern "C-unwind" fn tunpack(mut L: *mut lua_State) -> i32 {
         != 0) as i32 as std::ffi::c_long
         != 0
     {
-        return luaL_error(
-            L,
-            b"too many results to unpack\0" as *const u8 as *const std::ffi::c_char,
-        );
+        return luaL_error(L, c"too many results to unpack".as_ptr());
     }
     while i < e {
         lua_geti(L, 1 as i32, i);
@@ -31358,10 +30082,7 @@ unsafe extern "C-unwind" fn partition(mut L: *mut lua_State, mut lo: IdxT, mut u
             if ((i == up.wrapping_sub(1 as i32 as IdxT)) as i32 != 0) as i32 as std::ffi::c_long
                 != 0
             {
-                luaL_error(
-                    L,
-                    b"invalid order function for sorting\0" as *const u8 as *const std::ffi::c_char,
-                );
+                luaL_error(L, c"invalid order function for sorting".as_ptr());
             }
             lua_settop(L, -(1 as i32) - 1 as i32);
         }
@@ -31372,10 +30093,7 @@ unsafe extern "C-unwind" fn partition(mut L: *mut lua_State, mut lo: IdxT, mut u
                 break;
             }
             if ((j < i) as i32 != 0) as i32 as std::ffi::c_long != 0 {
-                luaL_error(
-                    L,
-                    b"invalid order function for sorting\0" as *const u8 as *const std::ffi::c_char,
-                );
+                luaL_error(L, c"invalid order function for sorting".as_ptr());
             }
             lua_settop(L, -(1 as i32) - 1 as i32);
         }
@@ -31462,11 +30180,7 @@ unsafe extern "C-unwind" fn sort(mut L: *mut lua_State) -> i32 {
     let mut n: lua_Integer = luaL_len(L, 1 as i32);
     if n > 1 as i32 as lua_Integer {
         (((n < 2147483647 as i32 as lua_Integer) as i32 != 0) as i32 as std::ffi::c_long != 0
-            || luaL_argerror(
-                L,
-                1 as i32,
-                b"array too big\0" as *const u8 as *const std::ffi::c_char,
-            ) != 0) as i32;
+            || luaL_argerror(L, 1 as i32, c"array too big".as_ptr()) != 0) as i32;
         if !(lua_type(L, 2 as i32) <= 0) {
             luaL_checktype(L, 2 as i32, 6 as i32);
         }
@@ -31479,49 +30193,49 @@ static mut tab_funcs: [luaL_Reg; 8] = unsafe {
     [
         {
             let mut init = luaL_Reg {
-                name: b"concat\0" as *const u8 as *const std::ffi::c_char,
+                name: c"concat".as_ptr(),
                 func: Some(tconcat as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"insert\0" as *const u8 as *const std::ffi::c_char,
+                name: c"insert".as_ptr(),
                 func: Some(tinsert as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"pack\0" as *const u8 as *const std::ffi::c_char,
+                name: c"pack".as_ptr(),
                 func: Some(tpack as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"unpack\0" as *const u8 as *const std::ffi::c_char,
+                name: c"unpack".as_ptr(),
                 func: Some(tunpack as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"remove\0" as *const u8 as *const std::ffi::c_char,
+                name: c"remove".as_ptr(),
                 func: Some(tremove as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"move\0" as *const u8 as *const std::ffi::c_char,
+                name: c"move".as_ptr(),
                 func: Some(tmove as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"sort\0" as *const u8 as *const std::ffi::c_char,
+                name: c"sort".as_ptr(),
                 func: Some(sort as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
@@ -31624,18 +30338,10 @@ unsafe extern "C-unwind" fn utflen(mut L: *mut lua_State) -> i32 {
     }) as i32
         != 0) as i32 as std::ffi::c_long
         != 0
-        || luaL_argerror(
-            L,
-            2 as i32,
-            b"initial position out of bounds\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_argerror(L, 2 as i32, c"initial position out of bounds".as_ptr()) != 0) as i32;
     posj -= 1;
     (((posj < len as lua_Integer) as i32 != 0) as i32 as std::ffi::c_long != 0
-        || luaL_argerror(
-            L,
-            3 as i32,
-            b"final position out of bounds\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_argerror(L, 3 as i32, c"final position out of bounds".as_ptr()) != 0) as i32;
     while posi <= posj {
         let mut s1: *const std::ffi::c_char =
             utf8_decode(s.offset(posi as isize), 0 as *mut utfint, (lax == 0) as i32);
@@ -31661,32 +30367,17 @@ unsafe extern "C-unwind" fn codepoint(mut L: *mut lua_State) -> i32 {
     let mut n: i32 = 0;
     let mut se: *const std::ffi::c_char = 0 as *const std::ffi::c_char;
     (((posi >= 1 as i32 as lua_Integer) as i32 != 0) as i32 as std::ffi::c_long != 0
-        || luaL_argerror(
-            L,
-            2 as i32,
-            b"out of bounds\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_argerror(L, 2 as i32, c"out of bounds".as_ptr()) != 0) as i32;
     (((pose <= len as lua_Integer) as i32 != 0) as i32 as std::ffi::c_long != 0
-        || luaL_argerror(
-            L,
-            3 as i32,
-            b"out of bounds\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_argerror(L, 3 as i32, c"out of bounds".as_ptr()) != 0) as i32;
     if posi > pose {
         return 0;
     }
     if pose - posi >= 2147483647 as i32 as lua_Integer {
-        return luaL_error(
-            L,
-            b"string slice too long\0" as *const u8 as *const std::ffi::c_char,
-        );
+        return luaL_error(L, c"string slice too long".as_ptr());
     }
     n = (pose - posi) as i32 + 1 as i32;
-    luaL_checkstack(
-        L,
-        n,
-        b"string slice too long\0" as *const u8 as *const std::ffi::c_char,
-    );
+    luaL_checkstack(L, n, c"string slice too long".as_ptr());
     n = 0;
     se = s.offset(pose as isize);
     s = s.offset((posi - 1 as i32 as lua_Integer) as isize);
@@ -31694,10 +30385,7 @@ unsafe extern "C-unwind" fn codepoint(mut L: *mut lua_State) -> i32 {
         let mut code: utfint = 0;
         s = utf8_decode(s, &mut code, (lax == 0) as i32);
         if s.is_null() {
-            return luaL_error(
-                L,
-                b"invalid UTF-8 code\0" as *const u8 as *const std::ffi::c_char,
-            );
+            return luaL_error(L, c"invalid UTF-8 code".as_ptr());
         }
         lua_pushinteger(L, code as lua_Integer);
         n += 1;
@@ -31708,16 +30396,8 @@ unsafe extern "C-unwind" fn codepoint(mut L: *mut lua_State) -> i32 {
 unsafe extern "C-unwind" fn pushutfchar(mut L: *mut lua_State, mut arg: i32) {
     let mut code: lua_Unsigned = luaL_checkinteger(L, arg) as lua_Unsigned;
     (((code <= 0x7fffffff as u32 as lua_Unsigned) as i32 != 0) as i32 as std::ffi::c_long != 0
-        || luaL_argerror(
-            L,
-            arg,
-            b"value out of range\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
-    lua_pushfstring(
-        L,
-        b"%U\0" as *const u8 as *const std::ffi::c_char,
-        code as std::ffi::c_long,
-    );
+        || luaL_argerror(L, arg, c"value out of range".as_ptr()) != 0) as i32;
+    lua_pushfstring(L, c"%U".as_ptr(), code as std::ffi::c_long);
 }
 unsafe extern "C-unwind" fn utfchar(mut L: *mut lua_State) -> i32 {
     let mut n: i32 = lua_gettop(L);
@@ -31760,11 +30440,7 @@ unsafe extern "C-unwind" fn byteoffset(mut L: *mut lua_State) -> i32 {
     }) as i32
         != 0) as i32 as std::ffi::c_long
         != 0
-        || luaL_argerror(
-            L,
-            3 as i32,
-            b"position out of bounds\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_argerror(L, 3 as i32, c"position out of bounds".as_ptr()) != 0) as i32;
     if n == 0 as lua_Integer {
         while posi > 0 as lua_Integer && *s.offset(posi as isize) as i32 & 0xc0 == 0x80 {
             posi -= 1;
@@ -31772,11 +30448,7 @@ unsafe extern "C-unwind" fn byteoffset(mut L: *mut lua_State) -> i32 {
         }
     } else {
         if *s.offset(posi as isize) as i32 & 0xc0 == 0x80 {
-            return luaL_error(
-                L,
-                b"initial position is a continuation byte\0" as *const u8
-                    as *const std::ffi::c_char,
-            );
+            return luaL_error(L, c"initial position is a continuation byte".as_ptr());
         }
         if n < 0 as lua_Integer {
             while n < 0 as lua_Integer && posi > 0 as lua_Integer {
@@ -31831,10 +30503,7 @@ unsafe extern "C-unwind" fn iter_aux(mut L: *mut lua_State, mut strict: i32) -> 
         let mut next: *const std::ffi::c_char =
             utf8_decode(s.offset(n as isize), &mut code, strict);
         if next.is_null() || *next as i32 & 0xc0 == 0x80 {
-            return luaL_error(
-                L,
-                b"invalid UTF-8 code\0" as *const u8 as *const std::ffi::c_char,
-            );
+            return luaL_error(L, c"invalid UTF-8 code".as_ptr());
         }
         lua_pushinteger(L, n.wrapping_add(1 as i32 as lua_Unsigned) as lua_Integer);
         lua_pushinteger(L, code as lua_Integer);
@@ -31851,11 +30520,7 @@ unsafe extern "C-unwind" fn iter_codes(mut L: *mut lua_State) -> i32 {
     let mut lax: i32 = lua_toboolean(L, 2 as i32);
     let mut s: *const std::ffi::c_char = luaL_checklstring(L, 1 as i32, 0 as *mut size_t);
     ((!(*s as i32 & 0xc0 == 0x80) as i32 != 0) as i32 as std::ffi::c_long != 0
-        || luaL_argerror(
-            L,
-            1 as i32,
-            b"invalid UTF-8 code\0" as *const u8 as *const std::ffi::c_char,
-        ) != 0) as i32;
+        || luaL_argerror(L, 1 as i32, c"invalid UTF-8 code".as_ptr()) != 0) as i32;
     lua_pushcclosure(
         L,
         if lax != 0 {
@@ -31873,42 +30538,42 @@ static mut funcs: [luaL_Reg; 7] = unsafe {
     [
         {
             let mut init = luaL_Reg {
-                name: b"offset\0" as *const u8 as *const std::ffi::c_char,
+                name: c"offset".as_ptr(),
                 func: Some(byteoffset as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"codepoint\0" as *const u8 as *const std::ffi::c_char,
+                name: c"codepoint".as_ptr(),
                 func: Some(codepoint as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"char\0" as *const u8 as *const std::ffi::c_char,
+                name: c"char".as_ptr(),
                 func: Some(utfchar as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"len\0" as *const u8 as *const std::ffi::c_char,
+                name: c"len".as_ptr(),
                 func: Some(utflen as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"codes\0" as *const u8 as *const std::ffi::c_char,
+                name: c"codes".as_ptr(),
                 func: Some(iter_codes as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"charpattern\0" as *const u8 as *const std::ffi::c_char,
+                name: c"charpattern".as_ptr(),
                 func: None,
             };
             init
@@ -31946,81 +30611,77 @@ pub unsafe extern "C-unwind" fn luaopen_utf8(mut L: *mut lua_State) -> i32 {
             .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
             .wrapping_sub(1 as i32 as usize),
     );
-    lua_setfield(
-        L,
-        -(2 as i32),
-        b"charpattern\0" as *const u8 as *const std::ffi::c_char,
-    );
+    lua_setfield(L, -(2 as i32), c"charpattern".as_ptr());
     return 1 as i32;
 }
 static mut loadedlibs: [luaL_Reg; 11] = unsafe {
     [
         {
             let mut init = luaL_Reg {
-                name: b"_G\0" as *const u8 as *const std::ffi::c_char,
+                name: c"_G".as_ptr(),
                 func: Some(luaopen_base as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"package\0" as *const u8 as *const std::ffi::c_char,
+                name: c"package".as_ptr(),
                 func: Some(luaopen_package as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"coroutine\0" as *const u8 as *const std::ffi::c_char,
+                name: c"coroutine".as_ptr(),
                 func: Some(luaopen_coroutine as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"table\0" as *const u8 as *const std::ffi::c_char,
+                name: c"table".as_ptr(),
                 func: Some(luaopen_table as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"io\0" as *const u8 as *const std::ffi::c_char,
+                name: c"io".as_ptr(),
                 func: Some(luaopen_io as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"os\0" as *const u8 as *const std::ffi::c_char,
+                name: c"os".as_ptr(),
                 func: Some(luaopen_os as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"string\0" as *const u8 as *const std::ffi::c_char,
+                name: c"string".as_ptr(),
                 func: Some(luaopen_string as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"math\0" as *const u8 as *const std::ffi::c_char,
+                name: c"math".as_ptr(),
                 func: Some(luaopen_math as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"utf8\0" as *const u8 as *const std::ffi::c_char,
+                name: c"utf8".as_ptr(),
                 func: Some(luaopen_utf8 as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
         },
         {
             let mut init = luaL_Reg {
-                name: b"debug\0" as *const u8 as *const std::ffi::c_char,
+                name: c"debug".as_ptr(),
                 func: Some(luaopen_debug as unsafe extern "C-unwind" fn(*mut lua_State) -> i32),
             };
             init
