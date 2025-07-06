@@ -31,9 +31,6 @@ use opcodes::*;
 use zio::*;
 
 unsafe extern "C-unwind" {
-    pub type _IO_wide_data;
-    pub type _IO_codecvt;
-    pub type _IO_marker;
     static mut stdin: *mut FILE;
     static mut stdout: *mut FILE;
     static mut stderr: *mut FILE;
@@ -130,34 +127,34 @@ pub struct CallInfo {
     pub top: StkIdRel,
     pub previous: *mut CallInfo,
     pub next: *mut CallInfo,
-    pub u: C2RustUnnamed_1,
-    pub u2: C2RustUnnamed,
+    pub u: CallInfoState,
+    pub u2: CallInfoUnion2,
     pub nresults: std::ffi::c_short,
     pub callstatus: u16,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub union C2RustUnnamed {
+pub union CallInfoUnion2 {
     pub funcidx: i32,
     pub nyield: i32,
     pub nres: i32,
-    pub transferinfo: C2RustUnnamed_0,
+    pub transferinfo: CallInfoTransferredValues,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct C2RustUnnamed_0 {
+pub struct CallInfoTransferredValues {
     pub ftransfer: u16,
     pub ntransfer: u16,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub union C2RustUnnamed_1 {
-    pub l: C2RustUnnamed_3,
-    pub c: C2RustUnnamed_2,
+pub union CallInfoState {
+    pub l: CallInfoLuaState,
+    pub c: CallInfoCState,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct C2RustUnnamed_2 {
+pub struct CallInfoCState {
     pub k: lua_KFunction,
     pub old_errfunc: ptrdiff_t,
     pub ctx: lua_KContext,
@@ -167,7 +164,7 @@ pub type lua_KFunction =
     Option<unsafe extern "C-unwind" fn(*mut lua_State, i32, lua_KContext) -> i32>;
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct C2RustUnnamed_3 {
+pub struct CallInfoLuaState {
     pub savedpc: *const Instruction,
     pub trap: sig_atomic_t,
     pub nextraargs: i32,
@@ -184,11 +181,11 @@ pub type StkId = *mut StackValue;
 #[repr(C)]
 pub union StackValue {
     pub val: TValue,
-    pub tbclist: C2RustUnnamed_4,
+    pub tbclist: ToBeClosedList,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct C2RustUnnamed_4 {
+pub struct ToBeClosedList {
     pub value_: Value,
     pub tt_: lu_byte,
     pub delta: u16,
@@ -232,24 +229,24 @@ pub struct UpVal {
     pub next: *mut GCObject,
     pub tt: lu_byte,
     pub marked: lu_byte,
-    pub v: C2RustUnnamed_7,
-    pub u: C2RustUnnamed_5,
+    pub v: UpValValuePtr,
+    pub u: UpValLinksOrValue,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub union C2RustUnnamed_5 {
-    pub open: C2RustUnnamed_6,
+pub union UpValLinksOrValue {
+    pub open: UpValLinks,
     pub value: TValue,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct C2RustUnnamed_6 {
+pub struct UpValLinks {
     pub next: *mut UpVal,
     pub previous: *mut *mut UpVal,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub union C2RustUnnamed_7 {
+pub union UpValValuePtr {
     pub p: *mut TValue,
     pub offset: ptrdiff_t,
 }
