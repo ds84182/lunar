@@ -1,0 +1,12 @@
+[package]
+name = "lunar"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "lunar"
+path = "src/lua.rs"
+
+[dependencies]
+c2rust-bitfields = { git = "https://github.com/immunant/c2rust.git", rev = "e56acbc" }
+libc = "0.2.174"
