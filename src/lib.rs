@@ -813,60 +813,60 @@ pub const TK_STRING: RESERVED = 292;
 pub const TK_NAME: RESERVED = 291;
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub union C2RustUnnamed_11 {
+pub union ExpVariant {
     pub ival: lua_Integer,
     pub nval: lua_Number,
     pub strval: *mut TString,
     pub info: i32,
-    pub ind: C2RustUnnamed_13,
-    pub var: C2RustUnnamed_12,
+    pub ind: IndexedVar,
+    pub var: LocalVar,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct C2RustUnnamed_12 {
+pub struct LocalVar {
     pub ridx: lu_byte,
     pub vidx: u16,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct C2RustUnnamed_13 {
+pub struct IndexedVar {
     pub idx: i16,
     pub t: lu_byte,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct expdesc {
-    pub k: expkind,
-    pub u: C2RustUnnamed_11,
+pub struct ExpDesc {
+    pub k: ExpKind,
+    pub u: ExpVariant,
     pub t: i32,
     pub f: i32,
 }
-pub type expkind = u32;
-pub const VVARARG: expkind = 19;
-pub const VCALL: expkind = 18;
-pub const VRELOC: expkind = 17;
-pub const VJMP: expkind = 16;
-pub const VINDEXSTR: expkind = 15;
-pub const VINDEXI: expkind = 14;
-pub const VINDEXUP: expkind = 13;
-pub const VINDEXED: expkind = 12;
-pub const VCONST: expkind = 11;
-pub const VUPVAL: expkind = 10;
-pub const VLOCAL: expkind = 9;
-pub const VNONRELOC: expkind = 8;
-pub const VKSTR: expkind = 7;
-pub const VKINT: expkind = 6;
-pub const VKFLT: expkind = 5;
-pub const VK: expkind = 4;
-pub const VFALSE: expkind = 3;
-pub const VTRUE: expkind = 2;
-pub const VNIL: expkind = 1;
-pub const VVOID: expkind = 0;
+pub type ExpKind = u32;
+pub const VVARARG: ExpKind = 19;
+pub const VCALL: ExpKind = 18;
+pub const VRELOC: ExpKind = 17;
+pub const VJMP: ExpKind = 16;
+pub const VINDEXSTR: ExpKind = 15;
+pub const VINDEXI: ExpKind = 14;
+pub const VINDEXUP: ExpKind = 13;
+pub const VINDEXED: ExpKind = 12;
+pub const VCONST: ExpKind = 11;
+pub const VUPVAL: ExpKind = 10;
+pub const VLOCAL: ExpKind = 9;
+pub const VNONRELOC: ExpKind = 8;
+pub const VKSTR: ExpKind = 7;
+pub const VKINT: ExpKind = 6;
+pub const VKFLT: ExpKind = 5;
+pub const VK: ExpKind = 4;
+pub const VFALSE: ExpKind = 3;
+pub const VTRUE: ExpKind = 2;
+pub const VNIL: ExpKind = 1;
+pub const VVOID: ExpKind = 0;
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct LHS_assign {
     pub prev: *mut LHS_assign,
-    pub v: expdesc,
+    pub v: ExpDesc,
 }
 pub type BinOpr = u32;
 pub const OPR_NOBINOPR: BinOpr = 21;
@@ -912,8 +912,8 @@ pub const TK_AND: RESERVED = 256;
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct ConsControl {
-    pub v: expdesc,
-    pub t: *mut expdesc,
+    pub v: ExpDesc,
+    pub t: *mut ExpDesc,
     pub nh: i32,
     pub na: i32,
     pub tostore: i32,
@@ -3723,7 +3723,7 @@ pub unsafe extern "C-unwind" fn luaK_semerror(
     (*ls).t.token = 0;
     luaX_syntaxerror(ls, msg);
 }
-unsafe extern "C-unwind" fn tonumeral(mut e: *const expdesc, mut v: *mut TValue) -> i32 {
+unsafe extern "C-unwind" fn tonumeral(mut e: *const ExpDesc, mut v: *mut TValue) -> i32 {
     if (*e).t != (*e).f {
         return 0;
     }
@@ -3749,14 +3749,14 @@ unsafe extern "C-unwind" fn tonumeral(mut e: *const expdesc, mut v: *mut TValue)
 }
 unsafe extern "C-unwind" fn const2val(
     mut fs: *mut FuncState,
-    mut e: *const expdesc,
+    mut e: *const ExpDesc,
 ) -> *mut TValue {
     return &mut (*((*(*(*fs).ls).dyd).actvar.arr).offset((*e).u.info as isize)).k;
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaK_exp2const(
     mut fs: *mut FuncState,
-    mut e: *const expdesc,
+    mut e: *const ExpDesc,
     mut v: *mut TValue,
 ) -> i32 {
     if (*e).t != (*e).f {
@@ -4226,15 +4226,15 @@ unsafe extern "C-unwind" fn freeregs(mut fs: *mut FuncState, mut r1: i32, mut r2
         freereg(fs, r1);
     };
 }
-unsafe extern "C-unwind" fn freeexp(mut fs: *mut FuncState, mut e: *mut expdesc) {
+unsafe extern "C-unwind" fn freeexp(mut fs: *mut FuncState, mut e: *mut ExpDesc) {
     if (*e).k as u32 == VNONRELOC as i32 as u32 {
         freereg(fs, (*e).u.info);
     }
 }
 unsafe extern "C-unwind" fn freeexps(
     mut fs: *mut FuncState,
-    mut e1: *mut expdesc,
-    mut e2: *mut expdesc,
+    mut e1: *mut ExpDesc,
+    mut e2: *mut ExpDesc,
 ) {
     let mut r1: i32 = if (*e1).k as u32 == VNONRELOC as i32 as u32 {
         (*e1).u.info
@@ -4475,7 +4475,7 @@ unsafe extern "C-unwind" fn luaK_float(mut fs: *mut FuncState, mut reg: i32, mut
         luaK_codek(fs, reg, luaK_numberK(fs, f));
     };
 }
-unsafe extern "C-unwind" fn const2exp(mut v: *mut TValue, mut e: *mut expdesc) {
+unsafe extern "C-unwind" fn const2exp(mut v: *mut TValue, mut e: *mut ExpDesc) {
     match (*v).tt_ as i32 & 0x3f as i32 {
         3 => {
             (*e).k = VKINT;
@@ -4504,7 +4504,7 @@ unsafe extern "C-unwind" fn const2exp(mut v: *mut TValue, mut e: *mut expdesc) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaK_setreturns(
     mut fs: *mut FuncState,
-    mut e: *mut expdesc,
+    mut e: *mut ExpDesc,
     mut nresults: i32,
 ) {
     let mut pc: *mut Instruction =
@@ -4531,12 +4531,12 @@ pub unsafe extern "C-unwind" fn luaK_setreturns(
         luaK_reserveregs(fs, 1 as i32);
     };
 }
-unsafe extern "C-unwind" fn str2K(mut fs: *mut FuncState, mut e: *mut expdesc) {
+unsafe extern "C-unwind" fn str2K(mut fs: *mut FuncState, mut e: *mut ExpDesc) {
     (*e).u.info = stringK(fs, (*e).u.strval);
     (*e).k = VK;
 }
 #[unsafe(no_mangle)]
-pub unsafe extern "C-unwind" fn luaK_setoneret(mut fs: *mut FuncState, mut e: *mut expdesc) {
+pub unsafe extern "C-unwind" fn luaK_setoneret(mut fs: *mut FuncState, mut e: *mut ExpDesc) {
     if (*e).k as u32 == VCALL as i32 as u32 {
         (*e).k = VNONRELOC;
         (*e).u.info = (*((*(*fs).f).code).offset((*e).u.info as isize) >> 0 + 7 as i32
@@ -4553,7 +4553,7 @@ pub unsafe extern "C-unwind" fn luaK_setoneret(mut fs: *mut FuncState, mut e: *m
     }
 }
 #[unsafe(no_mangle)]
-pub unsafe extern "C-unwind" fn luaK_dischargevars(mut fs: *mut FuncState, mut e: *mut expdesc) {
+pub unsafe extern "C-unwind" fn luaK_dischargevars(mut fs: *mut FuncState, mut e: *mut ExpDesc) {
     match (*e).k as u32 {
         11 => {
             const2exp(const2val(fs, e), e);
@@ -4622,7 +4622,7 @@ pub unsafe extern "C-unwind" fn luaK_dischargevars(mut fs: *mut FuncState, mut e
 }
 unsafe extern "C-unwind" fn discharge2reg(
     mut fs: *mut FuncState,
-    mut e: *mut expdesc,
+    mut e: *mut ExpDesc,
     mut reg: i32,
 ) {
     luaK_dischargevars(fs, e);
@@ -4680,7 +4680,7 @@ unsafe extern "C-unwind" fn discharge2reg(
     (*e).u.info = reg;
     (*e).k = VNONRELOC;
 }
-unsafe extern "C-unwind" fn discharge2anyreg(mut fs: *mut FuncState, mut e: *mut expdesc) {
+unsafe extern "C-unwind" fn discharge2anyreg(mut fs: *mut FuncState, mut e: *mut ExpDesc) {
     if (*e).k as u32 != VNONRELOC as i32 as u32 {
         luaK_reserveregs(fs, 1 as i32);
         discharge2reg(fs, e, (*fs).freereg as i32 - 1 as i32);
@@ -4706,7 +4706,7 @@ unsafe extern "C-unwind" fn need_value(mut fs: *mut FuncState, mut list: i32) ->
     }
     return 0;
 }
-unsafe extern "C-unwind" fn exp2reg(mut fs: *mut FuncState, mut e: *mut expdesc, mut reg: i32) {
+unsafe extern "C-unwind" fn exp2reg(mut fs: *mut FuncState, mut e: *mut ExpDesc, mut reg: i32) {
     discharge2reg(fs, e, reg);
     if (*e).k as u32 == VJMP as i32 as u32 {
         luaK_concat(fs, &mut (*e).t, (*e).u.info);
@@ -4735,7 +4735,7 @@ unsafe extern "C-unwind" fn exp2reg(mut fs: *mut FuncState, mut e: *mut expdesc,
     (*e).k = VNONRELOC;
 }
 #[unsafe(no_mangle)]
-pub unsafe extern "C-unwind" fn luaK_exp2nextreg(mut fs: *mut FuncState, mut e: *mut expdesc) {
+pub unsafe extern "C-unwind" fn luaK_exp2nextreg(mut fs: *mut FuncState, mut e: *mut ExpDesc) {
     luaK_dischargevars(fs, e);
     freeexp(fs, e);
     luaK_reserveregs(fs, 1 as i32);
@@ -4744,7 +4744,7 @@ pub unsafe extern "C-unwind" fn luaK_exp2nextreg(mut fs: *mut FuncState, mut e: 
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaK_exp2anyreg(
     mut fs: *mut FuncState,
-    mut e: *mut expdesc,
+    mut e: *mut ExpDesc,
 ) -> i32 {
     luaK_dischargevars(fs, e);
     if (*e).k as u32 == VNONRELOC as i32 as u32 {
@@ -4760,20 +4760,20 @@ pub unsafe extern "C-unwind" fn luaK_exp2anyreg(
     return (*e).u.info;
 }
 #[unsafe(no_mangle)]
-pub unsafe extern "C-unwind" fn luaK_exp2anyregup(mut fs: *mut FuncState, mut e: *mut expdesc) {
+pub unsafe extern "C-unwind" fn luaK_exp2anyregup(mut fs: *mut FuncState, mut e: *mut ExpDesc) {
     if (*e).k as u32 != VUPVAL as i32 as u32 || (*e).t != (*e).f {
         luaK_exp2anyreg(fs, e);
     }
 }
 #[unsafe(no_mangle)]
-pub unsafe extern "C-unwind" fn luaK_exp2val(mut fs: *mut FuncState, mut e: *mut expdesc) {
+pub unsafe extern "C-unwind" fn luaK_exp2val(mut fs: *mut FuncState, mut e: *mut ExpDesc) {
     if (*e).t != (*e).f {
         luaK_exp2anyreg(fs, e);
     } else {
         luaK_dischargevars(fs, e);
     };
 }
-unsafe extern "C-unwind" fn luaK_exp2K(mut fs: *mut FuncState, mut e: *mut expdesc) -> i32 {
+unsafe extern "C-unwind" fn luaK_exp2K(mut fs: *mut FuncState, mut e: *mut ExpDesc) -> i32 {
     if !((*e).t != (*e).f) {
         let mut info: i32 = 0;
         match (*e).k as u32 {
@@ -4808,7 +4808,7 @@ unsafe extern "C-unwind" fn luaK_exp2K(mut fs: *mut FuncState, mut e: *mut expde
     }
     return 0;
 }
-unsafe extern "C-unwind" fn exp2RK(mut fs: *mut FuncState, mut e: *mut expdesc) -> i32 {
+unsafe extern "C-unwind" fn exp2RK(mut fs: *mut FuncState, mut e: *mut ExpDesc) -> i32 {
     if luaK_exp2K(fs, e) != 0 {
         return 1 as i32;
     } else {
@@ -4821,7 +4821,7 @@ unsafe extern "C-unwind" fn codeABRK(
     mut o: OpCode,
     mut a: i32,
     mut b: i32,
-    mut ec: *mut expdesc,
+    mut ec: *mut ExpDesc,
 ) {
     let mut k: i32 = exp2RK(fs, ec);
     luaK_codeABCk(fs, o, a, b, (*ec).u.info, k);
@@ -4829,8 +4829,8 @@ unsafe extern "C-unwind" fn codeABRK(
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaK_storevar(
     mut fs: *mut FuncState,
-    mut var: *mut expdesc,
-    mut ex: *mut expdesc,
+    mut var: *mut ExpDesc,
+    mut ex: *mut ExpDesc,
 ) {
     match (*var).k as u32 {
         9 => {
@@ -4885,8 +4885,8 @@ pub unsafe extern "C-unwind" fn luaK_storevar(
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaK_self(
     mut fs: *mut FuncState,
-    mut e: *mut expdesc,
-    mut key: *mut expdesc,
+    mut e: *mut ExpDesc,
+    mut key: *mut ExpDesc,
 ) {
     let mut ereg: i32 = 0;
     luaK_exp2anyreg(fs, e);
@@ -4898,7 +4898,7 @@ pub unsafe extern "C-unwind" fn luaK_self(
     codeABRK(fs, OP_SELF, (*e).u.info, ereg, key);
     freeexp(fs, key);
 }
-unsafe extern "C-unwind" fn negatecondition(mut fs: *mut FuncState, mut e: *mut expdesc) {
+unsafe extern "C-unwind" fn negatecondition(mut fs: *mut FuncState, mut e: *mut ExpDesc) {
     let mut pc: *mut Instruction = getjumpcontrol(fs, (*e).u.info);
     *pc = *pc & !(!(!(0 as Instruction) << 1 as i32) << 0 + 7 as i32 + 8 as i32)
         | (((*pc >> 0 + 7 as i32 + 8 as i32 & !(!(0 as Instruction) << 1 as i32) << 0) as i32
@@ -4908,7 +4908,7 @@ unsafe extern "C-unwind" fn negatecondition(mut fs: *mut FuncState, mut e: *mut 
 }
 unsafe extern "C-unwind" fn jumponcond(
     mut fs: *mut FuncState,
-    mut e: *mut expdesc,
+    mut e: *mut ExpDesc,
     mut cond_0: i32,
 ) -> i32 {
     if (*e).k as u32 == VRELOC as i32 as u32 {
@@ -4940,7 +4940,7 @@ unsafe extern "C-unwind" fn jumponcond(
     );
 }
 #[unsafe(no_mangle)]
-pub unsafe extern "C-unwind" fn luaK_goiftrue(mut fs: *mut FuncState, mut e: *mut expdesc) {
+pub unsafe extern "C-unwind" fn luaK_goiftrue(mut fs: *mut FuncState, mut e: *mut ExpDesc) {
     let mut pc: i32 = 0;
     luaK_dischargevars(fs, e);
     match (*e).k as u32 {
@@ -4960,7 +4960,7 @@ pub unsafe extern "C-unwind" fn luaK_goiftrue(mut fs: *mut FuncState, mut e: *mu
     (*e).t = -(1 as i32);
 }
 #[unsafe(no_mangle)]
-pub unsafe extern "C-unwind" fn luaK_goiffalse(mut fs: *mut FuncState, mut e: *mut expdesc) {
+pub unsafe extern "C-unwind" fn luaK_goiffalse(mut fs: *mut FuncState, mut e: *mut ExpDesc) {
     let mut pc: i32 = 0;
     luaK_dischargevars(fs, e);
     match (*e).k as u32 {
@@ -4978,7 +4978,7 @@ pub unsafe extern "C-unwind" fn luaK_goiffalse(mut fs: *mut FuncState, mut e: *m
     luaK_patchtohere(fs, (*e).f);
     (*e).f = -(1 as i32);
 }
-unsafe extern "C-unwind" fn codenot(mut fs: *mut FuncState, mut e: *mut expdesc) {
+unsafe extern "C-unwind" fn codenot(mut fs: *mut FuncState, mut e: *mut ExpDesc) {
     match (*e).k as u32 {
         1 | 3 => {
             (*e).k = VTRUE;
@@ -5003,26 +5003,26 @@ unsafe extern "C-unwind" fn codenot(mut fs: *mut FuncState, mut e: *mut expdesc)
     removevalues(fs, (*e).f);
     removevalues(fs, (*e).t);
 }
-unsafe extern "C-unwind" fn isKstr(mut fs: *mut FuncState, mut e: *mut expdesc) -> i32 {
+unsafe extern "C-unwind" fn isKstr(mut fs: *mut FuncState, mut e: *mut ExpDesc) -> i32 {
     return ((*e).k as u32 == VK as i32 as u32
         && !((*e).t != (*e).f)
         && (*e).u.info <= ((1 as i32) << 8 as i32) - 1 as i32
         && (*((*(*fs).f).k).offset((*e).u.info as isize)).tt_ as i32
             == 4 as i32 | (0) << 4 as i32 | (1 as i32) << 6 as i32) as i32;
 }
-unsafe extern "C-unwind" fn isKint(mut e: *mut expdesc) -> i32 {
+unsafe extern "C-unwind" fn isKint(mut e: *mut ExpDesc) -> i32 {
     return ((*e).k as u32 == VKINT as i32 as u32 && !((*e).t != (*e).f)) as i32;
 }
-unsafe extern "C-unwind" fn isCint(mut e: *mut expdesc) -> i32 {
+unsafe extern "C-unwind" fn isCint(mut e: *mut ExpDesc) -> i32 {
     return (isKint(e) != 0
         && (*e).u.ival as lua_Unsigned <= (((1 as i32) << 8 as i32) - 1 as i32) as lua_Unsigned)
         as i32;
 }
-unsafe extern "C-unwind" fn isSCint(mut e: *mut expdesc) -> i32 {
+unsafe extern "C-unwind" fn isSCint(mut e: *mut ExpDesc) -> i32 {
     return (isKint(e) != 0 && fitsC((*e).u.ival) != 0) as i32;
 }
 unsafe extern "C-unwind" fn isSCnumber(
-    mut e: *mut expdesc,
+    mut e: *mut ExpDesc,
     mut pi: *mut i32,
     mut isfloat: *mut i32,
 ) -> i32 {
@@ -5046,8 +5046,8 @@ unsafe extern "C-unwind" fn isSCnumber(
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaK_indexed(
     mut fs: *mut FuncState,
-    mut t: *mut expdesc,
-    mut k: *mut expdesc,
+    mut t: *mut ExpDesc,
+    mut k: *mut ExpDesc,
 ) {
     if (*k).k as u32 == VKSTR as i32 as u32 {
         str2K(fs, k);
@@ -5098,8 +5098,8 @@ unsafe extern "C-unwind" fn validop(mut op: i32, mut v1: *mut TValue, mut v2: *m
 unsafe extern "C-unwind" fn constfolding(
     mut fs: *mut FuncState,
     mut op: i32,
-    mut e1: *mut expdesc,
-    mut e2: *const expdesc,
+    mut e1: *mut ExpDesc,
+    mut e2: *const ExpDesc,
 ) -> i32 {
     let mut v1: TValue = TValue {
         value_: Value {
@@ -5158,7 +5158,7 @@ unsafe extern "C-unwind" fn binopr2TM(mut opr: BinOpr) -> TMS {
 unsafe extern "C-unwind" fn codeunexpval(
     mut fs: *mut FuncState,
     mut op: OpCode,
-    mut e: *mut expdesc,
+    mut e: *mut ExpDesc,
     mut line: i32,
 ) {
     let mut r: i32 = luaK_exp2anyreg(fs, e);
@@ -5169,8 +5169,8 @@ unsafe extern "C-unwind" fn codeunexpval(
 }
 unsafe extern "C-unwind" fn finishbinexpval(
     mut fs: *mut FuncState,
-    mut e1: *mut expdesc,
-    mut e2: *mut expdesc,
+    mut e1: *mut ExpDesc,
+    mut e2: *mut ExpDesc,
     mut op: OpCode,
     mut v2: i32,
     mut flip: i32,
@@ -5190,8 +5190,8 @@ unsafe extern "C-unwind" fn finishbinexpval(
 unsafe extern "C-unwind" fn codebinexpval(
     mut fs: *mut FuncState,
     mut opr: BinOpr,
-    mut e1: *mut expdesc,
-    mut e2: *mut expdesc,
+    mut e1: *mut ExpDesc,
+    mut e2: *mut ExpDesc,
     mut line: i32,
 ) {
     let mut op: OpCode = binopr2op(opr, OPR_ADD, OP_ADD);
@@ -5201,8 +5201,8 @@ unsafe extern "C-unwind" fn codebinexpval(
 unsafe extern "C-unwind" fn codebini(
     mut fs: *mut FuncState,
     mut op: OpCode,
-    mut e1: *mut expdesc,
-    mut e2: *mut expdesc,
+    mut e1: *mut ExpDesc,
+    mut e2: *mut ExpDesc,
     mut flip: i32,
     mut line: i32,
     mut event: TMS,
@@ -5213,8 +5213,8 @@ unsafe extern "C-unwind" fn codebini(
 unsafe extern "C-unwind" fn codebinK(
     mut fs: *mut FuncState,
     mut opr: BinOpr,
-    mut e1: *mut expdesc,
-    mut e2: *mut expdesc,
+    mut e1: *mut ExpDesc,
+    mut e2: *mut ExpDesc,
     mut flip: i32,
     mut line: i32,
 ) {
@@ -5225,8 +5225,8 @@ unsafe extern "C-unwind" fn codebinK(
 }
 unsafe extern "C-unwind" fn finishbinexpneg(
     mut fs: *mut FuncState,
-    mut e1: *mut expdesc,
-    mut e2: *mut expdesc,
+    mut e1: *mut ExpDesc,
+    mut e2: *mut ExpDesc,
     mut op: OpCode,
     mut line: i32,
     mut event: TMS,
@@ -5260,16 +5260,16 @@ unsafe extern "C-unwind" fn finishbinexpneg(
         }
     };
 }
-unsafe extern "C-unwind" fn swapexps(mut e1: *mut expdesc, mut e2: *mut expdesc) {
-    let mut temp: expdesc = *e1;
+unsafe extern "C-unwind" fn swapexps(mut e1: *mut ExpDesc, mut e2: *mut ExpDesc) {
+    let mut temp: ExpDesc = *e1;
     *e1 = *e2;
     *e2 = temp;
 }
 unsafe extern "C-unwind" fn codebinNoK(
     mut fs: *mut FuncState,
     mut opr: BinOpr,
-    mut e1: *mut expdesc,
-    mut e2: *mut expdesc,
+    mut e1: *mut ExpDesc,
+    mut e2: *mut ExpDesc,
     mut flip: i32,
     mut line: i32,
 ) {
@@ -5281,8 +5281,8 @@ unsafe extern "C-unwind" fn codebinNoK(
 unsafe extern "C-unwind" fn codearith(
     mut fs: *mut FuncState,
     mut opr: BinOpr,
-    mut e1: *mut expdesc,
-    mut e2: *mut expdesc,
+    mut e1: *mut ExpDesc,
+    mut e2: *mut ExpDesc,
     mut flip: i32,
     mut line: i32,
 ) {
@@ -5295,8 +5295,8 @@ unsafe extern "C-unwind" fn codearith(
 unsafe extern "C-unwind" fn codecommutative(
     mut fs: *mut FuncState,
     mut op: BinOpr,
-    mut e1: *mut expdesc,
-    mut e2: *mut expdesc,
+    mut e1: *mut ExpDesc,
+    mut e2: *mut ExpDesc,
     mut line: i32,
 ) {
     let mut flip: i32 = 0;
@@ -5313,8 +5313,8 @@ unsafe extern "C-unwind" fn codecommutative(
 unsafe extern "C-unwind" fn codebitwise(
     mut fs: *mut FuncState,
     mut opr: BinOpr,
-    mut e1: *mut expdesc,
-    mut e2: *mut expdesc,
+    mut e1: *mut ExpDesc,
+    mut e2: *mut ExpDesc,
     mut line: i32,
 ) {
     let mut flip: i32 = 0;
@@ -5331,8 +5331,8 @@ unsafe extern "C-unwind" fn codebitwise(
 unsafe extern "C-unwind" fn codeorder(
     mut fs: *mut FuncState,
     mut opr: BinOpr,
-    mut e1: *mut expdesc,
-    mut e2: *mut expdesc,
+    mut e1: *mut ExpDesc,
+    mut e2: *mut ExpDesc,
 ) {
     let mut r1: i32 = 0;
     let mut r2: i32 = 0;
@@ -5359,8 +5359,8 @@ unsafe extern "C-unwind" fn codeorder(
 unsafe extern "C-unwind" fn codeeq(
     mut fs: *mut FuncState,
     mut opr: BinOpr,
-    mut e1: *mut expdesc,
-    mut e2: *mut expdesc,
+    mut e1: *mut ExpDesc,
+    mut e2: *mut ExpDesc,
 ) {
     let mut r1: i32 = 0;
     let mut r2: i32 = 0;
@@ -5396,13 +5396,13 @@ unsafe extern "C-unwind" fn codeeq(
 pub unsafe extern "C-unwind" fn luaK_prefix(
     mut fs: *mut FuncState,
     mut opr: UnOpr,
-    mut e: *mut expdesc,
+    mut e: *mut ExpDesc,
     mut line: i32,
 ) {
-    static mut ef: expdesc = {
-        let mut init = expdesc {
+    static mut ef: ExpDesc = {
+        let mut init = ExpDesc {
             k: VKINT,
-            u: C2RustUnnamed_11 {
+            u: ExpVariant {
                 ival: 0 as lua_Integer,
             },
             t: -(1 as i32),
@@ -5442,7 +5442,7 @@ pub unsafe extern "C-unwind" fn luaK_prefix(
 pub unsafe extern "C-unwind" fn luaK_infix(
     mut fs: *mut FuncState,
     mut op: BinOpr,
-    mut v: *mut expdesc,
+    mut v: *mut ExpDesc,
 ) {
     luaK_dischargevars(fs, v);
     match op as u32 {
@@ -5477,8 +5477,8 @@ pub unsafe extern "C-unwind" fn luaK_infix(
 }
 unsafe extern "C-unwind" fn codeconcat(
     mut fs: *mut FuncState,
-    mut e1: *mut expdesc,
-    mut e2: *mut expdesc,
+    mut e1: *mut ExpDesc,
+    mut e2: *mut ExpDesc,
     mut line: i32,
 ) {
     let mut ie2: *mut Instruction = previousinstruction(fs);
@@ -5504,8 +5504,8 @@ unsafe extern "C-unwind" fn codeconcat(
 pub unsafe extern "C-unwind" fn luaK_posfix(
     mut fs: *mut FuncState,
     mut opr: BinOpr,
-    mut e1: *mut expdesc,
-    mut e2: *mut expdesc,
+    mut e1: *mut ExpDesc,
+    mut e2: *mut ExpDesc,
     mut line: i32,
 ) {
     luaK_dischargevars(fs, e2);
@@ -5804,19 +5804,19 @@ unsafe extern "C-unwind" fn str_checkname(mut ls: *mut LexState) -> *mut TString
     luaX_next(ls);
     return ts;
 }
-unsafe extern "C-unwind" fn init_exp(mut e: *mut expdesc, mut k: expkind, mut i: i32) {
+unsafe extern "C-unwind" fn init_exp(mut e: *mut ExpDesc, mut k: ExpKind, mut i: i32) {
     (*e).t = -(1 as i32);
     (*e).f = (*e).t;
     (*e).k = k;
     (*e).u.info = i;
 }
-unsafe extern "C-unwind" fn codestring(mut e: *mut expdesc, mut s: *mut TString) {
+unsafe extern "C-unwind" fn codestring(mut e: *mut ExpDesc, mut s: *mut TString) {
     (*e).t = -(1 as i32);
     (*e).f = (*e).t;
     (*e).k = VKSTR;
     (*e).u.strval = s;
 }
-unsafe extern "C-unwind" fn codename(mut ls: *mut LexState, mut e: *mut expdesc) {
+unsafe extern "C-unwind" fn codename(mut ls: *mut LexState, mut e: *mut ExpDesc) {
     codestring(e, str_checkname(ls));
 }
 unsafe extern "C-unwind" fn registerlocalvar(
@@ -5928,14 +5928,14 @@ unsafe extern "C-unwind" fn localdebuginfo(mut fs: *mut FuncState, mut vidx: i32
         return &mut *((*(*fs).f).locvars).offset(idx as isize) as *mut LocVar;
     };
 }
-unsafe extern "C-unwind" fn init_var(mut fs: *mut FuncState, mut e: *mut expdesc, mut vidx: i32) {
+unsafe extern "C-unwind" fn init_var(mut fs: *mut FuncState, mut e: *mut ExpDesc, mut vidx: i32) {
     (*e).t = -(1 as i32);
     (*e).f = (*e).t;
     (*e).k = VLOCAL;
     (*e).u.var.vidx = vidx as u16;
     (*e).u.var.ridx = (*getlocalvardesc(fs, vidx)).vd.ridx;
 }
-unsafe extern "C-unwind" fn check_readonly(mut ls: *mut LexState, mut e: *mut expdesc) {
+unsafe extern "C-unwind" fn check_readonly(mut ls: *mut LexState, mut e: *mut ExpDesc) {
     let mut fs: *mut FuncState = (*ls).fs;
     let mut varname: *mut TString = 0 as *mut TString;
     match (*e).k as u32 {
@@ -6046,7 +6046,7 @@ unsafe extern "C-unwind" fn allocupvalue(mut fs: *mut FuncState) -> *mut Upvalde
 unsafe extern "C-unwind" fn newupvalue(
     mut fs: *mut FuncState,
     mut name: *mut TString,
-    mut v: *mut expdesc,
+    mut v: *mut ExpDesc,
 ) -> i32 {
     let mut up: *mut Upvaldesc = allocupvalue(fs);
     let mut prev: *mut FuncState = (*fs).prev;
@@ -6075,7 +6075,7 @@ unsafe extern "C-unwind" fn newupvalue(
 unsafe extern "C-unwind" fn searchvar(
     mut fs: *mut FuncState,
     mut n: *mut TString,
-    mut var: *mut expdesc,
+    mut var: *mut ExpDesc,
 ) -> i32 {
     let mut i: i32 = 0;
     i = (*fs).nactvar as i32 - 1 as i32;
@@ -6111,7 +6111,7 @@ unsafe extern "C-unwind" fn marktobeclosed(mut fs: *mut FuncState) {
 unsafe extern "C-unwind" fn singlevaraux(
     mut fs: *mut FuncState,
     mut n: *mut TString,
-    mut var: *mut expdesc,
+    mut var: *mut ExpDesc,
     mut base: i32,
 ) {
     if fs.is_null() {
@@ -6138,14 +6138,14 @@ unsafe extern "C-unwind" fn singlevaraux(
         }
     };
 }
-unsafe extern "C-unwind" fn singlevar(mut ls: *mut LexState, mut var: *mut expdesc) {
+unsafe extern "C-unwind" fn singlevar(mut ls: *mut LexState, mut var: *mut ExpDesc) {
     let mut varname: *mut TString = str_checkname(ls);
     let mut fs: *mut FuncState = (*ls).fs;
     singlevaraux(fs, varname, var, 1 as i32);
     if (*var).k as u32 == VVOID as i32 as u32 {
-        let mut key: expdesc = expdesc {
+        let mut key: ExpDesc = ExpDesc {
             k: VVOID,
-            u: C2RustUnnamed_11 { ival: 0 },
+            u: ExpVariant { ival: 0 },
             t: 0,
             f: 0,
         };
@@ -6159,7 +6159,7 @@ unsafe extern "C-unwind" fn adjust_assign(
     mut ls: *mut LexState,
     mut nvars: i32,
     mut nexps: i32,
-    mut e: *mut expdesc,
+    mut e: *mut ExpDesc,
 ) {
     let mut fs: *mut FuncState = (*ls).fs;
     let mut needed: i32 = nvars - nexps;
@@ -6444,7 +6444,7 @@ unsafe extern "C-unwind" fn addprototype(mut ls: *mut LexState) -> *mut Proto {
     };
     return clp;
 }
-unsafe extern "C-unwind" fn codeclosure(mut ls: *mut LexState, mut v: *mut expdesc) {
+unsafe extern "C-unwind" fn codeclosure(mut ls: *mut LexState, mut v: *mut ExpDesc) {
     let mut fs: *mut FuncState = (*(*ls).fs).prev;
     init_exp(
         v,
@@ -6568,11 +6568,11 @@ unsafe extern "C-unwind" fn statlist(mut ls: *mut LexState) {
         statement(ls);
     }
 }
-unsafe extern "C-unwind" fn fieldsel(mut ls: *mut LexState, mut v: *mut expdesc) {
+unsafe extern "C-unwind" fn fieldsel(mut ls: *mut LexState, mut v: *mut ExpDesc) {
     let mut fs: *mut FuncState = (*ls).fs;
-    let mut key: expdesc = expdesc {
+    let mut key: ExpDesc = ExpDesc {
         k: VVOID,
-        u: C2RustUnnamed_11 { ival: 0 },
+        u: ExpVariant { ival: 0 },
         t: 0,
         f: 0,
     };
@@ -6581,7 +6581,7 @@ unsafe extern "C-unwind" fn fieldsel(mut ls: *mut LexState, mut v: *mut expdesc)
     codename(ls, &mut key);
     luaK_indexed(fs, v, &mut key);
 }
-unsafe extern "C-unwind" fn yindex(mut ls: *mut LexState, mut v: *mut expdesc) {
+unsafe extern "C-unwind" fn yindex(mut ls: *mut LexState, mut v: *mut ExpDesc) {
     luaX_next(ls);
     expr(ls, v);
     luaK_exp2val((*ls).fs, v);
@@ -6590,21 +6590,21 @@ unsafe extern "C-unwind" fn yindex(mut ls: *mut LexState, mut v: *mut expdesc) {
 unsafe extern "C-unwind" fn recfield(mut ls: *mut LexState, mut cc: *mut ConsControl) {
     let mut fs: *mut FuncState = (*ls).fs;
     let mut reg: i32 = (*(*ls).fs).freereg as i32;
-    let mut tab: expdesc = expdesc {
+    let mut tab: ExpDesc = ExpDesc {
         k: VVOID,
-        u: C2RustUnnamed_11 { ival: 0 },
+        u: ExpVariant { ival: 0 },
         t: 0,
         f: 0,
     };
-    let mut key: expdesc = expdesc {
+    let mut key: ExpDesc = ExpDesc {
         k: VVOID,
-        u: C2RustUnnamed_11 { ival: 0 },
+        u: ExpVariant { ival: 0 },
         t: 0,
         f: 0,
     };
-    let mut val: expdesc = expdesc {
+    let mut val: ExpDesc = ExpDesc {
         k: VVOID,
-        u: C2RustUnnamed_11 { ival: 0 },
+        u: ExpVariant { ival: 0 },
         t: 0,
         f: 0,
     };
@@ -6679,18 +6679,18 @@ unsafe extern "C-unwind" fn field(mut ls: *mut LexState, mut cc: *mut ConsContro
         }
     };
 }
-unsafe extern "C-unwind" fn constructor(mut ls: *mut LexState, mut t: *mut expdesc) {
+unsafe extern "C-unwind" fn constructor(mut ls: *mut LexState, mut t: *mut ExpDesc) {
     let mut fs: *mut FuncState = (*ls).fs;
     let mut line: i32 = (*ls).linenumber;
     let mut pc: i32 = luaK_codeABCk(fs, OP_NEWTABLE, 0, 0, 0, 0);
     let mut cc: ConsControl = ConsControl {
-        v: expdesc {
+        v: ExpDesc {
             k: VVOID,
-            u: C2RustUnnamed_11 { ival: 0 },
+            u: ExpVariant { ival: 0 },
             t: 0,
             f: 0,
         },
-        t: 0 as *mut expdesc,
+        t: 0 as *mut ExpDesc,
         nh: 0,
         na: 0,
         tostore: 0,
@@ -6754,7 +6754,7 @@ unsafe extern "C-unwind" fn parlist(mut ls: *mut LexState) {
 }
 unsafe extern "C-unwind" fn body(
     mut ls: *mut LexState,
-    mut e: *mut expdesc,
+    mut e: *mut ExpDesc,
     mut ismethod: i32,
     mut line: i32,
 ) {
@@ -6812,7 +6812,7 @@ unsafe extern "C-unwind" fn body(
     codeclosure(ls, e);
     close_func(ls);
 }
-unsafe extern "C-unwind" fn explist(mut ls: *mut LexState, mut v: *mut expdesc) -> i32 {
+unsafe extern "C-unwind" fn explist(mut ls: *mut LexState, mut v: *mut ExpDesc) -> i32 {
     let mut n: i32 = 1 as i32;
     expr(ls, v);
     while testnext(ls, ',' as i32) != 0 {
@@ -6823,11 +6823,11 @@ unsafe extern "C-unwind" fn explist(mut ls: *mut LexState, mut v: *mut expdesc) 
     }
     return n;
 }
-unsafe extern "C-unwind" fn funcargs(mut ls: *mut LexState, mut f: *mut expdesc) {
+unsafe extern "C-unwind" fn funcargs(mut ls: *mut LexState, mut f: *mut ExpDesc) {
     let mut fs: *mut FuncState = (*ls).fs;
-    let mut args: expdesc = expdesc {
+    let mut args: ExpDesc = ExpDesc {
         k: VVOID,
-        u: C2RustUnnamed_11 { ival: 0 },
+        u: ExpVariant { ival: 0 },
         t: 0,
         f: 0,
     };
@@ -6875,7 +6875,7 @@ unsafe extern "C-unwind" fn funcargs(mut ls: *mut LexState, mut f: *mut expdesc)
     luaK_fixline(fs, line);
     (*fs).freereg = (base + 1 as i32) as lu_byte;
 }
-unsafe extern "C-unwind" fn primaryexp(mut ls: *mut LexState, mut v: *mut expdesc) {
+unsafe extern "C-unwind" fn primaryexp(mut ls: *mut LexState, mut v: *mut ExpDesc) {
     match (*ls).t.token {
         40 => {
             let mut line: i32 = (*ls).linenumber;
@@ -6894,7 +6894,7 @@ unsafe extern "C-unwind" fn primaryexp(mut ls: *mut LexState, mut v: *mut expdes
         }
     };
 }
-unsafe extern "C-unwind" fn suffixedexp(mut ls: *mut LexState, mut v: *mut expdesc) {
+unsafe extern "C-unwind" fn suffixedexp(mut ls: *mut LexState, mut v: *mut ExpDesc) {
     let mut fs: *mut FuncState = (*ls).fs;
     primaryexp(ls, v);
     loop {
@@ -6903,9 +6903,9 @@ unsafe extern "C-unwind" fn suffixedexp(mut ls: *mut LexState, mut v: *mut expde
                 fieldsel(ls, v);
             }
             91 => {
-                let mut key: expdesc = expdesc {
+                let mut key: ExpDesc = ExpDesc {
                     k: VVOID,
-                    u: C2RustUnnamed_11 { ival: 0 },
+                    u: ExpVariant { ival: 0 },
                     t: 0,
                     f: 0,
                 };
@@ -6914,9 +6914,9 @@ unsafe extern "C-unwind" fn suffixedexp(mut ls: *mut LexState, mut v: *mut expde
                 luaK_indexed(fs, v, &mut key);
             }
             58 => {
-                let mut key_0: expdesc = expdesc {
+                let mut key_0: ExpDesc = ExpDesc {
                     k: VVOID,
-                    u: C2RustUnnamed_11 { ival: 0 },
+                    u: ExpVariant { ival: 0 },
                     t: 0,
                     f: 0,
                 };
@@ -6933,7 +6933,7 @@ unsafe extern "C-unwind" fn suffixedexp(mut ls: *mut LexState, mut v: *mut expde
         }
     }
 }
-unsafe extern "C-unwind" fn simpleexp(mut ls: *mut LexState, mut v: *mut expdesc) {
+unsafe extern "C-unwind" fn simpleexp(mut ls: *mut LexState, mut v: *mut ExpDesc) {
     match (*ls).t.token {
         289 => {
             init_exp(v, VKFLT, 0);
@@ -7164,7 +7164,7 @@ static mut priority: [C2RustUnnamed_14; 21] = [
 ];
 unsafe extern "C-unwind" fn subexpr(
     mut ls: *mut LexState,
-    mut v: *mut expdesc,
+    mut v: *mut ExpDesc,
     mut limit: i32,
 ) -> BinOpr {
     let mut op: BinOpr = OPR_ADD;
@@ -7181,9 +7181,9 @@ unsafe extern "C-unwind" fn subexpr(
     }
     op = getbinopr((*ls).t.token);
     while op as u32 != OPR_NOBINOPR as i32 as u32 && priority[op as usize].left as i32 > limit {
-        let mut v2: expdesc = expdesc {
+        let mut v2: ExpDesc = ExpDesc {
             k: VVOID,
-            u: C2RustUnnamed_11 { ival: 0 },
+            u: ExpVariant { ival: 0 },
             t: 0,
             f: 0,
         };
@@ -7199,7 +7199,7 @@ unsafe extern "C-unwind" fn subexpr(
     (*(*ls).L).nCcalls;
     return op;
 }
-unsafe extern "C-unwind" fn expr(mut ls: *mut LexState, mut v: *mut expdesc) {
+unsafe extern "C-unwind" fn expr(mut ls: *mut LexState, mut v: *mut ExpDesc) {
     subexpr(ls, v, 0);
 }
 unsafe extern "C-unwind" fn block(mut ls: *mut LexState) {
@@ -7220,7 +7220,7 @@ unsafe extern "C-unwind" fn block(mut ls: *mut LexState) {
 unsafe extern "C-unwind" fn check_conflict(
     mut ls: *mut LexState,
     mut lh: *mut LHS_assign,
-    mut v: *mut expdesc,
+    mut v: *mut ExpDesc,
 ) {
     let mut fs: *mut FuncState = (*ls).fs;
     let mut extra: i32 = (*fs).freereg as i32;
@@ -7266,9 +7266,9 @@ unsafe extern "C-unwind" fn restassign(
     mut lh: *mut LHS_assign,
     mut nvars: i32,
 ) {
-    let mut e: expdesc = expdesc {
+    let mut e: ExpDesc = ExpDesc {
         k: VVOID,
-        u: C2RustUnnamed_11 { ival: 0 },
+        u: ExpVariant { ival: 0 },
         t: 0,
         f: 0,
     };
@@ -7279,9 +7279,9 @@ unsafe extern "C-unwind" fn restassign(
     if testnext(ls, ',' as i32) != 0 {
         let mut nv: LHS_assign = LHS_assign {
             prev: 0 as *mut LHS_assign,
-            v: expdesc {
+            v: ExpDesc {
                 k: VVOID,
-                u: C2RustUnnamed_11 { ival: 0 },
+                u: ExpVariant { ival: 0 },
                 t: 0,
                 f: 0,
             },
@@ -7311,9 +7311,9 @@ unsafe extern "C-unwind" fn restassign(
     luaK_storevar((*ls).fs, &mut (*lh).v, &mut e);
 }
 unsafe extern "C-unwind" fn cond(mut ls: *mut LexState) -> i32 {
-    let mut v: expdesc = expdesc {
+    let mut v: ExpDesc = ExpDesc {
         k: VVOID,
-        u: C2RustUnnamed_11 { ival: 0 },
+        u: ExpVariant { ival: 0 },
         t: 0,
         f: 0,
     };
@@ -7439,9 +7439,9 @@ unsafe extern "C-unwind" fn repeatstat(mut ls: *mut LexState, mut line: i32) {
     leaveblock(fs);
 }
 unsafe extern "C-unwind" fn exp1(mut ls: *mut LexState) {
-    let mut e: expdesc = expdesc {
+    let mut e: ExpDesc = ExpDesc {
         k: VVOID,
-        u: C2RustUnnamed_11 { ival: 0 },
+        u: ExpVariant { ival: 0 },
         t: 0,
         f: 0,
     };
@@ -7560,9 +7560,9 @@ unsafe extern "C-unwind" fn fornum(
 }
 unsafe extern "C-unwind" fn forlist(mut ls: *mut LexState, mut indexname: *mut TString) {
     let mut fs: *mut FuncState = (*ls).fs;
-    let mut e: expdesc = expdesc {
+    let mut e: ExpDesc = ExpDesc {
         k: VVOID,
-        u: C2RustUnnamed_11 { ival: 0 },
+        u: ExpVariant { ival: 0 },
         t: 0,
         f: 0,
     };
@@ -7663,9 +7663,9 @@ unsafe extern "C-unwind" fn test_then_block(mut ls: *mut LexState, mut escapelis
         insidetbc: 0,
     };
     let mut fs: *mut FuncState = (*ls).fs;
-    let mut v: expdesc = expdesc {
+    let mut v: ExpDesc = ExpDesc {
         k: VVOID,
-        u: C2RustUnnamed_11 { ival: 0 },
+        u: ExpVariant { ival: 0 },
         t: 0,
         f: 0,
     };
@@ -7723,9 +7723,9 @@ unsafe extern "C-unwind" fn ifstat(mut ls: *mut LexState, mut line: i32) {
     luaK_patchtohere(fs, escapelist);
 }
 unsafe extern "C-unwind" fn localfunc(mut ls: *mut LexState) {
-    let mut b: expdesc = expdesc {
+    let mut b: ExpDesc = ExpDesc {
         k: VVOID,
-        u: C2RustUnnamed_11 { ival: 0 },
+        u: ExpVariant { ival: 0 },
         t: 0,
         f: 0,
     };
@@ -7767,9 +7767,9 @@ unsafe extern "C-unwind" fn localstat(mut ls: *mut LexState) {
     let mut kind: i32 = 0;
     let mut nvars: i32 = 0;
     let mut nexps: i32 = 0;
-    let mut e: expdesc = expdesc {
+    let mut e: ExpDesc = ExpDesc {
         k: VVOID,
-        u: C2RustUnnamed_11 { ival: 0 },
+        u: ExpVariant { ival: 0 },
         t: 0,
         f: 0,
     };
@@ -7813,7 +7813,7 @@ unsafe extern "C-unwind" fn localstat(mut ls: *mut LexState) {
     }
     checktoclose(fs, toclose);
 }
-unsafe extern "C-unwind" fn funcname(mut ls: *mut LexState, mut v: *mut expdesc) -> i32 {
+unsafe extern "C-unwind" fn funcname(mut ls: *mut LexState, mut v: *mut ExpDesc) -> i32 {
     let mut ismethod: i32 = 0;
     singlevar(ls, v);
     while (*ls).t.token == '.' as i32 {
@@ -7827,15 +7827,15 @@ unsafe extern "C-unwind" fn funcname(mut ls: *mut LexState, mut v: *mut expdesc)
 }
 unsafe extern "C-unwind" fn funcstat(mut ls: *mut LexState, mut line: i32) {
     let mut ismethod: i32 = 0;
-    let mut v: expdesc = expdesc {
+    let mut v: ExpDesc = ExpDesc {
         k: VVOID,
-        u: C2RustUnnamed_11 { ival: 0 },
+        u: ExpVariant { ival: 0 },
         t: 0,
         f: 0,
     };
-    let mut b: expdesc = expdesc {
+    let mut b: ExpDesc = ExpDesc {
         k: VVOID,
-        u: C2RustUnnamed_11 { ival: 0 },
+        u: ExpVariant { ival: 0 },
         t: 0,
         f: 0,
     };
@@ -7850,9 +7850,9 @@ unsafe extern "C-unwind" fn exprstat(mut ls: *mut LexState) {
     let mut fs: *mut FuncState = (*ls).fs;
     let mut v: LHS_assign = LHS_assign {
         prev: 0 as *mut LHS_assign,
-        v: expdesc {
+        v: ExpDesc {
             k: VVOID,
-            u: C2RustUnnamed_11 { ival: 0 },
+            u: ExpVariant { ival: 0 },
             t: 0,
             f: 0,
         },
@@ -7877,9 +7877,9 @@ unsafe extern "C-unwind" fn exprstat(mut ls: *mut LexState) {
 }
 unsafe extern "C-unwind" fn retstat(mut ls: *mut LexState) {
     let mut fs: *mut FuncState = (*ls).fs;
-    let mut e: expdesc = expdesc {
+    let mut e: ExpDesc = ExpDesc {
         k: VVOID,
-        u: C2RustUnnamed_11 { ival: 0 },
+        u: ExpVariant { ival: 0 },
         t: 0,
         f: 0,
     };
