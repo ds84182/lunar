@@ -14942,11 +14942,12 @@ pub unsafe extern "C-unwind" fn luaD_seterrorobj(
     }
     (*L).top.p = oldtop.offset(1 as i32 as isize);
 }
+struct LuaThrow;
 #[unsafe(no_mangle)]
 pub unsafe fn luaD_throw(mut L: *mut lua_State, mut errcode: i32) -> ! {
     if !((*L).errorJmp).is_null() {
         ::core::ptr::write_volatile(&mut (*(*L).errorJmp).status as *mut i32, errcode);
-        std::panic::resume_unwind(Box::new(()));
+        std::panic::resume_unwind(Box::new(LuaThrow));
     } else {
         let mut g: *mut global_State = (*L).l_G;
         errcode = luaE_resetthread(L, errcode);
@@ -14995,7 +14996,7 @@ pub unsafe fn luaD_rawrunprotected(
         (Some(f.expect("non-null function pointer"))).expect("non-null function pointer")(L, ud);
     });
 
-    if res.as_ref().is_err_and(|err| !err.is::<()>()) {
+    if res.as_ref().is_err_and(|err| !err.is::<LuaThrow>()) {
         std::panic::resume_unwind(res.unwrap_err());
     }
 
