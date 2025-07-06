@@ -1,1 +1,7 @@
+/doc
+/src/*.c
+/src/*.h
+/src/*.hpp
+/src/Makefile
+/Makefile
 /target
