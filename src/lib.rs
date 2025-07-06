@@ -178,7 +178,7 @@ pub struct C2RustUnnamed_3 {
     pub trap: sig_atomic_t,
     pub nextraargs: i32,
 }
-pub type Instruction = l_uint32;
+pub type Instruction = u32;
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub union StkIdRel {
@@ -199,7 +199,7 @@ pub struct C2RustUnnamed_4 {
     pub tt_: lu_byte,
     pub delta: std::ffi::c_ushort,
 }
-pub type lu_byte = std::ffi::c_uchar;
+pub type lu_byte = u8;
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub union Value {
@@ -210,7 +210,7 @@ pub union Value {
     pub n: lua_Number,
     pub ub: lu_byte,
 }
-pub type lua_Number = std::ffi::c_double;
+pub type lua_Number = f64;
 pub type lua_Integer = i64;
 pub type lua_CFunction = Option<unsafe extern "C-unwind" fn(*mut lua_State) -> i32>;
 #[derive(Copy, Clone)]
