@@ -84,16 +84,17 @@ pub struct lua_State {
     pub hookmask: sig_atomic_t,
 }
 
-pub const LUA_TNONE: i32 = -1;
-pub const LUA_TNIL: i32 = 0;
-pub const LUA_TLIGHTUSERDATA: i32 = 2;
-pub const LUA_TNUMBER: i32 = 3;
-pub const LUA_TSTRING: i32 = 4;
-pub const LUA_TTABLE: i32 = 5;
-pub const LUA_TFUNCTION: i32 = 6;
-pub const LUA_TUSERDATA: i32 = 7;
-pub const LUA_TTHREAD: i32 = 8;
-pub const LUA_NUMTYPES: i32 = 9;
+pub const LUA_TNONE: i8 = -1;
+pub const LUA_TNIL: i8 = 0;
+pub const LUA_TBOOLEAN: i8 = 1;
+pub const LUA_TLIGHTUSERDATA: i8 = 2;
+pub const LUA_TNUMBER: i8 = 3;
+pub const LUA_TSTRING: i8 = 4;
+pub const LUA_TTABLE: i8 = 5;
+pub const LUA_TFUNCTION: i8 = 6;
+pub const LUA_TUSERDATA: i8 = 7;
+pub const LUA_TTHREAD: i8 = 8;
+pub const LUA_NUMTYPES: i8 = 9;
 
 pub type sig_atomic_t = __sig_atomic_t;
 pub type l_uint32 = u32;
@@ -1932,13 +1933,12 @@ unsafe extern "C-unwind" fn dumpSize(mut D: *mut DumpState, mut x: size_t) {
         .wrapping_mul(8)
         .wrapping_add(6)
         .wrapping_div(7)
-        .wrapping_sub(1) as usize] =
-        (buff[(::core::mem::size_of::<size_t>() as usize)
-            .wrapping_mul(8)
-            .wrapping_add(6)
-            .wrapping_div(7)
-            .wrapping_sub(1) as usize] as i32
-            | 0x80) as lu_byte;
+        .wrapping_sub(1) as usize] = (buff[(::core::mem::size_of::<size_t>() as usize)
+        .wrapping_mul(8)
+        .wrapping_add(6)
+        .wrapping_div(7)
+        .wrapping_sub(1) as usize] as i32
+        | 0x80) as lu_byte;
     dumpBlock(
         D,
         buff.as_mut_ptr()
@@ -2650,17 +2650,17 @@ pub unsafe extern "C-unwind" fn luaE_warnerror(
     luaE_warning(L, c")".as_ptr(), 0);
 }
 unsafe extern "C-unwind" fn getgclist(mut o: *mut GCObject) -> *mut *mut GCObject {
-    match (*o).tt as i32 {
-        5 => return &mut (*&mut (*(o as *mut GCUnion)).h).gclist,
-        6 => return &mut (*&mut (*(o as *mut GCUnion)).cl.l).gclist,
-        38 => return &mut (*&mut (*(o as *mut GCUnion)).cl.c).gclist,
-        8 => return &mut (*&mut (*(o as *mut GCUnion)).th).gclist,
-        10 => return &mut (*&mut (*(o as *mut GCUnion)).p).gclist,
-        7 => {
+    match (*o).tt {
+        LUA_VTABLE => return &mut (*&mut (*(o as *mut GCUnion)).h).gclist,
+        LUA_VLCL => return &mut (*&mut (*(o as *mut GCUnion)).cl.l).gclist,
+        LUA_VCCL => return &mut (*&mut (*(o as *mut GCUnion)).cl.c).gclist,
+        LUA_VTHREAD => return &mut (*&mut (*(o as *mut GCUnion)).th).gclist,
+        LUA_VPROTO => return &mut (*&mut (*(o as *mut GCUnion)).p).gclist,
+        LUA_VUSERDATA => {
             let mut u: *mut Udata = &mut (*(o as *mut GCUnion)).u;
             return &mut (*u).gclist;
         }
-        _ => return 0 as *mut *mut GCObject,
+        _ => return ptr::null_mut(),
     };
 }
 unsafe extern "C-unwind" fn linkgclist_(
@@ -2767,13 +2767,13 @@ pub unsafe extern "C-unwind" fn luaC_newobj(
 }
 unsafe extern "C-unwind" fn reallymarkobject(mut g: *mut global_State, mut o: *mut GCObject) {
     let mut current_block_18: u64;
-    match (*o).tt as i32 {
-        4 | 20 => {
+    match (*o).tt {
+        LUA_VSHRSTR | LUA_VLNGSTR => {
             (*o).marked = ((*o).marked as i32 & !((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
                 | (1 as i32) << 5 as i32) as lu_byte;
             current_block_18 = 18317007320854588510;
         }
-        9 => {
+        LUA_VUPVAL => {
             let mut uv: *mut UpVal = &mut (*(o as *mut GCUnion)).upv;
             if (*uv).v.p != &mut (*uv).u.value as *mut TValue {
                 (*uv).marked = ((*uv).marked as i32
@@ -2803,7 +2803,7 @@ unsafe extern "C-unwind" fn reallymarkobject(mut g: *mut global_State, mut o: *m
             }
             current_block_18 = 18317007320854588510;
         }
-        7 => {
+        LUA_VUSERDATA => {
             let mut u: *mut Udata = &mut (*(o as *mut GCUnion)).u;
             if (*u).nuvalue as i32 == 0 {
                 if !((*u).metatable).is_null() {
@@ -2822,7 +2822,7 @@ unsafe extern "C-unwind" fn reallymarkobject(mut g: *mut global_State, mut o: *m
                 current_block_18 = 15904375183555213903;
             }
         }
-        6 | 38 | 5 | 8 | 10 => {
+        LUA_VLCL | LUA_VCCL | LUA_VTABLE | LUA_VTHREAD | LUA_VPROTO => {
             current_block_18 = 15904375183555213903;
         }
         _ => {
@@ -3036,8 +3036,7 @@ unsafe extern "C-unwind" fn traverseephemeron(
     i = 0 as u32;
     while i < nsize {
         let mut n: *mut Node = if inv != 0 {
-            &mut *((*h).node).offset(nsize.wrapping_sub(1).wrapping_sub(i) as isize)
-                as *mut Node
+            &mut *((*h).node).offset(nsize.wrapping_sub(1).wrapping_sub(i) as isize) as *mut Node
         } else {
             &mut *((*h).node).offset(i as isize) as *mut Node
         };
@@ -3447,13 +3446,13 @@ unsafe extern "C-unwind" fn propagatemark(mut g: *mut global_State) -> lu_mem {
     let mut o: *mut GCObject = (*g).gray;
     (*o).marked = ((*o).marked as i32 | (1 as i32) << 5 as i32) as lu_byte;
     (*g).gray = *getgclist(o);
-    match (*o).tt as i32 {
-        5 => return traversetable(g, &mut (*(o as *mut GCUnion)).h),
-        7 => return traverseudata(g, &mut (*(o as *mut GCUnion)).u) as lu_mem,
-        6 => return traverseLclosure(g, &mut (*(o as *mut GCUnion)).cl.l) as lu_mem,
-        38 => return traverseCclosure(g, &mut (*(o as *mut GCUnion)).cl.c) as lu_mem,
-        10 => return traverseproto(g, &mut (*(o as *mut GCUnion)).p) as lu_mem,
-        8 => return traversethread(g, &mut (*(o as *mut GCUnion)).th) as lu_mem,
+    match (*o).tt {
+        LUA_VTABLE => return traversetable(g, &mut (*(o as *mut GCUnion)).h),
+        LUA_VUSERDATA => return traverseudata(g, &mut (*(o as *mut GCUnion)).u) as lu_mem,
+        LUA_VLCL => return traverseLclosure(g, &mut (*(o as *mut GCUnion)).cl.l) as lu_mem,
+        LUA_VCCL => return traverseCclosure(g, &mut (*(o as *mut GCUnion)).cl.c) as lu_mem,
+        LUA_VPROTO => return traverseproto(g, &mut (*(o as *mut GCUnion)).p) as lu_mem,
+        LUA_VTHREAD => return traversethread(g, &mut (*(o as *mut GCUnion)).th) as lu_mem,
         _ => return 0 as lu_mem,
     };
 }
@@ -3583,14 +3582,14 @@ unsafe extern "C-unwind" fn freeupval(mut L: *mut lua_State, mut uv: *mut UpVal)
     );
 }
 unsafe extern "C-unwind" fn freeobj(mut L: *mut lua_State, mut o: *mut GCObject) {
-    match (*o).tt as i32 {
-        10 => {
+    match (*o).tt {
+        LUA_VPROTO => {
             luaF_freeproto(L, &mut (*(o as *mut GCUnion)).p);
         }
-        9 => {
+        LUA_VUPVAL => {
             freeupval(L, &mut (*(o as *mut GCUnion)).upv);
         }
-        6 => {
+        LUA_VLCL => {
             let mut cl: *mut LClosure = &mut (*(o as *mut GCUnion)).cl.l;
             luaM_free_(
                 L,
@@ -3600,7 +3599,7 @@ unsafe extern "C-unwind" fn freeobj(mut L: *mut lua_State, mut o: *mut GCObject)
                         * (*cl).nupvalues as i32) as size_t,
             );
         }
-        38 => {
+        LUA_VCCL => {
             let mut cl_0: *mut CClosure = &mut (*(o as *mut GCUnion)).cl.c;
             luaM_free_(
                 L,
@@ -3610,13 +3609,13 @@ unsafe extern "C-unwind" fn freeobj(mut L: *mut lua_State, mut o: *mut GCObject)
                     as size_t,
             );
         }
-        5 => {
+        LUA_VTABLE => {
             luaH_free(L, &mut (*(o as *mut GCUnion)).h);
         }
-        8 => {
+        LUA_VTHREAD => {
             luaE_freethread(L, &mut (*(o as *mut GCUnion)).th);
         }
-        7 => {
+        LUA_VUSERDATA => {
             let mut u: *mut Udata = &mut (*(o as *mut GCUnion)).u;
             luaM_free_(
                 L,
@@ -3632,7 +3631,7 @@ unsafe extern "C-unwind" fn freeobj(mut L: *mut lua_State, mut o: *mut GCObject)
                 .wrapping_add((*u).len),
             );
         }
-        4 => {
+        LUA_VSHRSTR => {
             let mut ts: *mut TString = &mut (*(o as *mut GCUnion)).ts;
             luaS_remove(L, ts);
             luaM_free_(
@@ -3644,7 +3643,7 @@ unsafe extern "C-unwind" fn freeobj(mut L: *mut lua_State, mut o: *mut GCObject)
                 ),
             );
         }
-        20 => {
+        LUA_VLNGSTR => {
             let mut ts_0: *mut TString = &mut (*(o as *mut GCUnion)).ts;
             luaM_free_(
                 L,
@@ -3791,8 +3790,7 @@ unsafe extern "C-unwind" fn GCTM(mut L: *mut lua_State) {
         {
         } else {
         };
-        (*(*L).ci).callstatus =
-            ((*(*L).ci).callstatus as i32 | (1 as i32) << 7 as i32) as u16;
+        (*(*L).ci).callstatus = ((*(*L).ci).callstatus as i32 | (1 as i32) << 7 as i32) as u16;
         status = luaD_pcall(
             L,
             Some(dothecall as unsafe extern "C-unwind" fn(*mut lua_State, *mut c_void) -> ()),
@@ -3801,8 +3799,7 @@ unsafe extern "C-unwind" fn GCTM(mut L: *mut lua_State) {
                 .offset_from((*L).stack.p as *mut std::ffi::c_char),
             0 as ptrdiff_t,
         );
-        (*(*L).ci).callstatus =
-            ((*(*L).ci).callstatus as i32 & !((1 as i32) << 7 as i32)) as u16;
+        (*(*L).ci).callstatus = ((*(*L).ci).callstatus as i32 & !((1 as i32) << 7 as i32)) as u16;
         (*L).allowhook = oldah;
         (*g).gcstp = oldgcstp as lu_byte;
         if ((status != 0) as i32 != 0) as i32 as std::ffi::c_long != 0 {
@@ -4704,9 +4701,7 @@ unsafe extern "C-unwind" fn check_next2(
     mut ls: *mut LexState,
     mut set: *const std::ffi::c_char,
 ) -> i32 {
-    if (*ls).current == *set.offset(0 as isize) as i32
-        || (*ls).current == *set.offset(1) as i32
-    {
+    if (*ls).current == *set.offset(0 as isize) as i32 || (*ls).current == *set.offset(1) as i32 {
         save(ls, (*ls).current);
         let fresh19 = (*(*ls).z).n;
         (*(*ls).z).n = ((*(*ls).z).n).wrapping_sub(1);
@@ -5743,8 +5738,9 @@ unsafe extern "C-unwind" fn getjumpcontrol(
 ) -> *mut Instruction {
     let mut pi: *mut Instruction = &mut *((*(*fs).f).code).offset(pc as isize) as *mut Instruction;
     if pc >= 1 as i32
-        && luaP_opmodes[(*pi.offset(-(1)) >> 0
-            & !(!(0 as Instruction) << 7 as i32) << 0) as OpCode as usize] as i32
+        && luaP_opmodes
+            [(*pi.offset(-(1)) >> 0 & !(!(0 as Instruction) << 7 as i32) << 0) as OpCode as usize]
+            as i32
             & (1 as i32) << 4 as i32
             != 0
     {
@@ -7212,13 +7208,7 @@ pub unsafe extern "C-unwind" fn luaK_prefix(
     let mut current_block_3: u64;
     match opr as u32 {
         0 | 1 => {
-            if constfolding(
-                fs,
-                (opr as u32).wrapping_add(12) as i32,
-                e,
-                &raw const ef,
-            ) != 0
-            {
+            if constfolding(fs, (opr as u32).wrapping_add(12) as i32, e, &raw const ef) != 0 {
                 current_block_3 = 7815301370352969686;
             } else {
                 current_block_3 = 8039936322597116006;
@@ -9936,9 +9926,7 @@ unsafe extern "C-unwind" fn getbaseline(
         *basepc = -(1 as i32);
         return (*f).linedefined;
     } else {
-        let mut i: i32 = (pc as u32)
-            .wrapping_div(128)
-            .wrapping_sub(1) as i32;
+        let mut i: i32 = (pc as u32).wrapping_div(128).wrapping_sub(1) as i32;
         while (i + 1 as i32) < (*f).sizeabslineinfo
             && pc >= (*((*f).abslineinfo).offset((i + 1 as i32) as isize)).pc
         {
@@ -10122,8 +10110,7 @@ pub unsafe extern "C-unwind" fn lua_getlocal(
             name = 0 as *const std::ffi::c_char;
         } else {
             name = luaF_getlocalname(
-                (*&mut (*((*((*L).top.p).offset(-(1))).val.value_.gc
-                    as *mut GCUnion))
+                (*&mut (*((*((*L).top.p).offset(-(1))).val.value_.gc as *mut GCUnion))
                     .cl
                     .l)
                     .p,
@@ -11046,8 +11033,7 @@ pub unsafe extern "C-unwind" fn luaG_traceexec(
         return 1 as i32;
     }
     if (*ci).callstatus as i32 & (1 as i32) << 6 as i32 != 0 {
-        (*ci).callstatus =
-            ((*ci).callstatus as i32 & !((1 as i32) << 6 as i32)) as u16;
+        (*ci).callstatus = ((*ci).callstatus as i32 & !((1 as i32) << 6 as i32)) as u16;
         return 1 as i32;
     }
     if !(luaP_opmodes[(*((*ci).u.l.savedpc).offset(-(1)) >> 0
@@ -11305,8 +11291,7 @@ pub unsafe extern "C-unwind" fn luaF_newtbcupval(mut L: *mut lua_State, mut leve
         );
         (*(*L).tbclist.p).tbclist.delta = 0 as u16;
     }
-    (*level).tbclist.delta =
-        level.offset_from((*L).tbclist.p) as std::ffi::c_long as u16;
+    (*level).tbclist.delta = level.offset_from((*L).tbclist.p) as std::ffi::c_long as u16;
     (*L).tbclist.p = level;
 }
 #[unsafe(no_mangle)]
@@ -12609,8 +12594,7 @@ pub unsafe extern "C-unwind" fn luaH_realasize(mut t: *const Table) -> u32 {
 }
 unsafe extern "C-unwind" fn ispow2realasize(mut t: *const Table) -> i32 {
     return ((*t).flags as i32 & (1 as i32) << 7 as i32 != 0
-        || (*t).alimit & ((*t).alimit).wrapping_sub(1) == 0 as u32)
-        as i32;
+        || (*t).alimit & ((*t).alimit).wrapping_sub(1) == 0 as u32) as i32;
 }
 unsafe extern "C-unwind" fn setlimittosize(mut t: *mut Table) -> u32 {
     (*t).alimit = luaH_realasize(t);
@@ -12820,10 +12804,7 @@ unsafe extern "C-unwind" fn numusearray(mut t: *const Table, mut nums: *mut u32)
             }
         }
         while i <= lim {
-            if !((*((*t).array).offset(i.wrapping_sub(1) as isize)).tt_ as i32
-                & 0xf as i32
-                == 0)
-            {
+            if !((*((*t).array).offset(i.wrapping_sub(1) as isize)).tt_ as i32 & 0xf as i32 == 0) {
                 lc = lc.wrapping_add(1);
                 lc;
             }
@@ -13436,21 +13417,14 @@ unsafe extern "C-unwind" fn binsearch(mut array: *const TValue, mut i: u32, mut 
 pub unsafe extern "C-unwind" fn luaH_getn(mut t: *mut Table) -> lua_Unsigned {
     let mut limit: u32 = (*t).alimit;
     if limit > 0 as u32
-        && (*((*t).array).offset(limit.wrapping_sub(1) as isize)).tt_ as i32
-            & 0xf as i32
-            == 0
+        && (*((*t).array).offset(limit.wrapping_sub(1) as isize)).tt_ as i32 & 0xf as i32 == 0
     {
         if limit >= 2
-            && !((*((*t).array).offset(limit.wrapping_sub(2) as isize)).tt_ as i32
-                & 0xf as i32
+            && !((*((*t).array).offset(limit.wrapping_sub(2) as isize)).tt_ as i32 & 0xf as i32
                 == 0)
         {
             if ispow2realasize(t) != 0
-                && !(limit.wrapping_sub(1)
-                    & limit
-                        .wrapping_sub(1)
-                        .wrapping_sub(1)
-                    == 0 as u32)
+                && !(limit.wrapping_sub(1) & limit.wrapping_sub(1).wrapping_sub(1) == 0 as u32)
             {
                 (*t).alimit = limit.wrapping_sub(1);
                 (*t).flags = ((*t).flags as i32 | (1 as i32) << 7 as i32) as lu_byte;
@@ -13458,9 +13432,7 @@ pub unsafe extern "C-unwind" fn luaH_getn(mut t: *mut Table) -> lua_Unsigned {
             return limit.wrapping_sub(1) as lua_Unsigned;
         } else {
             let mut boundary: u32 = binsearch((*t).array, 0 as u32, limit);
-            if ispow2realasize(t) != 0
-                && boundary > (luaH_realasize(t)).wrapping_div(2)
-            {
+            if ispow2realasize(t) != 0 && boundary > (luaH_realasize(t)).wrapping_div(2) {
                 (*t).alimit = boundary;
                 (*t).flags = ((*t).flags as i32 | (1 as i32) << 7 as i32) as lu_byte;
             }
@@ -13474,19 +13446,14 @@ pub unsafe extern "C-unwind" fn luaH_getn(mut t: *mut Table) -> lua_Unsigned {
             return limit as lua_Unsigned;
         }
         limit = luaH_realasize(t);
-        if (*((*t).array).offset(limit.wrapping_sub(1) as isize)).tt_ as i32
-            & 0xf as i32
-            == 0
-        {
+        if (*((*t).array).offset(limit.wrapping_sub(1) as isize)).tt_ as i32 & 0xf as i32 == 0 {
             let mut boundary_0: u32 = binsearch((*t).array, (*t).alimit, limit);
             (*t).alimit = boundary_0;
             return boundary_0 as lua_Unsigned;
         }
     }
     if ((*t).lastfree).is_null()
-        || (*luaH_getint(t, limit.wrapping_add(1) as lua_Integer)).tt_ as i32
-            & 0xf as i32
-            == 0
+        || (*luaH_getint(t, limit.wrapping_add(1) as lua_Integer)).tt_ as i32 & 0xf as i32 == 0
     {
         return limit as lua_Unsigned;
     } else {
@@ -14287,8 +14254,7 @@ pub unsafe extern "C-unwind" fn luaV_concat(mut L: *mut lua_State, mut total: i3
             luaT_tryconcatTM(L);
         } else if (*top.offset(-(1))).val.tt_ as i32
             == 4 as i32 | (0) << 4 as i32 | (1 as i32) << 6 as i32
-            && (*(&mut (*((*top.offset(-(1))).val.value_.gc as *mut GCUnion)).ts
-                as *mut TString))
+            && (*(&mut (*((*top.offset(-(1))).val.value_.gc as *mut GCUnion)).ts as *mut TString))
                 .shrlen as i32
                 == 0
         {
@@ -14299,8 +14265,7 @@ pub unsafe extern "C-unwind" fn luaV_concat(mut L: *mut lua_State, mut total: i3
                 }) as i32;
         } else if (*top.offset(-(2))).val.tt_ as i32
             == 4 as i32 | (0) << 4 as i32 | (1 as i32) << 6 as i32
-            && (*(&mut (*((*top.offset(-(2))).val.value_.gc as *mut GCUnion)).ts
-                as *mut TString))
+            && (*(&mut (*((*top.offset(-(2))).val.value_.gc as *mut GCUnion)).ts as *mut TString))
                 .shrlen as i32
                 == 0
         {
@@ -14319,14 +14284,12 @@ pub unsafe extern "C-unwind" fn luaV_concat(mut L: *mut lua_State, mut total: i3
             } else {
             };
         } else {
-            let mut tl: size_t = if (*(&mut (*((*top.offset(-(1))).val.value_.gc
-                as *mut GCUnion))
+            let mut tl: size_t = if (*(&mut (*((*top.offset(-(1))).val.value_.gc as *mut GCUnion))
                 .ts as *mut TString))
                 .shrlen as i32
                 != 0xff as i32
             {
-                (*&mut (*((*top.offset(-(1))).val.value_.gc as *mut GCUnion)).ts)
-                    .shrlen as size_t
+                (*&mut (*((*top.offset(-(1))).val.value_.gc as *mut GCUnion)).ts).shrlen as size_t
             } else {
                 (*&mut (*((*top.offset(-(1))).val.value_.gc as *mut GCUnion)).ts)
                     .u
@@ -14335,44 +14298,29 @@ pub unsafe extern "C-unwind" fn luaV_concat(mut L: *mut lua_State, mut total: i3
             let mut ts: *mut TString = 0 as *mut TString;
             n = 1 as i32;
             while n < total
-                && ((*top.offset(-(n as isize)).offset(-(1)))
-                    .val
-                    .tt_ as i32
-                    & 0xf as i32
+                && ((*top.offset(-(n as isize)).offset(-(1))).val.tt_ as i32 & 0xf as i32
                     == 4 as i32
-                    || (*top.offset(-(n as isize)).offset(-(1)))
-                        .val
-                        .tt_ as i32
-                        & 0xf as i32
+                    || (*top.offset(-(n as isize)).offset(-(1))).val.tt_ as i32 & 0xf as i32
                         == 3 as i32
                         && {
-                            luaO_tostring(
-                                L,
-                                &mut (*top.offset(-(n as isize)).offset(-(1))).val,
-                            );
+                            luaO_tostring(L, &mut (*top.offset(-(n as isize)).offset(-(1))).val);
                             1 as i32 != 0
                         })
             {
                 let mut l: size_t =
-                    if (*(&mut (*((*top.offset(-(n as isize)).offset(-(1)))
-                        .val
-                        .value_
-                        .gc as *mut GCUnion))
+                    if (*(&mut (*((*top.offset(-(n as isize)).offset(-(1))).val.value_.gc
+                        as *mut GCUnion))
                         .ts as *mut TString))
                         .shrlen as i32
                         != 0xff as i32
                     {
-                        (*&mut (*((*top.offset(-(n as isize)).offset(-(1)))
-                            .val
-                            .value_
-                            .gc as *mut GCUnion))
+                        (*&mut (*((*top.offset(-(n as isize)).offset(-(1))).val.value_.gc
+                            as *mut GCUnion))
                             .ts)
                             .shrlen as size_t
                     } else {
-                        (*&mut (*((*top.offset(-(n as isize)).offset(-(1)))
-                            .val
-                            .value_
-                            .gc as *mut GCUnion))
+                        (*&mut (*((*top.offset(-(n as isize)).offset(-(1))).val.value_.gc
+                            as *mut GCUnion))
                             .ts)
                             .u
                             .lnglen
@@ -14545,16 +14493,15 @@ pub unsafe extern "C-unwind" fn luaV_modf(
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaV_shiftl(mut x: lua_Integer, mut y: lua_Integer) -> lua_Integer {
     if y < 0 as lua_Integer {
-        if y <= -((::core::mem::size_of::<lua_Integer>() as usize).wrapping_mul(8)
-            as i32) as lua_Integer
+        if y <= -((::core::mem::size_of::<lua_Integer>() as usize).wrapping_mul(8) as i32)
+            as lua_Integer
         {
             return 0 as lua_Integer;
         } else {
             return (x as lua_Unsigned >> -y as lua_Unsigned) as lua_Integer;
         }
     } else if y
-        >= (::core::mem::size_of::<lua_Integer>() as usize).wrapping_mul(8) as i32
-            as lua_Integer
+        >= (::core::mem::size_of::<lua_Integer>() as usize).wrapping_mul(8) as i32 as lua_Integer
     {
         return 0 as lua_Integer;
     } else {
@@ -14680,10 +14627,8 @@ pub unsafe extern "C-unwind" fn luaV_finishOp(mut L: *mut lua_State) {
             let mut top: StkId = ((*L).top.p).offset(-(1));
             let mut a: i32 =
                 (inst >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32;
-            let mut total: i32 = top
-                .offset(-(1))
-                .offset_from(base.offset(a as isize))
-                as std::ffi::c_long as i32;
+            let mut total: i32 =
+                top.offset(-(1)).offset_from(base.offset(a as isize)) as std::ffi::c_long as i32;
             let mut io1_1: *mut TValue = &mut (*top.offset(-(2))).val;
             let mut io2_1: *const TValue = &mut (*top).val;
             (*io1_1).value_ = (*io2_1).value_;
@@ -15908,8 +15853,9 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             pc = pc.offset(1);
                             pc;
                             let mut io_10: *mut TValue = &mut (*ra_22).val;
-                            (*io_10).value_.i =
-                                ((i1_1 as lua_Unsigned).wrapping_mul(i2_1 as lua_Unsigned)) as lua_Integer;
+                            (*io_10).value_.i = ((i1_1 as lua_Unsigned)
+                                .wrapping_mul(i2_1 as lua_Unsigned))
+                                as lua_Integer;
                             (*io_10).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
                         } else {
                             let mut n1_1: lua_Number = 0.;
@@ -16506,8 +16452,9 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             pc = pc.offset(1);
                             pc;
                             let mut io_27: *mut TValue = &mut (*ra_34).val;
-                            (*io_27).value_.i =
-                                ((i1_9 as lua_Unsigned).wrapping_mul(i2_9 as lua_Unsigned)) as lua_Integer;
+                            (*io_27).value_.i = ((i1_9 as lua_Unsigned)
+                                .wrapping_mul(i2_9 as lua_Unsigned))
+                                as lua_Integer;
                             (*io_27).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
                         } else {
                             let mut n1_8: lua_Number = 0.;
@@ -17921,8 +17868,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                     (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0)
                                         as i32 as isize,
                                 );
-                                let mut io1_15: *mut TValue =
-                                    &mut (*base.offset(-(1))).val;
+                                let mut io1_15: *mut TValue = &mut (*base.offset(-(1))).val;
                                 let mut io2_15: *const TValue = &mut (*ra_70).val;
                                 (*io1_15).value_ = (*io2_15).value_;
                                 (*io1_15).tt_ = (*io2_15).tt_;
@@ -17957,25 +17903,20 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
                                 as isize,
                         );
-                        if (*ra_71.offset(2)).val.tt_ as i32
-                            == 3 as i32 | (0) << 4 as i32
-                        {
+                        if (*ra_71.offset(2)).val.tt_ as i32 == 3 as i32 | (0) << 4 as i32 {
                             let mut count: lua_Unsigned =
                                 (*ra_71.offset(1)).val.value_.i as lua_Unsigned;
                             if count > 0 as lua_Unsigned {
-                                let mut step: lua_Integer =
-                                    (*ra_71.offset(2)).val.value_.i;
+                                let mut step: lua_Integer = (*ra_71.offset(2)).val.value_.i;
                                 let mut idx: lua_Integer = (*ra_71).val.value_.i;
-                                let mut io_43: *mut TValue =
-                                    &mut (*ra_71.offset(1)).val;
+                                let mut io_43: *mut TValue = &mut (*ra_71.offset(1)).val;
                                 (*io_43).value_.i =
                                     count.wrapping_sub(1 as i32 as lua_Unsigned) as lua_Integer;
                                 idx = (idx as lua_Unsigned).wrapping_add(step as lua_Unsigned)
                                     as lua_Integer;
                                 let mut io_44: *mut TValue = &mut (*ra_71).val;
                                 (*io_44).value_.i = idx;
-                                let mut io_45: *mut TValue =
-                                    &mut (*ra_71.offset(3)).val;
+                                let mut io_45: *mut TValue = &mut (*ra_71.offset(3)).val;
                                 (*io_45).value_.i = idx;
                                 (*io_45).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
                                 pc = pc.offset(
@@ -18176,8 +18117,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         memcpy(
                             ra_74.offset(4) as *mut c_void,
                             ra_74 as *const c_void,
-                            (3usize)
-                                .wrapping_mul(::core::mem::size_of::<StackValue>() as usize),
+                            (3usize).wrapping_mul(::core::mem::size_of::<StackValue>() as usize),
                         );
                         (*L).top.p = ra_74.offset(4).offset(3);
                         (*ci).u.l.savedpc = pc;
@@ -18358,8 +18298,7 @@ pub unsafe extern "C-unwind" fn lua_absindex(mut L: *mut lua_State, mut idx: i32
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn lua_gettop(mut L: *mut lua_State) -> i32 {
-    return ((*L).top.p).offset_from(((*(*L).ci).func.p).offset(1))
-        as std::ffi::c_long as i32;
+    return ((*L).top.p).offset_from(((*(*L).ci).func.p).offset(1)) as std::ffi::c_long as i32;
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn lua_settop(mut L: *mut lua_State, mut idx: i32) {
@@ -18370,10 +18309,7 @@ pub unsafe extern "C-unwind" fn lua_settop(mut L: *mut lua_State, mut idx: i32) 
     ci = (*L).ci;
     func = (*ci).func.p;
     if idx >= 0 {
-        diff = func
-            .offset(1)
-            .offset(idx as isize)
-            .offset_from((*L).top.p);
+        diff = func.offset(1).offset(idx as isize).offset_from((*L).top.p);
         while diff > 0 as ptrdiff_t {
             let fresh141 = (*L).top.p;
             (*L).top.p = ((*L).top.p).offset(1);
@@ -19436,8 +19372,7 @@ unsafe extern "C-unwind" fn auxsetstr(
         {
         } else {
         };
-        if (*((*L).top.p).offset(-(1))).val.tt_ as i32 & (1 as i32) << 6 as i32 != 0
-        {
+        if (*((*L).top.p).offset(-(1))).val.tt_ as i32 & (1 as i32) << 6 as i32 != 0 {
             if (*(*t).value_.gc).marked as i32 & (1 as i32) << 5 as i32 != 0
                 && (*(*((*L).top.p).offset(-(1))).val.value_.gc).marked as i32
                     & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
@@ -19518,8 +19453,7 @@ pub unsafe extern "C-unwind" fn lua_settable(mut L: *mut lua_State, mut idx: i32
         {
         } else {
         };
-        if (*((*L).top.p).offset(-(1))).val.tt_ as i32 & (1 as i32) << 6 as i32 != 0
-        {
+        if (*((*L).top.p).offset(-(1))).val.tt_ as i32 & (1 as i32) << 6 as i32 != 0 {
             if (*(*t).value_.gc).marked as i32 & (1 as i32) << 5 as i32 != 0
                 && (*(*((*L).top.p).offset(-(1))).val.value_.gc).marked as i32
                     & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
@@ -19584,8 +19518,7 @@ pub unsafe extern "C-unwind" fn lua_seti(mut L: *mut lua_State, mut idx: i32, mu
         {
         } else {
         };
-        if (*((*L).top.p).offset(-(1))).val.tt_ as i32 & (1 as i32) << 6 as i32 != 0
-        {
+        if (*((*L).top.p).offset(-(1))).val.tt_ as i32 & (1 as i32) << 6 as i32 != 0 {
             if (*(*t).value_.gc).marked as i32 & (1 as i32) << 5 as i32 != 0
                 && (*(*((*L).top.p).offset(-(1))).val.value_.gc).marked as i32
                     & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
@@ -19606,13 +19539,7 @@ pub unsafe extern "C-unwind" fn lua_seti(mut L: *mut lua_State, mut idx: i32, mu
         let mut io: *mut TValue = &mut aux;
         (*io).value_.i = n;
         (*io).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
-        luaV_finishset(
-            L,
-            t,
-            &mut aux,
-            &mut (*((*L).top.p).offset(-(1))).val,
-            slot,
-        );
+        luaV_finishset(L, t, &mut aux, &mut (*((*L).top.p).offset(-(1))).val, slot);
     }
     (*L).top.p = ((*L).top.p).offset(-1);
     (*L).top.p;
@@ -19625,12 +19552,7 @@ unsafe extern "C-unwind" fn aux_rawset(
 ) {
     let mut t: *mut Table = 0 as *mut Table;
     t = gettable(L, idx);
-    luaH_set(
-        L,
-        t,
-        key,
-        &mut (*((*L).top.p).offset(-(1))).val,
-    );
+    luaH_set(L, t, key, &mut (*((*L).top.p).offset(-(1))).val);
     (*t).flags = ((*t).flags as u32 & !!(!(0 as u32) << TM_EQ as i32 + 1 as i32)) as lu_byte;
     if (*((*L).top.p).offset(-(1))).val.tt_ as i32 & (1 as i32) << 6 as i32 != 0 {
         if (*(&mut (*(t as *mut GCUnion)).gc as *mut GCObject)).marked as i32
@@ -19649,12 +19571,7 @@ unsafe extern "C-unwind" fn aux_rawset(
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn lua_rawset(mut L: *mut lua_State, mut idx: i32) {
-    aux_rawset(
-        L,
-        idx,
-        &mut (*((*L).top.p).offset(-(2))).val,
-        2 as i32,
-    );
+    aux_rawset(L, idx, &mut (*((*L).top.p).offset(-(2))).val, 2 as i32);
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn lua_rawsetp(
@@ -19681,12 +19598,7 @@ pub unsafe extern "C-unwind" fn lua_rawseti(
 ) {
     let mut t: *mut Table = 0 as *mut Table;
     t = gettable(L, idx);
-    luaH_setint(
-        L,
-        t,
-        n,
-        &mut (*((*L).top.p).offset(-(1))).val,
-    );
+    luaH_setint(L, t, n, &mut (*((*L).top.p).offset(-(1))).val);
     if (*((*L).top.p).offset(-(1))).val.tt_ as i32 & (1 as i32) << 6 as i32 != 0 {
         if (*(&mut (*(t as *mut GCUnion)).gc as *mut GCObject)).marked as i32
             & (1 as i32) << 5 as i32
@@ -19792,8 +19704,7 @@ pub unsafe extern "C-unwind" fn lua_setiuservalue(
         {
         } else {
         };
-        if (*((*L).top.p).offset(-(1))).val.tt_ as i32 & (1 as i32) << 6 as i32 != 0
-        {
+        if (*((*L).top.p).offset(-(1))).val.tt_ as i32 & (1 as i32) << 6 as i32 != 0 {
             if (*(*o).value_.gc).marked as i32 & (1 as i32) << 5 as i32 != 0
                 && (*(*((*L).top.p).offset(-(1))).val.value_.gc).marked as i32
                     & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
@@ -19875,12 +19786,11 @@ pub unsafe extern "C-unwind" fn lua_pcallk(
             as std::ffi::c_long as i32;
         (*ci).u.c.old_errfunc = (*L).errfunc;
         (*L).errfunc = func;
-        (*ci).callstatus = ((*ci).callstatus as i32 & !((1 as i32) << 0) | (*L).allowhook as i32)
-            as u16;
+        (*ci).callstatus =
+            ((*ci).callstatus as i32 & !((1 as i32) << 0) | (*L).allowhook as i32) as u16;
         (*ci).callstatus = ((*ci).callstatus as i32 | (1 as i32) << 4 as i32) as u16;
         luaD_call(L, c.func, nresults);
-        (*ci).callstatus =
-            ((*ci).callstatus as i32 & !((1 as i32) << 4 as i32)) as u16;
+        (*ci).callstatus = ((*ci).callstatus as i32 & !((1 as i32) << 4 as i32)) as u16;
         (*L).errfunc = (*ci).u.c.old_errfunc;
         status = 0;
     }
@@ -19911,10 +19821,10 @@ pub unsafe extern "C-unwind" fn lua_load(
     luaZ_init(L, &mut z, reader, data);
     status = luaD_protectedparser(L, &mut z, chunkname, mode);
     if status == 0 {
-        let mut f: *mut LClosure =
-            &mut (*((*((*L).top.p).offset(-(1))).val.value_.gc as *mut GCUnion))
-                .cl
-                .l;
+        let mut f: *mut LClosure = &mut (*((*((*L).top.p).offset(-(1))).val.value_.gc
+            as *mut GCUnion))
+            .cl
+            .l;
         if (*f).nupvalues as i32 >= 1 as i32 {
             let mut gt: *const TValue =
                 &mut *((*(&mut (*((*(*L).l_G).l_registry.value_.gc as *mut GCUnion)).h
@@ -21832,22 +21742,20 @@ unsafe extern "C-unwind" fn b_str2int(
         s = s.offset(1);
         s;
     }
-    if *(*__ctype_b_loc()).offset(*s as u8 as i32 as isize) as i32
-        & _ISalnum as i32 as u16 as i32
+    if *(*__ctype_b_loc()).offset(*s as u8 as i32 as isize) as i32 & _ISalnum as i32 as u16 as i32
         == 0
     {
         return 0 as *const std::ffi::c_char;
     }
     loop {
-        let mut digit_0: i32 =
-            if *(*__ctype_b_loc()).offset(*s as u8 as i32 as isize) as i32
-                & _ISdigit as i32 as u16 as i32
-                != 0
-            {
-                *s as i32 - '0' as i32
-            } else {
-                toupper(*s as u8 as i32) - 'A' as i32 + 10
-            };
+        let mut digit_0: i32 = if *(*__ctype_b_loc()).offset(*s as u8 as i32 as isize) as i32
+            & _ISdigit as i32 as u16 as i32
+            != 0
+        {
+            *s as i32 - '0' as i32
+        } else {
+            toupper(*s as u8 as i32) - 'A' as i32 + 10
+        };
         if digit_0 >= base {
             return 0 as *const std::ffi::c_char;
         }
@@ -23668,8 +23576,7 @@ unsafe extern "C-unwind" fn nextc(mut rn: *mut RN) -> i32 {
     };
 }
 unsafe extern "C-unwind" fn test2(mut rn: *mut RN, mut set: *const std::ffi::c_char) -> i32 {
-    if (*rn).c == *set.offset(0 as isize) as i32 || (*rn).c == *set.offset(1) as i32
-    {
+    if (*rn).c == *set.offset(0 as isize) as i32 || (*rn).c == *set.offset(1) as i32 {
         return nextc(rn);
     } else {
         return 0;
@@ -23678,11 +23585,9 @@ unsafe extern "C-unwind" fn test2(mut rn: *mut RN, mut set: *const std::ffi::c_c
 unsafe extern "C-unwind" fn readdigits(mut rn: *mut RN, mut hex: i32) -> i32 {
     let mut count: i32 = 0;
     while (if hex != 0 {
-        *(*__ctype_b_loc()).offset((*rn).c as isize) as i32
-            & _ISxdigit as i32 as u16 as i32
+        *(*__ctype_b_loc()).offset((*rn).c as isize) as i32 & _ISxdigit as i32 as u16 as i32
     } else {
-        *(*__ctype_b_loc()).offset((*rn).c as isize) as i32
-            & _ISdigit as i32 as u16 as i32
+        *(*__ctype_b_loc()).offset((*rn).c as isize) as i32 & _ISdigit as i32 as u16 as i32
     }) != 0
         && nextc(rn) != 0
     {
@@ -23708,9 +23613,7 @@ unsafe extern "C-unwind" fn read_number(mut L: *mut lua_State, mut f: *mut FILE)
     flockfile(rn.f);
     loop {
         rn.c = getc_unlocked(rn.f);
-        if !(*(*__ctype_b_loc()).offset(rn.c as isize) as i32
-            & _ISspace as i32 as u16 as i32
-            != 0)
+        if !(*(*__ctype_b_loc()).offset(rn.c as isize) as i32 & _ISspace as i32 as u16 as i32 != 0)
         {
             break;
         }
@@ -24558,8 +24461,7 @@ unsafe extern "C-unwind" fn nextrand(mut state: *mut usize) -> usize {
     let mut state1: usize = *state.offset(1);
     let mut state2: usize = *state.offset(2) ^ state0;
     let mut state3: usize = *state.offset(3) ^ state1;
-    let mut res: usize =
-        (rotl(state1.wrapping_mul(5), 7 as i32)).wrapping_mul(9);
+    let mut res: usize = (rotl(state1.wrapping_mul(5), 7 as i32)).wrapping_mul(9);
     *state.offset(0 as isize) = state0 ^ state3;
     *state.offset(1) = state1 ^ state2;
     *state.offset(2) = state2 ^ state1 << 17 as i32;
@@ -24569,8 +24471,8 @@ unsafe extern "C-unwind" fn nextrand(mut state: *mut usize) -> usize {
 unsafe extern "C-unwind" fn I2d(mut x: usize) -> lua_Number {
     let mut sx: std::ffi::c_long =
         ((x & 0xffffffffffffffff as usize) >> 64 as i32 - 53 as i32) as std::ffi::c_long;
-    let mut res: lua_Number = sx as lua_Number
-        * (0.5f64 / ((1usize) << 53 as i32 - 1 as i32) as std::ffi::c_double);
+    let mut res: lua_Number =
+        sx as lua_Number * (0.5f64 / ((1usize) << 53 as i32 - 1 as i32) as std::ffi::c_double);
     if sx < 0 as std::ffi::c_long {
         res += 1.0f64;
     }
@@ -25029,9 +24931,8 @@ unsafe extern "C-unwind" fn setpath(
                 luaL_addlstring(
                     &mut b,
                     dftmark.offset(2),
-                    path.offset(len as isize)
-                        .offset(-(2))
-                        .offset_from(dftmark) as std::ffi::c_long as size_t,
+                    path.offset(len as isize).offset(-(2)).offset_from(dftmark) as std::ffi::c_long
+                        as size_t,
                 );
             }
             luaL_pushresult(&mut b);
@@ -25196,9 +25097,7 @@ unsafe extern "C-unwind" fn searchpath(
     buff.n = (buff.n).wrapping_add(1);
     *(buff.b).offset(fresh162 as isize) = '\0' as i32 as std::ffi::c_char;
     pathname = buff.b;
-    endpathname = pathname
-        .offset(buff.n as isize)
-        .offset(-(1));
+    endpathname = pathname.offset(buff.n as isize).offset(-(1));
     loop {
         filename = getnextfilename(&mut pathname, endpathname);
         if filename.is_null() {
@@ -25816,12 +25715,7 @@ unsafe extern "C-unwind" fn os_date(mut L: *mut lua_State) -> i32 {
                 let mut buff: *mut std::ffi::c_char = luaL_prepbuffsize(&mut b, 250 as size_t);
                 s = s.offset(1);
                 s;
-                s = checkoption(
-                    L,
-                    s,
-                    se.offset_from(s),
-                    cc.as_mut_ptr().offset(1),
-                );
+                s = checkoption(L, s, se.offset_from(s), cc.as_mut_ptr().offset(1));
                 reslen = strftime(buff, 250 as size_t, cc.as_mut_ptr(), stm);
                 b.n = (b.n).wrapping_add(reslen);
             }
@@ -26108,8 +26002,7 @@ unsafe extern "C-unwind" fn str_lower(mut L: *mut lua_State) -> i32 {
     let mut p: *mut std::ffi::c_char = luaL_buffinitsize(L, &mut b, l);
     i = 0 as size_t;
     while i < l {
-        *p.offset(i as isize) =
-            tolower(*s.offset(i as isize) as u8 as i32) as std::ffi::c_char;
+        *p.offset(i as isize) = tolower(*s.offset(i as isize) as u8 as i32) as std::ffi::c_char;
         i = i.wrapping_add(1);
         i;
     }
@@ -26130,8 +26023,7 @@ unsafe extern "C-unwind" fn str_upper(mut L: *mut lua_State) -> i32 {
     let mut p: *mut std::ffi::c_char = luaL_buffinitsize(L, &mut b, l);
     i = 0 as size_t;
     while i < l {
-        *p.offset(i as isize) =
-            toupper(*s.offset(i as isize) as u8 as i32) as std::ffi::c_char;
+        *p.offset(i as isize) = toupper(*s.offset(i as isize) as u8 as i32) as std::ffi::c_char;
         i = i.wrapping_add(1);
         i;
     }
@@ -26518,54 +26410,41 @@ unsafe extern "C-unwind" fn match_class(mut c: i32, mut cl: i32) -> i32 {
     let mut res: i32 = 0;
     match tolower(cl) {
         97 => {
-            res = *(*__ctype_b_loc()).offset(c as isize) as i32
-                & _ISalpha as i32 as u16 as i32;
+            res = *(*__ctype_b_loc()).offset(c as isize) as i32 & _ISalpha as i32 as u16 as i32;
         }
         99 => {
-            res = *(*__ctype_b_loc()).offset(c as isize) as i32
-                & _IScntrl as i32 as u16 as i32;
+            res = *(*__ctype_b_loc()).offset(c as isize) as i32 & _IScntrl as i32 as u16 as i32;
         }
         100 => {
-            res = *(*__ctype_b_loc()).offset(c as isize) as i32
-                & _ISdigit as i32 as u16 as i32;
+            res = *(*__ctype_b_loc()).offset(c as isize) as i32 & _ISdigit as i32 as u16 as i32;
         }
         103 => {
-            res = *(*__ctype_b_loc()).offset(c as isize) as i32
-                & _ISgraph as i32 as u16 as i32;
+            res = *(*__ctype_b_loc()).offset(c as isize) as i32 & _ISgraph as i32 as u16 as i32;
         }
         108 => {
-            res = *(*__ctype_b_loc()).offset(c as isize) as i32
-                & _ISlower as i32 as u16 as i32;
+            res = *(*__ctype_b_loc()).offset(c as isize) as i32 & _ISlower as i32 as u16 as i32;
         }
         112 => {
-            res = *(*__ctype_b_loc()).offset(c as isize) as i32
-                & _ISpunct as i32 as u16 as i32;
+            res = *(*__ctype_b_loc()).offset(c as isize) as i32 & _ISpunct as i32 as u16 as i32;
         }
         115 => {
-            res = *(*__ctype_b_loc()).offset(c as isize) as i32
-                & _ISspace as i32 as u16 as i32;
+            res = *(*__ctype_b_loc()).offset(c as isize) as i32 & _ISspace as i32 as u16 as i32;
         }
         117 => {
-            res = *(*__ctype_b_loc()).offset(c as isize) as i32
-                & _ISupper as i32 as u16 as i32;
+            res = *(*__ctype_b_loc()).offset(c as isize) as i32 & _ISupper as i32 as u16 as i32;
         }
         119 => {
-            res = *(*__ctype_b_loc()).offset(c as isize) as i32
-                & _ISalnum as i32 as u16 as i32;
+            res = *(*__ctype_b_loc()).offset(c as isize) as i32 & _ISalnum as i32 as u16 as i32;
         }
         120 => {
-            res = *(*__ctype_b_loc()).offset(c as isize) as i32
-                & _ISxdigit as i32 as u16 as i32;
+            res = *(*__ctype_b_loc()).offset(c as isize) as i32 & _ISxdigit as i32 as u16 as i32;
         }
         122 => {
             res = (c == 0) as i32;
         }
         _ => return (cl == c) as i32,
     }
-    return if *(*__ctype_b_loc()).offset(cl as isize) as i32
-        & _ISlower as i32 as u16 as i32
-        != 0
-    {
+    return if *(*__ctype_b_loc()).offset(cl as isize) as i32 & _ISlower as i32 as u16 as i32 != 0 {
         res
     } else {
         (res == 0) as i32
@@ -26593,13 +26472,9 @@ unsafe extern "C-unwind" fn matchbracketclass(
             if match_class(c, *p as u8 as i32) != 0 {
                 return sig;
             }
-        } else if *p.offset(1) as i32 == '-' as i32
-            && p.offset(2) < ec
-        {
+        } else if *p.offset(1) as i32 == '-' as i32 && p.offset(2) < ec {
             p = p.offset(2);
-            if *p.offset(-(2)) as u8 as i32 <= c
-                && c <= *p as u8 as i32
-            {
+            if *p.offset(-(2)) as u8 as i32 <= c && c <= *p as u8 as i32 {
                 return sig;
             }
         } else if *p as u8 as i32 == c {
@@ -26637,9 +26512,7 @@ unsafe extern "C-unwind" fn matchbalance(
     mut s: *const std::ffi::c_char,
     mut p: *const std::ffi::c_char,
 ) -> *const std::ffi::c_char {
-    if ((p >= ((*ms).p_end).offset(-(1))) as i32 != 0) as i32 as std::ffi::c_long
-        != 0
-    {
+    if ((p >= ((*ms).p_end).offset(-(1))) as i32 != 0) as i32 as std::ffi::c_long != 0 {
         luaL_error(
             (*ms).L,
             c"malformed pattern (missing arguments to '%%b')".as_ptr(),
@@ -26681,8 +26554,7 @@ unsafe extern "C-unwind" fn max_expand(
         i;
     }
     while i >= 0 as ptrdiff_t {
-        let mut res: *const std::ffi::c_char =
-            match_0(ms, s.offset(i as isize), ep.offset(1));
+        let mut res: *const std::ffi::c_char = match_0(ms, s.offset(i as isize), ep.offset(1));
         if !res.is_null() {
             return res;
         }
@@ -26835,16 +26707,8 @@ unsafe extern "C-unwind" fn match_0(
                             } else {
                                 *s.offset(-(1)) as i32
                             }) as std::ffi::c_char;
-                            if matchbracketclass(
-                                previous as u8 as i32,
-                                p,
-                                ep.offset(-(1)),
-                            ) == 0
-                                && matchbracketclass(
-                                    *s as u8 as i32,
-                                    p,
-                                    ep.offset(-(1)),
-                                ) != 0
+                            if matchbracketclass(previous as u8 as i32, p, ep.offset(-(1))) == 0
+                                && matchbracketclass(*s as u8 as i32, p, ep.offset(-(1))) != 0
                             {
                                 p = ep;
                                 continue;
@@ -26855,11 +26719,7 @@ unsafe extern "C-unwind" fn match_0(
                             }
                         }
                         _ => {
-                            s = match_capture(
-                                ms,
-                                s,
-                                *p.offset(1) as u8 as i32,
-                            );
+                            s = match_capture(ms, s, *p.offset(1) as u8 as i32);
                             if s.is_null() {
                                 current_block = 6476622998065200121;
                                 break;
@@ -26896,16 +26756,8 @@ unsafe extern "C-unwind" fn match_0(
                             } else {
                                 *s.offset(-(1)) as i32
                             }) as std::ffi::c_char;
-                            if matchbracketclass(
-                                previous as u8 as i32,
-                                p,
-                                ep.offset(-(1)),
-                            ) == 0
-                                && matchbracketclass(
-                                    *s as u8 as i32,
-                                    p,
-                                    ep.offset(-(1)),
-                                ) != 0
+                            if matchbracketclass(previous as u8 as i32, p, ep.offset(-(1))) == 0
+                                && matchbracketclass(*s as u8 as i32, p, ep.offset(-(1))) != 0
                             {
                                 p = ep;
                                 continue;
@@ -26916,11 +26768,7 @@ unsafe extern "C-unwind" fn match_0(
                             }
                         }
                         _ => {
-                            s = match_capture(
-                                ms,
-                                s,
-                                *p.offset(1) as u8 as i32,
-                            );
+                            s = match_capture(ms, s, *p.offset(1) as u8 as i32);
                             if s.is_null() {
                                 current_block = 6476622998065200121;
                                 break;
@@ -26957,16 +26805,8 @@ unsafe extern "C-unwind" fn match_0(
                             } else {
                                 *s.offset(-(1)) as i32
                             }) as std::ffi::c_char;
-                            if matchbracketclass(
-                                previous as u8 as i32,
-                                p,
-                                ep.offset(-(1)),
-                            ) == 0
-                                && matchbracketclass(
-                                    *s as u8 as i32,
-                                    p,
-                                    ep.offset(-(1)),
-                                ) != 0
+                            if matchbracketclass(previous as u8 as i32, p, ep.offset(-(1))) == 0
+                                && matchbracketclass(*s as u8 as i32, p, ep.offset(-(1))) != 0
                             {
                                 p = ep;
                                 continue;
@@ -26977,11 +26817,7 @@ unsafe extern "C-unwind" fn match_0(
                             }
                         }
                         _ => {
-                            s = match_capture(
-                                ms,
-                                s,
-                                *p.offset(1) as u8 as i32,
-                            );
+                            s = match_capture(ms, s, *p.offset(1) as u8 as i32);
                             if s.is_null() {
                                 current_block = 6476622998065200121;
                                 break;
@@ -27011,11 +26847,7 @@ unsafe extern "C-unwind" fn match_0(
             match *ep_0 {
                 63 => {
                     let mut res: *const std::ffi::c_char = 0 as *const std::ffi::c_char;
-                    res = match_0(
-                        ms,
-                        s.offset(1),
-                        ep_0.offset(1),
-                    );
+                    res = match_0(ms, s.offset(1), ep_0.offset(1));
                     if !res.is_null() {
                         s = res;
                         current_block = 6476622998065200121;
@@ -27078,12 +26910,7 @@ unsafe extern "C-unwind" fn lmemfind(
         } {
             init = init.offset(1);
             init;
-            if memcmp(
-                init as *const c_void,
-                s2.offset(1) as *const c_void,
-                l2,
-            ) == 0
-            {
+            if memcmp(init as *const c_void, s2.offset(1) as *const c_void, l2) == 0 {
                 return init.offset(-(1));
             } else {
                 l1 = l1.wrapping_sub(init.offset_from(s1) as std::ffi::c_long as size_t);
@@ -27162,8 +26989,7 @@ unsafe extern "C-unwind" fn nospecials(mut p: *const std::ffi::c_char, mut l: si
         if !(strpbrk(p.offset(upto as isize), c"^$*+?.([%-".as_ptr())).is_null() {
             return 0;
         }
-        upto = (upto as usize)
-            .wrapping_add((strlen(p.offset(upto as isize))).wrapping_add(1))
+        upto = (upto as usize).wrapping_add((strlen(p.offset(upto as isize))).wrapping_add(1))
             as size_t as size_t;
         if !(upto <= l) {
             break;
@@ -27354,9 +27180,7 @@ unsafe extern "C-unwind" fn add_s(
                 '%' as i32,
             );
         }
-        l = l.wrapping_sub(
-            p.offset(1).offset_from(news) as std::ffi::c_long as size_t,
-        );
+        l = l.wrapping_sub(p.offset(1).offset_from(news) as std::ffi::c_long as size_t);
         news = p.offset(1);
     }
     luaL_addlstring(b, news, l);
@@ -27513,9 +27337,7 @@ unsafe extern "C-unwind" fn addquoted(
             != 0
         {
             let mut buff: [std::ffi::c_char; 10] = [0; 10];
-            if *(*__ctype_b_loc())
-                .offset(*s.offset(1) as u8 as i32 as isize)
-                as i32
+            if *(*__ctype_b_loc()).offset(*s.offset(1) as u8 as i32 as isize) as i32
                 & _ISdigit as i32 as u16 as i32
                 == 0
             {
@@ -27613,8 +27435,7 @@ unsafe extern "C-unwind" fn addliteral(
     };
 }
 unsafe extern "C-unwind" fn get2digits(mut s: *const std::ffi::c_char) -> *const std::ffi::c_char {
-    if *(*__ctype_b_loc()).offset(*s as u8 as i32 as isize) as i32
-        & _ISdigit as i32 as u16 as i32
+    if *(*__ctype_b_loc()).offset(*s as u8 as i32 as isize) as i32 & _ISdigit as i32 as u16 as i32
         != 0
     {
         s = s.offset(1);
@@ -27777,8 +27598,8 @@ unsafe extern "C-unwind" fn str_format(mut L: *mut lua_State) -> i32 {
                         checkformat(L, form.as_mut_ptr(), c"-".as_ptr(), 0);
                         if p.is_null() {
                             p = c"(null)".as_ptr() as *const c_void;
-                            form[(strlen(form.as_mut_ptr())).wrapping_sub(1)
-                                as usize] = 's' as i32 as std::ffi::c_char;
+                            form[(strlen(form.as_mut_ptr())).wrapping_sub(1) as usize] =
+                                's' as i32 as std::ffi::c_char;
                         }
                         nb = snprintf(buff, maxitem as usize, form.as_mut_ptr(), p);
                         current_block = 11793792312832361944;

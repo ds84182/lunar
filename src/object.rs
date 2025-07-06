@@ -1,264 +1,86 @@
 use super::*;
 
+pub(super) const LUA_TUPVAL: i8 = LUA_NUMTYPES;
+pub(super) const LUA_TPROTO: i8 = LUA_NUMTYPES + 1;
+pub(super) const LUA_TDEADKEY: i8 = LUA_NUMTYPES + 2;
+
+pub(super) const LUA_TOTALTYPES: i8 = LUA_TPROTO + 2;
+
+/*
+** tags for Tagged Values have the following use of bits:
+** bits 0-3: actual tag (a LUA_T* constant)
+** bits 4-5: variant bits
+** bit 6: whether value is collectable
+*/
+
+#[inline]
+pub(super) const fn makevariant(t: i8, v: u8) -> u8 {
+    t as u8 | (v << 4)
+}
+
+#[inline]
+pub(super) const fn novariant(t: u8) -> u8 {
+    t & 0x0F
+}
+
+#[inline]
+pub(super) const fn withvariant(t: u8) -> u8 {
+    t & 0x3F
+}
+
+/// Standard nil
+pub(super) const LUA_VNIL: u8 = makevariant(LUA_TNIL, 0);
+
+/// Empty slot (which might be different from a slot containing nil)
+pub(super) const LUA_VEMPTY: u8 = makevariant(LUA_TNIL, 1);
+
+/// Value returned for a key not found in a table (absent key)
+pub(super) const LUA_VABSTKEY: u8 = makevariant(LUA_TNIL, 2);
+
+pub(super) const LUA_VFALSE: u8 = makevariant(LUA_TBOOLEAN, 0);
+pub(super) const LUA_VTRUE: u8 = makevariant(LUA_TBOOLEAN, 1);
+
+pub(super) const LUA_VTHREAD: u8 = makevariant(LUA_TTHREAD, 0);
+
+pub(super) const BIT_ISCOLLECTABLE: u8 = 1 << 6;
+
+pub(super) const LUA_VNUMINT: u8 = makevariant(LUA_TNUMBER, 0);
+pub(super) const LUA_VNUMFLT: u8 = makevariant(LUA_TNUMBER, 1);
+
+pub(super) const LUA_VSHRSTR: u8 = makevariant(LUA_TSTRING, 0);
+pub(super) const LUA_VLNGSTR: u8 = makevariant(LUA_TSTRING, 1);
+
+pub(super) const LUA_VLIGHTUSERDATA: u8 = makevariant(LUA_TLIGHTUSERDATA, 0);
+pub(super) const LUA_VUSERDATA: u8 = makevariant(LUA_TUSERDATA, 0);
+
+pub(super) const LUA_VPROTO: u8 = makevariant(LUA_TPROTO, 0);
+
+pub(super) const LUA_VUPVAL: u8 = makevariant(LUA_TUPVAL, 0);
+
+/// Lua closure
+pub(super) const LUA_VLCL: u8 = makevariant(LUA_TFUNCTION, 0);
+/// Light C function
+pub(super) const LUA_VLCF: u8 = makevariant(LUA_TFUNCTION, 1);
+/// C closure
+pub(super) const LUA_VCCL: u8 = makevariant(LUA_TFUNCTION, 2);
+
+pub(super) const LUA_VTABLE: u8 = makevariant(LUA_TTABLE, 0);
+
+// #[inline]
+// pub(super) fn iscollectable()
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaO_ceillog2(mut x: u32) -> i32 {
     static mut log_2: [lu_byte; 256] = [
-        0 as lu_byte,
-        1 as i32 as lu_byte,
-        2 as i32 as lu_byte,
-        2 as i32 as lu_byte,
-        3 as i32 as lu_byte,
-        3 as i32 as lu_byte,
-        3 as i32 as lu_byte,
-        3 as i32 as lu_byte,
-        4 as i32 as lu_byte,
-        4 as i32 as lu_byte,
-        4 as i32 as lu_byte,
-        4 as i32 as lu_byte,
-        4 as i32 as lu_byte,
-        4 as i32 as lu_byte,
-        4 as i32 as lu_byte,
-        4 as i32 as lu_byte,
-        5 as i32 as lu_byte,
-        5 as i32 as lu_byte,
-        5 as i32 as lu_byte,
-        5 as i32 as lu_byte,
-        5 as i32 as lu_byte,
-        5 as i32 as lu_byte,
-        5 as i32 as lu_byte,
-        5 as i32 as lu_byte,
-        5 as i32 as lu_byte,
-        5 as i32 as lu_byte,
-        5 as i32 as lu_byte,
-        5 as i32 as lu_byte,
-        5 as i32 as lu_byte,
-        5 as i32 as lu_byte,
-        5 as i32 as lu_byte,
-        5 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        6 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        7 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
-        8 as i32 as lu_byte,
+        0, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+        5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+        6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+        7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+        8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+        8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+        8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+        8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
     ];
     let mut l: i32 = 0;
     x = x.wrapping_sub(1);
@@ -485,8 +307,7 @@ unsafe extern "C-unwind" fn l_str2dloc(
     if endptr == s as *mut std::ffi::c_char {
         return 0 as *const std::ffi::c_char;
     }
-    while luai_ctype_[(*endptr as u8 as i32 + 1 as i32) as usize] as i32
-        & (1 as i32) << 3 as i32
+    while luai_ctype_[(*endptr as u8 as i32 + 1 as i32) as usize] as i32 & (1 as i32) << 3 as i32
         != 0
     {
         endptr = endptr.offset(1);
@@ -536,32 +357,27 @@ unsafe extern "C-unwind" fn l_str2int(
     let mut a: lua_Unsigned = 0 as lua_Unsigned;
     let mut empty: i32 = 1 as i32;
     let mut neg: i32 = 0;
-    while luai_ctype_[(*s as u8 as i32 + 1 as i32) as usize] as i32
-        & (1 as i32) << 3 as i32
-        != 0
-    {
+    while luai_ctype_[(*s as u8 as i32 + 1 as i32) as usize] as i32 & (1 as i32) << 3 as i32 != 0 {
         s = s.offset(1);
         s;
     }
     neg = isneg(&mut s);
     if *s.offset(0 as isize) as i32 == '0' as i32
-        && (*s.offset(1) as i32 == 'x' as i32
-            || *s.offset(1) as i32 == 'X' as i32)
+        && (*s.offset(1) as i32 == 'x' as i32 || *s.offset(1) as i32 == 'X' as i32)
     {
         s = s.offset(2);
-        while luai_ctype_[(*s as u8 as i32 + 1 as i32) as usize] as i32
-            & (1 as i32) << 4 as i32
+        while luai_ctype_[(*s as u8 as i32 + 1 as i32) as usize] as i32 & (1 as i32) << 4 as i32
             != 0
         {
-            a = a.wrapping_mul(16)
+            a = a
+                .wrapping_mul(16)
                 .wrapping_add(luaO_hexavalue(*s as i32) as lua_Unsigned);
             empty = 0;
             s = s.offset(1);
             s;
         }
     } else {
-        while luai_ctype_[(*s as u8 as i32 + 1 as i32) as usize] as i32
-            & (1 as i32) << 1 as i32
+        while luai_ctype_[(*s as u8 as i32 + 1 as i32) as usize] as i32 & (1 as i32) << 1 as i32
             != 0
         {
             let mut d: i32 = *s as i32 - '0' as i32;
@@ -582,10 +398,7 @@ unsafe extern "C-unwind" fn l_str2int(
             s;
         }
     }
-    while luai_ctype_[(*s as u8 as i32 + 1 as i32) as usize] as i32
-        & (1 as i32) << 3 as i32
-        != 0
-    {
+    while luai_ctype_[(*s as u8 as i32 + 1 as i32) as usize] as i32 & (1 as i32) << 3 as i32 != 0 {
         s = s.offset(1);
         s;
     }
@@ -779,8 +592,7 @@ pub unsafe extern "C-unwind" fn luaO_pushvfstring(
                 addstr2buff(&mut buff, s, strlen(s));
             }
             99 => {
-                let mut c: std::ffi::c_char =
-                    argp.arg::<i32>() as u8 as std::ffi::c_char;
+                let mut c: std::ffi::c_char = argp.arg::<i32>() as u8 as std::ffi::c_char;
                 addstr2buff(
                     &mut buff,
                     &mut c,
@@ -838,9 +650,7 @@ pub unsafe extern "C-unwind" fn luaO_pushvfstring(
                     luaO_utf8esc(bf_0.as_mut_ptr(), argp.arg::<std::ffi::c_long>() as usize);
                 addstr2buff(
                     &mut buff,
-                    bf_0.as_mut_ptr()
-                        .offset(8)
-                        .offset(-(len_0 as isize)),
+                    bf_0.as_mut_ptr().offset(8).offset(-(len_0 as isize)),
                     len_0 as size_t,
                 );
             }
@@ -859,10 +669,7 @@ pub unsafe extern "C-unwind" fn luaO_pushvfstring(
     }
     addstr2buff(&mut buff, fmt, strlen(fmt));
     clearbuff(&mut buff);
-    return ((*&mut (*((*((*L).top.p).offset(-(1))).val.value_.gc
-        as *mut GCUnion))
-        .ts)
-        .contents)
+    return ((*&mut (*((*((*L).top.p).offset(-(1))).val.value_.gc as *mut GCUnion)).ts).contents)
         .as_mut_ptr();
 }
 #[unsafe(no_mangle)]
