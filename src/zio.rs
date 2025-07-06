@@ -18,10 +18,47 @@ impl ZIO {
         if buff.is_null() || size == 0 {
             return -1;
         }
+        // discount char being returned
         self.n = size - 1;
         let c = *buff;
-        self.p = buff.offset(1);
+        self.p = buff.add(1);
         c as i32
+    }
+
+    pub unsafe fn read(&mut self, mut b: &mut [u8]) -> usize {
+        while !b.is_empty() {
+            let m;
+            // no bytes in buffer?
+            if self.n == 0 {
+                // try to read more
+                if self.fill() == -1 {
+                    // no more input; return number of missing bytes
+                    return b.len()
+                } else {
+                    // luaZ_fill consumed first byte; put it back
+                    self.n += 1;
+                    self.p = self.p.offset(-1);
+                }
+            }
+            // min. between n and z->n
+            m = if b.len() <= self.n { b.len() } else { self.n };
+            ptr::copy_nonoverlapping(self.p, b.as_mut_ptr().cast(), m);
+            self.n -= m;
+            self.p = self.p.add(m);
+            b = b.get_unchecked_mut(m..);
+        }
+        0
+    }
+
+    pub unsafe fn read_byte(&mut self) -> i32 {
+        if self.n > 0 {
+            self.n -= 1;
+            let p = self.p;
+            self.p = p.add(1);
+            *p as i32
+        } else {
+            self.fill()
+        }
     }
 }
 
