@@ -30,7 +30,7 @@ pub unsafe extern "C-unwind" fn luaD_seterrorobj(
                 c"error in error handling".as_ptr(),
                 (::core::mem::size_of::<[std::ffi::c_char; 24]>() as usize)
                     .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
-                    .wrapping_sub(1 as i32 as usize),
+                    .wrapping_sub(1),
             );
             (*io_0).value_.gc = &mut (*(x__0 as *mut GCUnion)).gc;
             (*io_0).tt_ = ((*x__0).tt as i32 | (1 as i32) << 6 as i32) as lu_byte;
@@ -50,7 +50,7 @@ pub unsafe extern "C-unwind" fn luaD_seterrorobj(
         }
         _ => {
             let mut io1: *mut TValue = &mut (*oldtop).val;
-            let mut io2: *const TValue = &mut (*((*L).top.p).offset(-(1 as i32 as isize))).val;
+            let mut io2: *const TValue = &mut (*((*L).top.p).offset(-(1))).val;
             (*io1).value_ = (*io2).value_;
             (*io1).tt_ = (*io2).tt_;
             if (*io1).tt_ as i32 & (1 as i32) << 6 as i32 == 0
@@ -65,7 +65,7 @@ pub unsafe extern "C-unwind" fn luaD_seterrorobj(
             };
         }
     }
-    (*L).top.p = oldtop.offset(1 as i32 as isize);
+    (*L).top.p = oldtop.offset(1);
 }
 struct LuaThrow;
 #[unsafe(no_mangle)]
@@ -80,7 +80,7 @@ pub unsafe fn luaD_throw(mut L: *mut lua_State, mut errcode: i32) -> ! {
             let fresh128 = (*(*g).mainthread).top.p;
             (*(*g).mainthread).top.p = ((*(*g).mainthread).top.p).offset(1);
             let mut io1: *mut TValue = &mut (*fresh128).val;
-            let mut io2: *const TValue = &mut (*((*L).top.p).offset(-(1 as i32 as isize))).val;
+            let mut io2: *const TValue = &mut (*((*L).top.p).offset(-(1))).val;
             (*io1).value_ = (*io2).value_;
             (*io1).tt_ = (*io2).tt_;
             if (*io1).tt_ as i32 & (1 as i32) << 6 as i32 == 0
@@ -429,7 +429,7 @@ unsafe extern "C-unwind" fn tryfuncTM(mut L: *mut lua_State, mut func: StkId) ->
     p = (*L).top.p;
     while p > func {
         let mut io1: *mut TValue = &mut (*p).val;
-        let mut io2: *const TValue = &mut (*p.offset(-(1 as i32 as isize))).val;
+        let mut io2: *const TValue = &mut (*p.offset(-(1))).val;
         (*io1).value_ = (*io2).value_;
         (*io1).tt_ = (*io2).tt_;
         if (*io1).tt_ as i32 & (1 as i32) << 6 as i32 == 0
@@ -496,7 +496,7 @@ unsafe extern "C-unwind" fn moveresults(
                 } else {
                 };
             }
-            (*L).top.p = res.offset(1 as i32 as isize);
+            (*L).top.p = res.offset(1);
             return;
         }
         -1 => {
@@ -689,7 +689,7 @@ pub unsafe extern "C-unwind" fn luaD_pretailcall(
                     narg1 += 1;
                     narg1;
                 }
-                (*ci).top.p = func.offset(1 as i32 as isize).offset(fsize as isize);
+                (*ci).top.p = func.offset(1).offset(fsize as isize);
                 (*ci).u.l.savedpc = (*p).code;
                 (*ci).callstatus =
                     ((*ci).callstatus as i32 | (1 as i32) << 5 as i32) as std::ffi::c_ushort;
@@ -750,7 +750,7 @@ pub unsafe extern "C-unwind" fn luaD_precall(
                     func,
                     nresults,
                     0,
-                    func.offset(1 as i32 as isize).offset(fsize as isize),
+                    func.offset(1).offset(fsize as isize),
                 );
                 (*L).ci = ci;
                 (*ci).u.l.savedpc = (*p).code;
@@ -909,7 +909,7 @@ unsafe extern "C-unwind" fn resume(mut L: *mut lua_State, mut ud: *mut c_void) {
     if (*L).status as i32 == 0 {
         ccall(
             L,
-            firstArg.offset(-(1 as i32 as isize)),
+            firstArg.offset(-(1)),
             -(1 as i32),
             0 as l_uint32,
         );
@@ -960,7 +960,7 @@ pub unsafe extern "C-unwind" fn lua_resume(
     if (*L).status as i32 == 0 {
         if (*L).ci != &mut (*L).base_ci as *mut CallInfo {
             return resume_error(L, c"cannot resume non-suspended coroutine".as_ptr(), nargs);
-        } else if ((*L).top.p).offset_from(((*(*L).ci).func.p).offset(1 as i32 as isize))
+        } else if ((*L).top.p).offset_from(((*(*L).ci).func.p).offset(1))
             as std::ffi::c_long
             == nargs as std::ffi::c_long
         {
@@ -993,7 +993,7 @@ pub unsafe extern "C-unwind" fn lua_resume(
     *nresults = if status == 1 as i32 {
         (*(*L).ci).u2.nyield
     } else {
-        ((*L).top.p).offset_from(((*(*L).ci).func.p).offset(1 as i32 as isize)) as std::ffi::c_long
+        ((*L).top.p).offset_from(((*(*L).ci).func.p).offset(1)) as std::ffi::c_long
             as i32
     };
     return status;
