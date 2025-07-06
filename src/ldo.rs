@@ -132,27 +132,22 @@ pub unsafe fn luaD_rawrunprotected(
 unsafe extern "C-unwind" fn relstack(mut L: *mut lua_State) {
     let mut ci: *mut CallInfo = 0 as *mut CallInfo;
     let mut up: *mut UpVal = 0 as *mut UpVal;
-    (*L).top.offset = ((*L).top.p as *mut std::ffi::c_char)
-        .offset_from((*L).stack.p as *mut std::ffi::c_char)
-        as std::ffi::c_long;
+    (*L).top.offset =
+        ((*L).top.p as *mut std::ffi::c_char).offset_from((*L).stack.p as *mut std::ffi::c_char);
     (*L).tbclist.offset = ((*L).tbclist.p as *mut std::ffi::c_char)
-        .offset_from((*L).stack.p as *mut std::ffi::c_char)
-        as std::ffi::c_long;
+        .offset_from((*L).stack.p as *mut std::ffi::c_char);
     up = (*L).openupval;
     while !up.is_null() {
         (*up).v.offset = ((*up).v.p as StkId as *mut std::ffi::c_char)
-            .offset_from((*L).stack.p as *mut std::ffi::c_char)
-            as std::ffi::c_long;
+            .offset_from((*L).stack.p as *mut std::ffi::c_char);
         up = (*up).u.open.next;
     }
     ci = (*L).ci;
     while !ci.is_null() {
         (*ci).top.offset = ((*ci).top.p as *mut std::ffi::c_char)
-            .offset_from((*L).stack.p as *mut std::ffi::c_char)
-            as std::ffi::c_long;
+            .offset_from((*L).stack.p as *mut std::ffi::c_char);
         (*ci).func.offset = ((*ci).func.p as *mut std::ffi::c_char)
-            .offset_from((*L).stack.p as *mut std::ffi::c_char)
-            as std::ffi::c_long;
+            .offset_from((*L).stack.p as *mut std::ffi::c_char);
         ci = (*ci).previous;
     }
 }
@@ -317,11 +312,9 @@ pub unsafe extern "C-unwind" fn luaD_hook(
         let mut mask: i32 = (1 as i32) << 3 as i32;
         let mut ci: *mut CallInfo = (*L).ci;
         let mut top: ptrdiff_t = ((*L).top.p as *mut std::ffi::c_char)
-            .offset_from((*L).stack.p as *mut std::ffi::c_char)
-            as std::ffi::c_long;
+            .offset_from((*L).stack.p as *mut std::ffi::c_char);
         let mut ci_top: ptrdiff_t = ((*ci).top.p as *mut std::ffi::c_char)
-            .offset_from((*L).stack.p as *mut std::ffi::c_char)
-            as std::ffi::c_long;
+            .offset_from((*L).stack.p as *mut std::ffi::c_char);
         let mut ar: lua_Debug = lua_Debug {
             event: 0,
             name: 0 as *const std::ffi::c_char,
@@ -424,9 +417,8 @@ unsafe extern "C-unwind" fn tryfuncTM(mut L: *mut lua_State, mut func: StkId) ->
         != 0) as i32 as std::ffi::c_long
         != 0
     {
-        let mut t__: ptrdiff_t = (func as *mut std::ffi::c_char)
-            .offset_from((*L).stack.p as *mut std::ffi::c_char)
-            as std::ffi::c_long;
+        let mut t__: ptrdiff_t =
+            (func as *mut std::ffi::c_char).offset_from((*L).stack.p as *mut std::ffi::c_char);
         if (*(*L).l_G).GCdebt > 0 as l_mem {
             luaC_step(L);
         }
@@ -523,8 +515,7 @@ unsafe extern "C-unwind" fn moveresults(
                     as std::ffi::c_ushort;
                 if (*L).hookmask != 0 {
                     let mut savedres: ptrdiff_t = (res as *mut std::ffi::c_char)
-                        .offset_from((*L).stack.p as *mut std::ffi::c_char)
-                        as std::ffi::c_long;
+                        .offset_from((*L).stack.p as *mut std::ffi::c_char);
                     rethook(L, (*L).ci, nres);
                     res =
                         ((*L).stack.p as *mut std::ffi::c_char).offset(savedres as isize) as StkId;
@@ -614,9 +605,8 @@ unsafe extern "C-unwind" fn precallC(
         != 0) as i32 as std::ffi::c_long
         != 0
     {
-        let mut t__: ptrdiff_t = (func as *mut std::ffi::c_char)
-            .offset_from((*L).stack.p as *mut std::ffi::c_char)
-            as std::ffi::c_long;
+        let mut t__: ptrdiff_t =
+            (func as *mut std::ffi::c_char).offset_from((*L).stack.p as *mut std::ffi::c_char);
         if (*(*L).l_G).GCdebt > 0 as l_mem {
             luaC_step(L);
         }
@@ -669,8 +659,7 @@ pub unsafe extern "C-unwind" fn luaD_pretailcall(
                     != 0
                 {
                     let mut t__: ptrdiff_t = (func as *mut std::ffi::c_char)
-                        .offset_from((*L).stack.p as *mut std::ffi::c_char)
-                        as std::ffi::c_long;
+                        .offset_from((*L).stack.p as *mut std::ffi::c_char);
                     if (*(*L).l_G).GCdebt > 0 as l_mem {
                         luaC_step(L);
                     }
@@ -752,8 +741,7 @@ pub unsafe extern "C-unwind" fn luaD_precall(
                     != 0
                 {
                     let mut t__: ptrdiff_t = (func as *mut std::ffi::c_char)
-                        .offset_from((*L).stack.p as *mut std::ffi::c_char)
-                        as std::ffi::c_long;
+                        .offset_from((*L).stack.p as *mut std::ffi::c_char);
                     if (*(*L).l_G).GCdebt > 0 as l_mem {
                         luaC_step(L);
                     }
@@ -802,9 +790,8 @@ unsafe extern "C-unwind" fn ccall(
             != 0) as i32 as std::ffi::c_long
             != 0
         {
-            let mut t__: ptrdiff_t = (func as *mut std::ffi::c_char)
-                .offset_from((*L).stack.p as *mut std::ffi::c_char)
-                as std::ffi::c_long;
+            let mut t__: ptrdiff_t =
+                (func as *mut std::ffi::c_char).offset_from((*L).stack.p as *mut std::ffi::c_char);
             luaD_growstack(L, 0, 1 as i32);
             func = ((*L).stack.p as *mut std::ffi::c_char).offset(t__ as isize) as StkId;
         }
@@ -1228,8 +1215,7 @@ pub unsafe extern "C-unwind" fn luaD_protectedparser(
         L,
         Some(f_parser as unsafe extern "C-unwind" fn(*mut lua_State, *mut c_void) -> ()),
         &mut p as *mut SParser as *mut c_void,
-        ((*L).top.p as *mut std::ffi::c_char).offset_from((*L).stack.p as *mut std::ffi::c_char)
-            as std::ffi::c_long,
+        ((*L).top.p as *mut std::ffi::c_char).offset_from((*L).stack.p as *mut std::ffi::c_char),
         (*L).errfunc,
     );
     p.buff.buffer = luaM_saferealloc_(

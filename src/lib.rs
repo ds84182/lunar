@@ -60,25 +60,15 @@ unsafe extern "C-unwind" {
     fn fmod(_: std::ffi::c_double, _: std::ffi::c_double) -> std::ffi::c_double;
     fn __ctype_b_loc() -> *mut *const std::ffi::c_ushort;
 }
-pub type __builtin_va_list = [__va_list_tag; 1];
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct __va_list_tag {
-    pub gp_offset: u32,
-    pub fp_offset: u32,
-    pub overflow_arg_area: *mut c_void,
-    pub reg_save_area: *mut c_void,
-}
-pub type ptrdiff_t = std::ffi::c_long;
+pub type ptrdiff_t = isize;
 pub type size_t = usize;
 pub type __off_t = std::ffi::c_long;
 pub type __off64_t = std::ffi::c_long;
 pub type __clock_t = std::ffi::c_long;
 pub type __time_t = std::ffi::c_long;
 pub type __sig_atomic_t = i32;
-pub type intptr_t = std::ffi::c_long;
+pub type intptr_t = isize;
 pub type uintptr_t = usize;
-pub type va_list = __builtin_va_list;
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct lua_State {
@@ -3996,7 +3986,7 @@ unsafe extern "C-unwind" fn GCTM(mut L: *mut lua_State) {
             Some(dothecall as unsafe extern "C-unwind" fn(*mut lua_State, *mut c_void) -> ()),
             0 as *mut c_void,
             (((*L).top.p).offset(-(2 as i32 as isize)) as *mut std::ffi::c_char)
-                .offset_from((*L).stack.p as *mut std::ffi::c_char) as std::ffi::c_long,
+                .offset_from((*L).stack.p as *mut std::ffi::c_char),
             0 as ptrdiff_t,
         );
         (*(*L).ci).callstatus =
@@ -11714,9 +11704,8 @@ pub unsafe extern "C-unwind" fn luaF_close(
     mut status: i32,
     mut yy: i32,
 ) -> StkId {
-    let mut levelrel: ptrdiff_t = (level as *mut std::ffi::c_char)
-        .offset_from((*L).stack.p as *mut std::ffi::c_char)
-        as std::ffi::c_long;
+    let mut levelrel: ptrdiff_t =
+        (level as *mut std::ffi::c_char).offset_from((*L).stack.p as *mut std::ffi::c_char);
     luaF_closeupval(L, level);
     while (*L).tbclist.p >= level {
         let mut tbc: StkId = (*L).tbclist.p;
@@ -13052,9 +13041,8 @@ pub unsafe extern "C-unwind" fn luaT_callTMres(
     mut p2: *const TValue,
     mut res: StkId,
 ) {
-    let mut result: ptrdiff_t = (res as *mut std::ffi::c_char)
-        .offset_from((*L).stack.p as *mut std::ffi::c_char)
-        as std::ffi::c_long;
+    let mut result: ptrdiff_t =
+        (res as *mut std::ffi::c_char).offset_from((*L).stack.p as *mut std::ffi::c_char);
     let mut func: StkId = (*L).top.p;
     let mut io1: *mut TValue = &mut (*func).val;
     let mut io2: *const TValue = f;
@@ -13351,8 +13339,7 @@ pub unsafe extern "C-unwind" fn luaT_getvarargs(
             != 0
         {
             let mut t__: ptrdiff_t = (where_0 as *mut std::ffi::c_char)
-                .offset_from((*L).stack.p as *mut std::ffi::c_char)
-                as std::ffi::c_long;
+                .offset_from((*L).stack.p as *mut std::ffi::c_char);
             if (*(*L).l_G).GCdebt > 0 as l_mem {
                 luaC_step(L);
             }
@@ -19790,7 +19777,7 @@ pub unsafe extern "C-unwind" fn lua_settop(mut L: *mut lua_State, mut idx: i32) 
         diff = func
             .offset(1 as i32 as isize)
             .offset(idx as isize)
-            .offset_from((*L).top.p) as std::ffi::c_long;
+            .offset_from((*L).top.p);
         while diff > 0 as ptrdiff_t {
             let fresh141 = (*L).top.p;
             (*L).top.p = ((*L).top.p).offset(1);
@@ -21271,8 +21258,7 @@ pub unsafe extern "C-unwind" fn lua_pcallk(
         func = 0 as ptrdiff_t;
     } else {
         let mut o: StkId = index2stack(L, errfunc);
-        func = (o as *mut std::ffi::c_char).offset_from((*L).stack.p as *mut std::ffi::c_char)
-            as std::ffi::c_long;
+        func = (o as *mut std::ffi::c_char).offset_from((*L).stack.p as *mut std::ffi::c_char);
     }
     c.func = ((*L).top.p).offset(-((nargs + 1 as i32) as isize));
     if k.is_none() || !((*L).nCcalls & 0xffff0000 as u32 == 0 as u32) {
@@ -21281,8 +21267,7 @@ pub unsafe extern "C-unwind" fn lua_pcallk(
             L,
             Some(f_call as unsafe extern "C-unwind" fn(*mut lua_State, *mut c_void) -> ()),
             &mut c as *mut CallS as *mut c_void,
-            (c.func as *mut std::ffi::c_char).offset_from((*L).stack.p as *mut std::ffi::c_char)
-                as std::ffi::c_long,
+            (c.func as *mut std::ffi::c_char).offset_from((*L).stack.p as *mut std::ffi::c_char),
             func,
         );
     } else {
@@ -27980,7 +27965,7 @@ unsafe extern "C-unwind" fn os_date(mut L: *mut lua_State) -> i32 {
                 s = checkoption(
                     L,
                     s,
-                    se.offset_from(s) as std::ffi::c_long,
+                    se.offset_from(s),
                     cc.as_mut_ptr().offset(1 as i32 as isize),
                 );
                 reslen = strftime(buff, 250 as size_t, cc.as_mut_ptr(), stm);
@@ -28988,8 +28973,7 @@ unsafe extern "C-unwind" fn end_capture(
 ) -> *const std::ffi::c_char {
     let mut l: i32 = capture_to_close(ms);
     let mut res: *const std::ffi::c_char = 0 as *const std::ffi::c_char;
-    (*ms).capture[l as usize].len =
-        s.offset_from((*ms).capture[l as usize].init) as std::ffi::c_long;
+    (*ms).capture[l as usize].len = s.offset_from((*ms).capture[l as usize].init);
     res = match_0(ms, s, p);
     if res.is_null() {
         (*ms).capture[l as usize].len = -(1 as i32) as ptrdiff_t;
@@ -29388,8 +29372,7 @@ unsafe extern "C-unwind" fn get_onecapture(
         } else if capl == -(2 as i32) as ptrdiff_t {
             lua_pushinteger(
                 (*ms).L,
-                (((*ms).capture[i as usize].init).offset_from((*ms).src_init) as std::ffi::c_long
-                    + 1 as i32 as std::ffi::c_long) as lua_Integer,
+                (((*ms).capture[i as usize].init).offset_from((*ms).src_init) + 1) as lua_Integer,
             );
         }
         return capl as size_t;
@@ -29483,11 +29466,7 @@ unsafe extern "C-unwind" fn str_find_aux(mut L: *mut lua_State, mut find: i32) -
         let mut s2: *const std::ffi::c_char =
             lmemfind(s.offset(init as isize), ls.wrapping_sub(init), p, lp);
         if !s2.is_null() {
-            lua_pushinteger(
-                L,
-                (s2.offset_from(s) as std::ffi::c_long + 1 as i32 as std::ffi::c_long)
-                    as lua_Integer,
-            );
+            lua_pushinteger(L, (s2.offset_from(s) + 1) as lua_Integer);
             lua_pushinteger(
                 L,
                 (s2.offset_from(s) as std::ffi::c_long as size_t).wrapping_add(lp) as lua_Integer,
@@ -29522,11 +29501,7 @@ unsafe extern "C-unwind" fn str_find_aux(mut L: *mut lua_State, mut find: i32) -
             res = match_0(&mut ms, s1, p);
             if !res.is_null() {
                 if find != 0 {
-                    lua_pushinteger(
-                        L,
-                        (s1.offset_from(s) as std::ffi::c_long + 1 as i32 as std::ffi::c_long)
-                            as lua_Integer,
-                    );
+                    lua_pushinteger(L, (s1.offset_from(s) + 1) as lua_Integer);
                     lua_pushinteger(L, res.offset_from(s) as std::ffi::c_long as lua_Integer);
                     return push_captures(
                         &mut ms,
