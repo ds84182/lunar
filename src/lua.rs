@@ -501,19 +501,19 @@ unsafe extern "C" fn incomplete(
             &mut lmsg,
         );
         if lmsg
-            >= (::core::mem::size_of::<[std::ffi::c_char; 6]>())
+            >= (size_of::<[std::ffi::c_char; 6]>())
                 .wrapping_div(
-                    ::core::mem::size_of::<std::ffi::c_char>(),
+                    size_of::<std::ffi::c_char>(),
                 )
                 .wrapping_sub(1)
             && strcmp(
                 msg
                     .offset(lmsg as isize)
                     .offset(
-                        -((::core::mem::size_of::<[std::ffi::c_char; 6]>()
+                        -((size_of::<[std::ffi::c_char; 6]>()
                             as std::ffi::c_ulong)
                             .wrapping_div(
-                                ::core::mem::size_of::<std::ffi::c_char>()
+                                size_of::<std::ffi::c_char>()
                                     as std::ffi::c_ulong,
                             )
                             .wrapping_sub(1 as i32 as std::ffi::c_ulong)
@@ -682,7 +682,7 @@ unsafe extern "C" fn doREPL(mut L: *mut lua_State) {
     lua_settop(L, 0 as i32);
     fwrite(
         b"\n\0" as *const u8 as *const std::ffi::c_char as *const std::ffi::c_void,
-        ::core::mem::size_of::<std::ffi::c_char>(),
+        size_of::<std::ffi::c_char>(),
         1,
         stdout,
     );
@@ -707,9 +707,9 @@ unsafe extern "C-unwind" fn pmain(mut L: *mut lua_State) -> i32 {
     luaL_checkversion_(
         L,
         504 as i32 as lua_Number,
-        (::core::mem::size_of::<lua_Integer>())
+        (size_of::<lua_Integer>())
             .wrapping_mul(16)
-            .wrapping_add(::core::mem::size_of::<lua_Number>()),
+            .wrapping_add(size_of::<lua_Number>()),
     );
     if args == 1 as i32 {
         print_usage(*argv.offset(script as isize));

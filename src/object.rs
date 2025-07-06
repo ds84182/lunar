@@ -593,11 +593,7 @@ pub unsafe extern "C-unwind" fn luaO_pushvfstring(
             }
             99 => {
                 let mut c: std::ffi::c_char = argp.arg::<i32>() as u8 as std::ffi::c_char;
-                addstr2buff(
-                    &mut buff,
-                    &mut c,
-                    ::core::mem::size_of::<std::ffi::c_char>() as usize,
-                );
+                addstr2buff(&mut buff, &mut c, size_of::<std::ffi::c_char>() as usize);
             }
             100 => {
                 let mut num: TValue = TValue {
@@ -637,7 +633,7 @@ pub unsafe extern "C-unwind" fn luaO_pushvfstring(
             }
             112 => {
                 let sz: i32 = (3usize)
-                    .wrapping_mul(::core::mem::size_of::<*mut c_void>() as usize)
+                    .wrapping_mul(size_of::<*mut c_void>() as usize)
                     .wrapping_add(8) as i32;
                 let mut bf: *mut std::ffi::c_char = getbuff(&mut buff, sz);
                 let mut p: *mut c_void = argp.arg::<*mut c_void>();
@@ -696,7 +692,7 @@ pub unsafe extern "C-unwind" fn luaO_chunkid(
             memcpy(
                 out as *mut c_void,
                 source.offset(1) as *const c_void,
-                srclen.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+                srclen.wrapping_mul(size_of::<std::ffi::c_char>() as usize),
             );
         } else {
             memcpy(
@@ -704,7 +700,7 @@ pub unsafe extern "C-unwind" fn luaO_chunkid(
                 source.offset(1) as *const c_void,
                 bufflen
                     .wrapping_sub(1 as i32 as size_t)
-                    .wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+                    .wrapping_mul(size_of::<std::ffi::c_char>() as usize),
             );
             out = out.offset(bufflen.wrapping_sub(1 as i32 as size_t) as isize);
             *out = b'\0' as std::ffi::c_char;
@@ -714,25 +710,25 @@ pub unsafe extern "C-unwind" fn luaO_chunkid(
             memcpy(
                 out as *mut c_void,
                 source.offset(1) as *const c_void,
-                srclen.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+                srclen.wrapping_mul(size_of::<std::ffi::c_char>() as usize),
             );
         } else {
             memcpy(
                 out as *mut c_void,
                 c"...".as_ptr() as *const c_void,
-                (::core::mem::size_of::<[std::ffi::c_char; 4]>() as usize)
-                    .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+                (size_of::<[std::ffi::c_char; 4]>() as usize)
+                    .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                     .wrapping_sub(1)
-                    .wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+                    .wrapping_mul(size_of::<std::ffi::c_char>() as usize),
             );
             out = out.offset(
-                (::core::mem::size_of::<[std::ffi::c_char; 4]>() as usize)
-                    .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+                (size_of::<[std::ffi::c_char; 4]>() as usize)
+                    .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                     .wrapping_sub(1) as isize,
             );
             bufflen = (bufflen as usize).wrapping_sub(
-                (::core::mem::size_of::<[std::ffi::c_char; 4]>() as usize)
-                    .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+                (size_of::<[std::ffi::c_char; 4]>() as usize)
+                    .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                     .wrapping_sub(1),
             ) as size_t as size_t;
             memcpy(
@@ -741,7 +737,7 @@ pub unsafe extern "C-unwind" fn luaO_chunkid(
                     .offset(1)
                     .offset(srclen as isize)
                     .offset(-(bufflen as isize)) as *const c_void,
-                bufflen.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+                bufflen.wrapping_mul(size_of::<std::ffi::c_char>() as usize),
             );
         }
     } else {
@@ -749,19 +745,19 @@ pub unsafe extern "C-unwind" fn luaO_chunkid(
         memcpy(
             out as *mut c_void,
             c"[string \"".as_ptr() as *const c_void,
-            (::core::mem::size_of::<[std::ffi::c_char; 10]>() as usize)
-                .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+            (size_of::<[std::ffi::c_char; 10]>() as usize)
+                .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1)
-                .wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+                .wrapping_mul(size_of::<std::ffi::c_char>() as usize),
         );
         out = out.offset(
-            (::core::mem::size_of::<[std::ffi::c_char; 10]>() as usize)
-                .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+            (size_of::<[std::ffi::c_char; 10]>() as usize)
+                .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1) as isize,
         );
         bufflen = (bufflen as usize).wrapping_sub(
-            (::core::mem::size_of::<[std::ffi::c_char; 15]>() as usize)
-                .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+            (size_of::<[std::ffi::c_char; 15]>() as usize)
+                .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1)
                 .wrapping_add(1),
         ) as size_t as size_t;
@@ -769,7 +765,7 @@ pub unsafe extern "C-unwind" fn luaO_chunkid(
             memcpy(
                 out as *mut c_void,
                 source as *const c_void,
-                srclen.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+                srclen.wrapping_mul(size_of::<std::ffi::c_char>() as usize),
             );
             out = out.offset(srclen as isize);
         } else {
@@ -782,31 +778,31 @@ pub unsafe extern "C-unwind" fn luaO_chunkid(
             memcpy(
                 out as *mut c_void,
                 source as *const c_void,
-                srclen.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+                srclen.wrapping_mul(size_of::<std::ffi::c_char>() as usize),
             );
             out = out.offset(srclen as isize);
             memcpy(
                 out as *mut c_void,
                 c"...".as_ptr() as *const c_void,
-                (::core::mem::size_of::<[std::ffi::c_char; 4]>() as usize)
-                    .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+                (size_of::<[std::ffi::c_char; 4]>() as usize)
+                    .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                     .wrapping_sub(1)
-                    .wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+                    .wrapping_mul(size_of::<std::ffi::c_char>() as usize),
             );
             out = out.offset(
-                (::core::mem::size_of::<[std::ffi::c_char; 4]>() as usize)
-                    .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+                (size_of::<[std::ffi::c_char; 4]>() as usize)
+                    .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                     .wrapping_sub(1) as isize,
             );
         }
         memcpy(
             out as *mut c_void,
             c"\"]".as_ptr() as *const c_void,
-            (::core::mem::size_of::<[std::ffi::c_char; 3]>() as usize)
-                .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+            (size_of::<[std::ffi::c_char; 3]>() as usize)
+                .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1)
                 .wrapping_add(1)
-                .wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+                .wrapping_mul(size_of::<std::ffi::c_char>() as usize),
         );
     };
 }

@@ -911,7 +911,7 @@ unsafe extern "C" fn reader(
     let fresh2 = *fresh1;
     *fresh1 = *fresh1 - 1;
     if fresh2 != 0 {
-        *size = (::core::mem::size_of::<[std::ffi::c_char; 20]>() as std::ffi::c_ulong)
+        *size = (size_of::<[std::ffi::c_char; 20]>() as std::ffi::c_ulong)
             .wrapping_sub(1 as std::ffi::c_int as std::ffi::c_ulong);
         return b"(function()end)();\n\0" as *const u8 as *const std::ffi::c_char;
     } else {

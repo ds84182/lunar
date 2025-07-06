@@ -28,8 +28,8 @@ pub unsafe extern "C-unwind" fn luaD_seterrorobj(
             let mut x__0: *mut TString = luaS_newlstr(
                 L,
                 c"error in error handling".as_ptr(),
-                (::core::mem::size_of::<[std::ffi::c_char; 24]>() as usize)
-                    .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+                (size_of::<[std::ffi::c_char; 24]>() as usize)
+                    .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                     .wrapping_sub(1),
             );
             (*io_0).value_.gc = &mut (*(x__0 as *mut GCUnion)).gc;
@@ -191,10 +191,8 @@ pub unsafe extern "C-unwind" fn luaD_reallocstack(
     newstack = luaM_realloc_(
         L,
         (*L).stack.p as *mut c_void,
-        ((oldsize + 5 as i32) as size_t)
-            .wrapping_mul(::core::mem::size_of::<StackValue>() as usize),
-        ((newsize + 5 as i32) as size_t)
-            .wrapping_mul(::core::mem::size_of::<StackValue>() as usize),
+        ((oldsize + 5 as i32) as size_t).wrapping_mul(size_of::<StackValue>() as usize),
+        ((newsize + 5 as i32) as size_t).wrapping_mul(size_of::<StackValue>() as usize),
     ) as *mut StackValue;
     (*(*L).l_G).gcstopem = oldgcstop as lu_byte;
     if ((newstack == 0 as *mut c_void as StkId) as i32 != 0) as i32 as std::ffi::c_long != 0 {
@@ -393,8 +391,7 @@ unsafe extern "C-unwind" fn rethook(mut L: *mut lua_State, mut ci: *mut CallInfo
             }
         }
         (*ci).func.p = ((*ci).func.p).offset(delta as isize);
-        ftransfer =
-            firstres.offset_from((*ci).func.p) as std::ffi::c_long as u16 as i32;
+        ftransfer = firstres.offset_from((*ci).func.p) as std::ffi::c_long as u16 as i32;
         luaD_hook(L, 1 as i32, -(1 as i32), ftransfer, nres);
         (*ci).func.p = ((*ci).func.p).offset(-(delta as isize));
     }
@@ -508,8 +505,8 @@ unsafe extern "C-unwind" fn moveresults(
                     ((*(*L).ci).callstatus as i32 | (1 as i32) << 9 as i32) as u16;
                 (*(*L).ci).u2.nres = nres;
                 res = luaF_close(L, res, -(1 as i32), 1 as i32);
-                (*(*L).ci).callstatus = ((*(*L).ci).callstatus as i32 & !((1 as i32) << 9 as i32))
-                    as u16;
+                (*(*L).ci).callstatus =
+                    ((*(*L).ci).callstatus as i32 & !((1 as i32) << 9 as i32)) as u16;
                 if (*L).hookmask != 0 {
                     let mut savedres: ptrdiff_t = (res as *mut std::ffi::c_char)
                         .offset_from((*L).stack.p as *mut std::ffi::c_char);
@@ -691,8 +688,7 @@ pub unsafe extern "C-unwind" fn luaD_pretailcall(
                 }
                 (*ci).top.p = func.offset(1).offset(fsize as isize);
                 (*ci).u.l.savedpc = (*p).code;
-                (*ci).callstatus =
-                    ((*ci).callstatus as i32 | (1 as i32) << 5 as i32) as u16;
+                (*ci).callstatus = ((*ci).callstatus as i32 | (1 as i32) << 5 as i32) as u16;
                 (*L).top.p = func.offset(narg1 as isize);
                 return -(1 as i32);
             }
@@ -745,13 +741,7 @@ pub unsafe extern "C-unwind" fn luaD_precall(
                     luaD_growstack(L, fsize, 1 as i32);
                     func = ((*L).stack.p as *mut std::ffi::c_char).offset(t__ as isize) as StkId;
                 }
-                ci = prepCallInfo(
-                    L,
-                    func,
-                    nresults,
-                    0,
-                    func.offset(1).offset(fsize as isize),
-                );
+                ci = prepCallInfo(L, func, nresults, 0, func.offset(1).offset(fsize as isize));
                 (*L).ci = ci;
                 (*ci).u.l.savedpc = (*p).code;
                 while narg < nfixparams {
@@ -828,8 +818,7 @@ unsafe extern "C-unwind" fn finishpcallk(mut L: *mut lua_State, mut ci: *mut Cal
         func = luaF_close(L, func, status, 1 as i32);
         luaD_seterrorobj(L, status, func);
         luaD_shrinkstack(L);
-        (*ci).callstatus =
-            ((*ci).callstatus as i32 & !((7 as i32) << 10) | (0) << 10) as u16;
+        (*ci).callstatus = ((*ci).callstatus as i32 & !((7 as i32) << 10) | (0) << 10) as u16;
     }
     (*ci).callstatus = ((*ci).callstatus as i32 & !((1 as i32) << 4 as i32)) as u16;
     (*L).errfunc = (*ci).u.c.old_errfunc;
@@ -907,12 +896,7 @@ unsafe extern "C-unwind" fn resume(mut L: *mut lua_State, mut ud: *mut c_void) {
     let mut firstArg: StkId = ((*L).top.p).offset(-(n as isize));
     let mut ci: *mut CallInfo = (*L).ci;
     if (*L).status as i32 == 0 {
-        ccall(
-            L,
-            firstArg.offset(-(1)),
-            -(1 as i32),
-            0 as l_uint32,
-        );
+        ccall(L, firstArg.offset(-(1)), -(1 as i32), 0 as l_uint32);
     } else {
         (*L).status = 0 as lu_byte;
         if (*ci).callstatus as i32 & (1 as i32) << 1 as i32 == 0 {
@@ -939,8 +923,7 @@ unsafe extern "C-unwind" fn precover(mut L: *mut lua_State, mut status: i32) -> 
         !ci.is_null()
     } {
         (*L).ci = ci;
-        (*ci).callstatus =
-            ((*ci).callstatus as i32 & !((7 as i32) << 10) | status << 10) as u16;
+        (*ci).callstatus = ((*ci).callstatus as i32 & !((7 as i32) << 10) | status << 10) as u16;
         status = luaD_rawrunprotected(
             L,
             Some(unroll as unsafe extern "C-unwind" fn(*mut lua_State, *mut c_void) -> ()),
@@ -960,8 +943,7 @@ pub unsafe extern "C-unwind" fn lua_resume(
     if (*L).status as i32 == 0 {
         if (*L).ci != &mut (*L).base_ci as *mut CallInfo {
             return resume_error(L, c"cannot resume non-suspended coroutine".as_ptr(), nargs);
-        } else if ((*L).top.p).offset_from(((*(*L).ci).func.p).offset(1))
-            as std::ffi::c_long
+        } else if ((*L).top.p).offset_from(((*(*L).ci).func.p).offset(1)) as std::ffi::c_long
             == nargs as std::ffi::c_long
         {
             return resume_error(L, c"cannot resume dead coroutine".as_ptr(), nargs);
@@ -993,8 +975,7 @@ pub unsafe extern "C-unwind" fn lua_resume(
     *nresults = if status == 1 as i32 {
         (*(*L).ci).u2.nyield
     } else {
-        ((*L).top.p).offset_from(((*(*L).ci).func.p).offset(1)) as std::ffi::c_long
-            as i32
+        ((*L).top.p).offset_from(((*(*L).ci).func.p).offset(1)) as std::ffi::c_long as i32
     };
     return status;
 }
@@ -1186,24 +1167,24 @@ pub unsafe extern "C-unwind" fn luaD_protectedparser(
     p.buff.buffer = luaM_saferealloc_(
         L,
         p.buff.buffer as *mut c_void,
-        (p.buff.buffsize).wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
-        (0 as usize).wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+        (p.buff.buffsize).wrapping_mul(size_of::<std::ffi::c_char>() as usize),
+        (0 as usize).wrapping_mul(size_of::<std::ffi::c_char>() as usize),
     ) as *mut std::ffi::c_char;
     p.buff.buffsize = 0 as size_t;
     luaM_free_(
         L,
         p.dyd.actvar.arr as *mut c_void,
-        (p.dyd.actvar.size as usize).wrapping_mul(::core::mem::size_of::<Vardesc>() as usize),
+        (p.dyd.actvar.size as usize).wrapping_mul(size_of::<Vardesc>() as usize),
     );
     luaM_free_(
         L,
         p.dyd.gt.arr as *mut c_void,
-        (p.dyd.gt.size as usize).wrapping_mul(::core::mem::size_of::<Labeldesc>() as usize),
+        (p.dyd.gt.size as usize).wrapping_mul(size_of::<Labeldesc>() as usize),
     );
     luaM_free_(
         L,
         p.dyd.label.arr as *mut c_void,
-        (p.dyd.label.size as usize).wrapping_mul(::core::mem::size_of::<Labeldesc>() as usize),
+        (p.dyd.label.size as usize).wrapping_mul(size_of::<Labeldesc>() as usize),
     );
     (*L).nCcalls = ((*L).nCcalls).wrapping_sub(0x10000 as l_uint32);
     return status;

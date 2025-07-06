@@ -56,7 +56,7 @@ unsafe extern "C-unwind" fn loadNumber(mut S: *mut LoadState) -> lua_Number {
     loadBlock(
         S,
         &mut x as *mut lua_Number as *mut c_void,
-        (1usize).wrapping_mul(::core::mem::size_of::<lua_Number>() as usize),
+        (1usize).wrapping_mul(size_of::<lua_Number>() as usize),
     );
     return x;
 }
@@ -65,7 +65,7 @@ unsafe extern "C-unwind" fn loadInteger(mut S: *mut LoadState) -> lua_Integer {
     loadBlock(
         S,
         &mut x as *mut lua_Integer as *mut c_void,
-        (1usize).wrapping_mul(::core::mem::size_of::<lua_Integer>() as usize),
+        (1usize).wrapping_mul(size_of::<lua_Integer>() as usize),
     );
     return x;
 }
@@ -82,7 +82,7 @@ unsafe extern "C-unwind" fn loadStringN(mut S: *mut LoadState, mut p: *mut Proto
             loadBlock(
                 S,
                 buff.as_mut_ptr() as *mut c_void,
-                size.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+                size.wrapping_mul(size_of::<std::ffi::c_char>() as usize),
             );
             ts = luaS_newlstr(L, buff.as_mut_ptr(), size);
         } else {
@@ -105,7 +105,7 @@ unsafe extern "C-unwind" fn loadStringN(mut S: *mut LoadState, mut p: *mut Proto
             loadBlock(
                 S,
                 ((*ts).contents).as_mut_ptr() as *mut c_void,
-                size.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+                size.wrapping_mul(size_of::<std::ffi::c_char>() as usize),
             );
             (*L).top.p = ((*L).top.p).offset(-1);
             (*L).top.p;
@@ -132,38 +132,38 @@ unsafe extern "C-unwind" fn loadString(mut S: *mut LoadState, mut p: *mut Proto)
 }
 unsafe extern "C-unwind" fn loadCode(mut S: *mut LoadState, mut f: *mut Proto) {
     let mut n: i32 = loadInt(S);
-    if ::core::mem::size_of::<i32>() as usize >= ::core::mem::size_of::<size_t>() as usize
+    if size_of::<i32>() as usize >= size_of::<size_t>() as usize
         && (n as size_t).wrapping_add(1 as i32 as size_t)
-            > (!(0 as size_t)).wrapping_div(::core::mem::size_of::<Instruction>() as usize)
+            > (!(0 as size_t)).wrapping_div(size_of::<Instruction>() as usize)
     {
         luaM_toobig((*S).L);
     } else {
     };
     (*f).code = luaM_malloc_(
         (*S).L,
-        (n as usize).wrapping_mul(::core::mem::size_of::<Instruction>() as usize),
+        (n as usize).wrapping_mul(size_of::<Instruction>() as usize),
         0,
     ) as *mut Instruction;
     (*f).sizecode = n;
     loadBlock(
         S,
         (*f).code as *mut c_void,
-        (n as usize).wrapping_mul(::core::mem::size_of::<Instruction>() as usize),
+        (n as usize).wrapping_mul(size_of::<Instruction>() as usize),
     );
 }
 unsafe extern "C-unwind" fn loadConstants(mut S: *mut LoadState, mut f: *mut Proto) {
     let mut i: i32 = 0;
     let mut n: i32 = loadInt(S);
-    if ::core::mem::size_of::<i32>() as usize >= ::core::mem::size_of::<size_t>() as usize
+    if size_of::<i32>() as usize >= size_of::<size_t>() as usize
         && (n as size_t).wrapping_add(1 as i32 as size_t)
-            > (!(0 as size_t)).wrapping_div(::core::mem::size_of::<TValue>() as usize)
+            > (!(0 as size_t)).wrapping_div(size_of::<TValue>() as usize)
     {
         luaM_toobig((*S).L);
     } else {
     };
     (*f).k = luaM_malloc_(
         (*S).L,
-        (n as usize).wrapping_mul(::core::mem::size_of::<TValue>() as usize),
+        (n as usize).wrapping_mul(size_of::<TValue>() as usize),
         0,
     ) as *mut TValue;
     (*f).sizek = n;
@@ -222,16 +222,16 @@ unsafe extern "C-unwind" fn loadConstants(mut S: *mut LoadState, mut f: *mut Pro
 unsafe extern "C-unwind" fn loadProtos(mut S: *mut LoadState, mut f: *mut Proto) {
     let mut i: i32 = 0;
     let mut n: i32 = loadInt(S);
-    if ::core::mem::size_of::<i32>() as usize >= ::core::mem::size_of::<size_t>() as usize
+    if size_of::<i32>() as usize >= size_of::<size_t>() as usize
         && (n as size_t).wrapping_add(1 as i32 as size_t)
-            > (!(0 as size_t)).wrapping_div(::core::mem::size_of::<*mut Proto>() as usize)
+            > (!(0 as size_t)).wrapping_div(size_of::<*mut Proto>() as usize)
     {
         luaM_toobig((*S).L);
     } else {
     };
     (*f).p = luaM_malloc_(
         (*S).L,
-        (n as usize).wrapping_mul(::core::mem::size_of::<*mut Proto>() as usize),
+        (n as usize).wrapping_mul(size_of::<*mut Proto>() as usize),
         0,
     ) as *mut *mut Proto;
     (*f).sizep = n;
@@ -267,16 +267,16 @@ unsafe extern "C-unwind" fn loadUpvalues(mut S: *mut LoadState, mut f: *mut Prot
     let mut i: i32 = 0;
     let mut n: i32 = 0;
     n = loadInt(S);
-    if ::core::mem::size_of::<i32>() as usize >= ::core::mem::size_of::<size_t>() as usize
+    if size_of::<i32>() as usize >= size_of::<size_t>() as usize
         && (n as size_t).wrapping_add(1 as i32 as size_t)
-            > (!(0 as size_t)).wrapping_div(::core::mem::size_of::<Upvaldesc>() as usize)
+            > (!(0 as size_t)).wrapping_div(size_of::<Upvaldesc>() as usize)
     {
         luaM_toobig((*S).L);
     } else {
     };
     (*f).upvalues = luaM_malloc_(
         (*S).L,
-        (n as usize).wrapping_mul(::core::mem::size_of::<Upvaldesc>() as usize),
+        (n as usize).wrapping_mul(size_of::<Upvaldesc>() as usize),
         0,
     ) as *mut Upvaldesc;
     (*f).sizeupvalues = n;
@@ -300,35 +300,35 @@ unsafe extern "C-unwind" fn loadDebug(mut S: *mut LoadState, mut f: *mut Proto) 
     let mut i: i32 = 0;
     let mut n: i32 = 0;
     n = loadInt(S);
-    if ::core::mem::size_of::<i32>() as usize >= ::core::mem::size_of::<size_t>() as usize
+    if size_of::<i32>() as usize >= size_of::<size_t>() as usize
         && (n as size_t).wrapping_add(1 as i32 as size_t)
-            > (!(0 as size_t)).wrapping_div(::core::mem::size_of::<ls_byte>() as usize)
+            > (!(0 as size_t)).wrapping_div(size_of::<ls_byte>() as usize)
     {
         luaM_toobig((*S).L);
     } else {
     };
     (*f).lineinfo = luaM_malloc_(
         (*S).L,
-        (n as usize).wrapping_mul(::core::mem::size_of::<ls_byte>() as usize),
+        (n as usize).wrapping_mul(size_of::<ls_byte>() as usize),
         0,
     ) as *mut ls_byte;
     (*f).sizelineinfo = n;
     loadBlock(
         S,
         (*f).lineinfo as *mut c_void,
-        (n as usize).wrapping_mul(::core::mem::size_of::<ls_byte>() as usize),
+        (n as usize).wrapping_mul(size_of::<ls_byte>() as usize),
     );
     n = loadInt(S);
-    if ::core::mem::size_of::<i32>() as usize >= ::core::mem::size_of::<size_t>() as usize
+    if size_of::<i32>() as usize >= size_of::<size_t>() as usize
         && (n as size_t).wrapping_add(1 as i32 as size_t)
-            > (!(0 as size_t)).wrapping_div(::core::mem::size_of::<AbsLineInfo>() as usize)
+            > (!(0 as size_t)).wrapping_div(size_of::<AbsLineInfo>() as usize)
     {
         luaM_toobig((*S).L);
     } else {
     };
     (*f).abslineinfo = luaM_malloc_(
         (*S).L,
-        (n as usize).wrapping_mul(::core::mem::size_of::<AbsLineInfo>() as usize),
+        (n as usize).wrapping_mul(size_of::<AbsLineInfo>() as usize),
         0,
     ) as *mut AbsLineInfo;
     (*f).sizeabslineinfo = n;
@@ -340,16 +340,16 @@ unsafe extern "C-unwind" fn loadDebug(mut S: *mut LoadState, mut f: *mut Proto) 
         i;
     }
     n = loadInt(S);
-    if ::core::mem::size_of::<i32>() as usize >= ::core::mem::size_of::<size_t>() as usize
+    if size_of::<i32>() as usize >= size_of::<size_t>() as usize
         && (n as size_t).wrapping_add(1 as i32 as size_t)
-            > (!(0 as size_t)).wrapping_div(::core::mem::size_of::<LocVar>() as usize)
+            > (!(0 as size_t)).wrapping_div(size_of::<LocVar>() as usize)
     {
         luaM_toobig((*S).L);
     } else {
     };
     (*f).locvars = luaM_malloc_(
         (*S).L,
-        (n as usize).wrapping_mul(::core::mem::size_of::<LocVar>() as usize),
+        (n as usize).wrapping_mul(size_of::<LocVar>() as usize),
         0,
     ) as *mut LocVar;
     (*f).sizelocvars = n;
@@ -411,7 +411,7 @@ unsafe extern "C-unwind" fn checkliteral(
     loadBlock(
         S,
         buff.as_mut_ptr() as *mut c_void,
-        len.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+        len.wrapping_mul(size_of::<std::ffi::c_char>() as usize),
     );
     if memcmp(s as *const c_void, buff.as_mut_ptr() as *const c_void, len) != 0 {
         error(S, msg);
@@ -448,19 +448,15 @@ unsafe extern "C-unwind" fn checkHeader(mut S: *mut LoadState) {
     );
     fchecksize(
         S,
-        ::core::mem::size_of::<Instruction>() as usize,
+        size_of::<Instruction>() as usize,
         c"Instruction".as_ptr(),
     );
     fchecksize(
         S,
-        ::core::mem::size_of::<lua_Integer>() as usize,
+        size_of::<lua_Integer>() as usize,
         c"lua_Integer".as_ptr(),
     );
-    fchecksize(
-        S,
-        ::core::mem::size_of::<lua_Number>() as usize,
-        c"lua_Number".as_ptr(),
-    );
+    fchecksize(S, size_of::<lua_Number>() as usize, c"lua_Number".as_ptr());
     if loadInteger(S) != 0x5678 as i32 as lua_Integer {
         error(S, c"integer format mismatch".as_ptr());
     }

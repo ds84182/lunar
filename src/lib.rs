@@ -1146,7 +1146,7 @@ unsafe extern "C-unwind" fn dumpByte(mut D: *mut DumpState, mut y: i32) {
     dumpBlock(
         D,
         &mut x as *mut lu_byte as *const c_void,
-        (1usize).wrapping_mul(::core::mem::size_of::<lu_byte>() as usize),
+        (1usize).wrapping_mul(size_of::<lu_byte>() as usize),
     );
 }
 unsafe extern "C-unwind" fn dumpSize(mut D: *mut DumpState, mut x: size_t) {
@@ -1154,7 +1154,7 @@ unsafe extern "C-unwind" fn dumpSize(mut D: *mut DumpState, mut x: size_t) {
     let mut n: i32 = 0;
     loop {
         n += 1;
-        buff[(::core::mem::size_of::<size_t>() as usize)
+        buff[(size_of::<size_t>() as usize)
             .wrapping_mul(8)
             .wrapping_add(6)
             .wrapping_div(7)
@@ -1164,11 +1164,11 @@ unsafe extern "C-unwind" fn dumpSize(mut D: *mut DumpState, mut x: size_t) {
             break;
         }
     }
-    buff[(::core::mem::size_of::<size_t>() as usize)
+    buff[(size_of::<size_t>() as usize)
         .wrapping_mul(8)
         .wrapping_add(6)
         .wrapping_div(7)
-        .wrapping_sub(1) as usize] = (buff[(::core::mem::size_of::<size_t>() as usize)
+        .wrapping_sub(1) as usize] = (buff[(size_of::<size_t>() as usize)
         .wrapping_mul(8)
         .wrapping_add(6)
         .wrapping_div(7)
@@ -1178,13 +1178,13 @@ unsafe extern "C-unwind" fn dumpSize(mut D: *mut DumpState, mut x: size_t) {
         D,
         buff.as_mut_ptr()
             .offset(
-                (::core::mem::size_of::<size_t>() as usize)
+                (size_of::<size_t>() as usize)
                     .wrapping_mul(8)
                     .wrapping_add(6)
                     .wrapping_div(7) as isize,
             )
             .offset(-(n as isize)) as *const c_void,
-        (n as usize).wrapping_mul(::core::mem::size_of::<lu_byte>() as usize),
+        (n as usize).wrapping_mul(size_of::<lu_byte>() as usize),
     );
 }
 unsafe extern "C-unwind" fn dumpInt(mut D: *mut DumpState, mut x: i32) {
@@ -1194,14 +1194,14 @@ unsafe extern "C-unwind" fn dumpNumber(mut D: *mut DumpState, mut x: lua_Number)
     dumpBlock(
         D,
         &mut x as *mut lua_Number as *const c_void,
-        (1usize).wrapping_mul(::core::mem::size_of::<lua_Number>() as usize),
+        (1usize).wrapping_mul(size_of::<lua_Number>() as usize),
     );
 }
 unsafe extern "C-unwind" fn dumpInteger(mut D: *mut DumpState, mut x: lua_Integer) {
     dumpBlock(
         D,
         &mut x as *mut lua_Integer as *const c_void,
-        (1usize).wrapping_mul(::core::mem::size_of::<lua_Integer>() as usize),
+        (1usize).wrapping_mul(size_of::<lua_Integer>() as usize),
     );
 }
 unsafe extern "C-unwind" fn dumpString(mut D: *mut DumpState, mut s: *const TString) {
@@ -1218,7 +1218,7 @@ unsafe extern "C-unwind" fn dumpString(mut D: *mut DumpState, mut s: *const TStr
         dumpBlock(
             D,
             str as *const c_void,
-            size.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+            size.wrapping_mul(size_of::<std::ffi::c_char>() as usize),
         );
     };
 }
@@ -1227,7 +1227,7 @@ unsafe extern "C-unwind" fn dumpCode(mut D: *mut DumpState, mut f: *const Proto)
     dumpBlock(
         D,
         (*f).code as *const c_void,
-        ((*f).sizecode as usize).wrapping_mul(::core::mem::size_of::<Instruction>() as usize),
+        ((*f).sizecode as usize).wrapping_mul(size_of::<Instruction>() as usize),
     );
 }
 unsafe extern "C-unwind" fn dumpConstants(mut D: *mut DumpState, mut f: *const Proto) {
@@ -1291,7 +1291,7 @@ unsafe extern "C-unwind" fn dumpDebug(mut D: *mut DumpState, mut f: *const Proto
     dumpBlock(
         D,
         (*f).lineinfo as *const c_void,
-        (n as usize).wrapping_mul(::core::mem::size_of::<ls_byte>() as usize),
+        (n as usize).wrapping_mul(size_of::<ls_byte>() as usize),
     );
     n = if (*D).strip != 0 {
         0
@@ -1354,20 +1354,20 @@ unsafe extern "C-unwind" fn dumpHeader(mut D: *mut DumpState) {
     dumpBlock(
         D,
         c"\x1BLua".as_ptr() as *const c_void,
-        (::core::mem::size_of::<[std::ffi::c_char; 5]>() as usize)
-            .wrapping_sub(::core::mem::size_of::<std::ffi::c_char>() as usize),
+        (size_of::<[std::ffi::c_char; 5]>() as usize)
+            .wrapping_sub(size_of::<std::ffi::c_char>() as usize),
     );
     dumpByte(D, 504 as i32 / 100 * 16 as i32 + 504 as i32 % 100);
     dumpByte(D, 0);
     dumpBlock(
         D,
         c"\x19\x93\r\n\x1A\n".as_ptr() as *const c_void,
-        (::core::mem::size_of::<[std::ffi::c_char; 7]>() as usize)
-            .wrapping_sub(::core::mem::size_of::<std::ffi::c_char>() as usize),
+        (size_of::<[std::ffi::c_char; 7]>() as usize)
+            .wrapping_sub(size_of::<std::ffi::c_char>() as usize),
     );
-    dumpByte(D, ::core::mem::size_of::<Instruction>() as usize as i32);
-    dumpByte(D, ::core::mem::size_of::<lua_Integer>() as usize as i32);
-    dumpByte(D, ::core::mem::size_of::<lua_Number>() as usize as i32);
+    dumpByte(D, size_of::<Instruction>() as usize as i32);
+    dumpByte(D, size_of::<lua_Integer>() as usize as i32);
+    dumpByte(D, size_of::<lua_Number>() as usize as i32);
     dumpInteger(D, 0x5678 as i32 as lua_Integer);
     dumpNumber(D, 370.5f64);
 }
@@ -1404,16 +1404,16 @@ unsafe extern "C-unwind" fn luai_makeseed(mut L: *mut lua_State) -> u32 {
     memcpy(
         buff.as_mut_ptr().offset(p as isize) as *mut c_void,
         &mut t as *mut size_t as *const c_void,
-        ::core::mem::size_of::<size_t>() as usize,
+        size_of::<size_t>() as usize,
     );
-    p = (p as usize).wrapping_add(::core::mem::size_of::<size_t>() as usize) as i32 as i32;
+    p = (p as usize).wrapping_add(size_of::<size_t>() as usize) as i32 as i32;
     let mut t_0: size_t = &mut h as *mut u32 as size_t;
     memcpy(
         buff.as_mut_ptr().offset(p as isize) as *mut c_void,
         &mut t_0 as *mut size_t as *const c_void,
-        ::core::mem::size_of::<size_t>() as usize,
+        size_of::<size_t>() as usize,
     );
-    p = (p as usize).wrapping_add(::core::mem::size_of::<size_t>() as usize) as i32 as i32;
+    p = (p as usize).wrapping_add(size_of::<size_t>() as usize) as i32 as i32;
     let mut t_1: size_t = ::core::mem::transmute::<
         Option<unsafe extern "C-unwind" fn(lua_Alloc, *mut c_void) -> *mut lua_State>,
         size_t,
@@ -1423,9 +1423,9 @@ unsafe extern "C-unwind" fn luai_makeseed(mut L: *mut lua_State) -> u32 {
     memcpy(
         buff.as_mut_ptr().offset(p as isize) as *mut c_void,
         &mut t_1 as *mut size_t as *const c_void,
-        ::core::mem::size_of::<size_t>() as usize,
+        size_of::<size_t>() as usize,
     );
-    p = (p as usize).wrapping_add(::core::mem::size_of::<size_t>() as usize) as i32 as i32;
+    p = (p as usize).wrapping_add(size_of::<size_t>() as usize) as i32 as i32;
     return luaS_hash(buff.as_mut_ptr(), p as size_t, h);
 }
 #[unsafe(no_mangle)]
@@ -1444,7 +1444,7 @@ pub unsafe extern "C-unwind" fn lua_setcstacklimit(mut L: *mut lua_State, mut li
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaE_extendCI(mut L: *mut lua_State) -> *mut CallInfo {
     let mut ci: *mut CallInfo = 0 as *mut CallInfo;
-    ci = luaM_malloc_(L, ::core::mem::size_of::<CallInfo>() as usize, 0) as *mut CallInfo;
+    ci = luaM_malloc_(L, size_of::<CallInfo>() as usize, 0) as *mut CallInfo;
     (*(*L).ci).next = ci;
     (*ci).previous = (*L).ci;
     (*ci).next = 0 as *mut CallInfo;
@@ -1463,11 +1463,7 @@ unsafe extern "C-unwind" fn freeCI(mut L: *mut lua_State) {
             break;
         }
         next = (*ci).next;
-        luaM_free_(
-            L,
-            ci as *mut c_void,
-            ::core::mem::size_of::<CallInfo>() as usize,
-        );
+        luaM_free_(L, ci as *mut c_void, size_of::<CallInfo>() as usize);
         (*L).nci = ((*L).nci).wrapping_sub(1);
         (*L).nci;
     }
@@ -1488,11 +1484,7 @@ pub unsafe extern "C-unwind" fn luaE_shrinkCI(mut L: *mut lua_State) {
         (*ci).next = next2;
         (*L).nci = ((*L).nci).wrapping_sub(1);
         (*L).nci;
-        luaM_free_(
-            L,
-            next as *mut c_void,
-            ::core::mem::size_of::<CallInfo>() as usize,
-        );
+        luaM_free_(L, next as *mut c_void, size_of::<CallInfo>() as usize);
         if next2.is_null() {
             break;
         }
@@ -1524,8 +1516,7 @@ unsafe extern "C-unwind" fn stack_init(mut L1: *mut lua_State, mut L: *mut lua_S
     let mut ci: *mut CallInfo = 0 as *mut CallInfo;
     (*L1).stack.p = luaM_malloc_(
         L,
-        ((2 as i32 * 20 + 5 as i32) as usize)
-            .wrapping_mul(::core::mem::size_of::<StackValue>() as usize),
+        ((2 as i32 * 20 + 5 as i32) as usize).wrapping_mul(size_of::<StackValue>() as usize),
         0,
     ) as *mut StackValue;
     (*L1).tbclist.p = (*L1).stack.p;
@@ -1561,7 +1552,7 @@ unsafe extern "C-unwind" fn freestack(mut L: *mut lua_State) {
         (*L).stack.p as *mut c_void,
         ((((*L).stack_last.p).offset_from((*L).stack.p) as std::ffi::c_long as i32 + 5 as i32)
             as usize)
-            .wrapping_mul(::core::mem::size_of::<StackValue>() as usize),
+            .wrapping_mul(size_of::<StackValue>() as usize),
     );
 }
 unsafe extern "C-unwind" fn init_registry(mut L: *mut lua_State, mut g: *mut global_State) {
@@ -1652,14 +1643,13 @@ unsafe extern "C-unwind" fn close_state(mut L: *mut lua_State) {
     luaM_free_(
         L,
         (*(*L).l_G).strt.hash as *mut c_void,
-        ((*(*L).l_G).strt.size as usize)
-            .wrapping_mul(::core::mem::size_of::<*mut TString>() as usize),
+        ((*(*L).l_G).strt.size as usize).wrapping_mul(size_of::<*mut TString>() as usize),
     );
     freestack(L);
     (Some(((*g).frealloc).expect("non-null function pointer"))).expect("non-null function pointer")(
         (*g).ud,
         (L as *mut lu_byte).offset(-(8 as usize as isize)) as *mut LX as *mut c_void,
-        ::core::mem::size_of::<LG>() as usize,
+        size_of::<LG>() as usize,
         0 as size_t,
     );
 }
@@ -1671,12 +1661,7 @@ pub unsafe extern "C-unwind" fn lua_newthread(mut L: *mut lua_State) -> *mut lua
     if (*(*L).l_G).GCdebt > 0 as l_mem {
         luaC_step(L);
     }
-    o = luaC_newobjdt(
-        L,
-        8 as i32,
-        ::core::mem::size_of::<LX>() as usize,
-        8 as usize,
-    );
+    o = luaC_newobjdt(L, 8 as i32, size_of::<LX>() as usize, 8 as usize);
     L1 = &mut (*(o as *mut GCUnion)).th;
     let mut io: *mut TValue = &mut (*(*L).top.p).val;
     let mut x_: *mut lua_State = L1;
@@ -1700,13 +1685,11 @@ pub unsafe extern "C-unwind" fn lua_newthread(mut L: *mut lua_State) -> *mut lua
     ::core::ptr::write_volatile(&mut (*L1).hook as *mut lua_Hook, (*L).hook);
     (*L1).hookcount = (*L1).basehookcount;
     memcpy(
-        (L1 as *mut std::ffi::c_char)
-            .offset(-(::core::mem::size_of::<*mut c_void>() as usize as isize))
+        (L1 as *mut std::ffi::c_char).offset(-(size_of::<*mut c_void>() as usize as isize))
             as *mut c_void,
         ((*g).mainthread as *mut std::ffi::c_char)
-            .offset(-(::core::mem::size_of::<*mut c_void>() as usize as isize))
-            as *mut c_void,
-        ::core::mem::size_of::<*mut c_void>() as usize,
+            .offset(-(size_of::<*mut c_void>() as usize as isize)) as *mut c_void,
+        size_of::<*mut c_void>() as usize,
     );
     stack_init(L1, L);
     return L1;
@@ -1716,7 +1699,7 @@ pub unsafe extern "C-unwind" fn luaE_freethread(mut L: *mut lua_State, mut L1: *
     let mut l: *mut LX = (L1 as *mut lu_byte).offset(-(8 as usize as isize)) as *mut LX;
     luaF_closeupval(L1, (*L1).stack.p);
     freestack(L1);
-    luaM_free_(L, l as *mut c_void, ::core::mem::size_of::<LX>() as usize);
+    luaM_free_(L, l as *mut c_void, size_of::<LX>() as usize);
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaE_resetthread(mut L: *mut lua_State, mut status: i32) -> i32 {
@@ -1774,7 +1757,7 @@ pub unsafe extern "C-unwind" fn lua_newstate(
         ud,
         0 as *mut c_void,
         8 as i32 as size_t,
-        ::core::mem::size_of::<LG>() as usize,
+        size_of::<LG>() as usize,
     ) as *mut LG;
     if l.is_null() {
         return 0 as *mut lua_State;
@@ -1822,7 +1805,7 @@ pub unsafe extern "C-unwind" fn lua_newstate(
     (*g).ephemeron = (*g).allweak;
     (*g).weak = (*g).ephemeron;
     (*g).twups = 0 as *mut lua_State;
-    (*g).totalbytes = ::core::mem::size_of::<LG>() as usize as l_mem;
+    (*g).totalbytes = size_of::<LG>() as usize as l_mem;
     (*g).GCdebt = 0 as l_mem;
     (*g).lastatomic = 0 as lu_mem;
     let mut io: *mut TValue = &mut (*g).nilvalue;
@@ -1929,9 +1912,7 @@ unsafe extern "C-unwind" fn save(mut ls: *mut LexState, mut c: i32) {
     if ((*b).n).wrapping_add(1 as i32 as size_t) > (*b).buffsize {
         let mut newsize: size_t = 0;
         if (*b).buffsize
-            >= (if (::core::mem::size_of::<size_t>() as usize)
-                < ::core::mem::size_of::<lua_Integer>() as usize
-            {
+            >= (if (size_of::<size_t>() as usize) < size_of::<lua_Integer>() as usize {
                 !(0 as size_t)
             } else {
                 9223372036854775807 as std::ffi::c_longlong as size_t
@@ -1943,8 +1924,8 @@ unsafe extern "C-unwind" fn save(mut ls: *mut LexState, mut c: i32) {
         (*b).buffer = luaM_saferealloc_(
             (*ls).L,
             (*b).buffer as *mut c_void,
-            ((*b).buffsize).wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
-            newsize.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+            ((*b).buffsize).wrapping_mul(size_of::<std::ffi::c_char>() as usize),
+            newsize.wrapping_mul(size_of::<std::ffi::c_char>() as usize),
         ) as *mut std::ffi::c_char;
         (*b).buffsize = newsize;
     }
@@ -1958,8 +1939,8 @@ pub unsafe extern "C-unwind" fn luaX_init(mut L: *mut lua_State) {
     let mut e: *mut TString = luaS_newlstr(
         L,
         c"_ENV".as_ptr(),
-        (::core::mem::size_of::<[std::ffi::c_char; 5]>() as usize)
-            .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+        (size_of::<[std::ffi::c_char; 5]>() as usize)
+            .wrapping_div(size_of::<std::ffi::c_char>() as usize)
             .wrapping_sub(1),
     );
     luaC_fix(L, &mut (*(e as *mut GCUnion)).gc);
@@ -2108,15 +2089,15 @@ pub unsafe extern "C-unwind" fn luaX_setinput(
     (*ls).envn = luaS_newlstr(
         L,
         c"_ENV".as_ptr(),
-        (::core::mem::size_of::<[std::ffi::c_char; 5]>() as usize)
-            .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+        (size_of::<[std::ffi::c_char; 5]>() as usize)
+            .wrapping_div(size_of::<std::ffi::c_char>() as usize)
             .wrapping_sub(1),
     );
     (*(*ls).buff).buffer = luaM_saferealloc_(
         (*ls).L,
         (*(*ls).buff).buffer as *mut c_void,
-        ((*(*ls).buff).buffsize).wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
-        (32usize).wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+        ((*(*ls).buff).buffsize).wrapping_mul(size_of::<std::ffi::c_char>() as usize),
+        (32usize).wrapping_mul(size_of::<std::ffi::c_char>() as usize),
     ) as *mut std::ffi::c_char;
     (*(*ls).buff).buffsize = 32 as i32 as size_t;
 }
@@ -3275,13 +3256,13 @@ unsafe extern "C-unwind" fn savelineinfo(mut fs: *mut FuncState, mut f: *mut Pro
             (*f).abslineinfo as *mut c_void,
             (*fs).nabslineinfo,
             &mut (*f).sizeabslineinfo,
-            ::core::mem::size_of::<AbsLineInfo>() as usize as i32,
+            size_of::<AbsLineInfo>() as usize as i32,
             (if 2147483647 as i32 as size_t
-                <= (!(0 as size_t)).wrapping_div(::core::mem::size_of::<AbsLineInfo>() as usize)
+                <= (!(0 as size_t)).wrapping_div(size_of::<AbsLineInfo>() as usize)
             {
                 2147483647
             } else {
-                (!(0 as size_t)).wrapping_div(::core::mem::size_of::<AbsLineInfo>() as usize) as u32
+                (!(0 as size_t)).wrapping_div(size_of::<AbsLineInfo>() as usize) as u32
             }) as i32,
             c"lines".as_ptr(),
         ) as *mut AbsLineInfo;
@@ -3297,13 +3278,13 @@ unsafe extern "C-unwind" fn savelineinfo(mut fs: *mut FuncState, mut f: *mut Pro
         (*f).lineinfo as *mut c_void,
         pc,
         &mut (*f).sizelineinfo,
-        ::core::mem::size_of::<ls_byte>() as usize as i32,
+        size_of::<ls_byte>() as usize as i32,
         (if 2147483647 as i32 as size_t
-            <= (!(0 as size_t)).wrapping_div(::core::mem::size_of::<ls_byte>() as usize)
+            <= (!(0 as size_t)).wrapping_div(size_of::<ls_byte>() as usize)
         {
             2147483647
         } else {
-            (!(0 as size_t)).wrapping_div(::core::mem::size_of::<ls_byte>() as usize) as u32
+            (!(0 as size_t)).wrapping_div(size_of::<ls_byte>() as usize) as u32
         }) as i32,
         c"opcodes".as_ptr(),
     ) as *mut ls_byte;
@@ -3336,13 +3317,13 @@ pub unsafe extern "C-unwind" fn luaK_code(mut fs: *mut FuncState, mut i: Instruc
         (*f).code as *mut c_void,
         (*fs).pc,
         &mut (*f).sizecode,
-        ::core::mem::size_of::<Instruction>() as usize as i32,
+        size_of::<Instruction>() as usize as i32,
         (if 2147483647 as i32 as size_t
-            <= (!(0 as size_t)).wrapping_div(::core::mem::size_of::<Instruction>() as usize)
+            <= (!(0 as size_t)).wrapping_div(size_of::<Instruction>() as usize)
         {
             2147483647
         } else {
-            (!(0 as size_t)).wrapping_div(::core::mem::size_of::<Instruction>() as usize) as u32
+            (!(0 as size_t)).wrapping_div(size_of::<Instruction>() as usize) as u32
         }) as i32,
         c"opcodes".as_ptr(),
     ) as *mut Instruction;
@@ -3518,13 +3499,13 @@ unsafe extern "C-unwind" fn addk(
         (*f).k as *mut c_void,
         k,
         &mut (*f).sizek,
-        ::core::mem::size_of::<TValue>() as usize as i32,
+        size_of::<TValue>() as usize as i32,
         (if (((1 as i32) << 8 as i32 + 8 as i32 + 1 as i32 + 8 as i32) - 1 as i32) as size_t
-            <= (!(0 as size_t)).wrapping_div(::core::mem::size_of::<TValue>() as usize)
+            <= (!(0 as size_t)).wrapping_div(size_of::<TValue>() as usize)
         {
             (((1 as i32) << 8 as i32 + 8 as i32 + 1 as i32 + 8 as i32) - 1 as i32) as u32
         } else {
-            (!(0 as size_t)).wrapping_div(::core::mem::size_of::<TValue>() as usize) as u32
+            (!(0 as size_t)).wrapping_div(size_of::<TValue>() as usize) as u32
         }) as i32,
         c"constants".as_ptr(),
     ) as *mut TValue;
@@ -5064,13 +5045,11 @@ unsafe extern "C-unwind" fn registerlocalvar(
         (*f).locvars as *mut c_void,
         (*fs).ndebugvars as i32,
         &mut (*f).sizelocvars,
-        ::core::mem::size_of::<LocVar>() as usize as i32,
-        (if 32767 as i32 as size_t
-            <= (!(0 as size_t)).wrapping_div(::core::mem::size_of::<LocVar>() as usize)
-        {
+        size_of::<LocVar>() as usize as i32,
+        (if 32767 as i32 as size_t <= (!(0 as size_t)).wrapping_div(size_of::<LocVar>() as usize) {
             32767
         } else {
-            (!(0 as size_t)).wrapping_div(::core::mem::size_of::<LocVar>() as usize) as u32
+            (!(0 as size_t)).wrapping_div(size_of::<LocVar>() as usize) as u32
         }) as i32,
         c"local variables".as_ptr(),
     ) as *mut LocVar;
@@ -5113,13 +5092,13 @@ unsafe extern "C-unwind" fn new_localvar(mut ls: *mut LexState, mut name: *mut T
         (*dyd).actvar.arr as *mut c_void,
         (*dyd).actvar.n + 1 as i32,
         &mut (*dyd).actvar.size,
-        ::core::mem::size_of::<Vardesc>() as usize as i32,
+        size_of::<Vardesc>() as usize as i32,
         (if (32767 as i32 * 2 as i32 + 1 as i32) as size_t
-            <= (!(0 as size_t)).wrapping_div(::core::mem::size_of::<Vardesc>() as usize)
+            <= (!(0 as size_t)).wrapping_div(size_of::<Vardesc>() as usize)
         {
             (32767 as i32 * 2 as i32 + 1 as i32) as u32
         } else {
-            (!(0 as size_t)).wrapping_div(::core::mem::size_of::<Vardesc>() as usize) as u32
+            (!(0 as size_t)).wrapping_div(size_of::<Vardesc>() as usize) as u32
         }) as i32,
         c"local variables".as_ptr(),
     ) as *mut Vardesc;
@@ -5256,13 +5235,11 @@ unsafe extern "C-unwind" fn allocupvalue(mut fs: *mut FuncState) -> *mut Upvalde
         (*f).upvalues as *mut c_void,
         (*fs).nups as i32,
         &mut (*f).sizeupvalues,
-        ::core::mem::size_of::<Upvaldesc>() as usize as i32,
-        (if 255 as i32 as size_t
-            <= (!(0 as size_t)).wrapping_div(::core::mem::size_of::<Upvaldesc>() as usize)
-        {
+        size_of::<Upvaldesc>() as usize as i32,
+        (if 255 as i32 as size_t <= (!(0 as size_t)).wrapping_div(size_of::<Upvaldesc>() as usize) {
             255
         } else {
-            (!(0 as size_t)).wrapping_div(::core::mem::size_of::<Upvaldesc>() as usize) as u32
+            (!(0 as size_t)).wrapping_div(size_of::<Upvaldesc>() as usize) as u32
         }) as i32,
         c"upvalues".as_ptr(),
     ) as *mut Upvaldesc;
@@ -5483,13 +5460,12 @@ unsafe extern "C-unwind" fn newlabelentry(
         (*l).arr as *mut c_void,
         n,
         &mut (*l).size,
-        ::core::mem::size_of::<Labeldesc>() as usize as i32,
-        (if 32767 as i32 as size_t
-            <= (!(0 as size_t)).wrapping_div(::core::mem::size_of::<Labeldesc>() as usize)
+        size_of::<Labeldesc>() as usize as i32,
+        (if 32767 as i32 as size_t <= (!(0 as size_t)).wrapping_div(size_of::<Labeldesc>() as usize)
         {
             32767
         } else {
-            (!(0 as size_t)).wrapping_div(::core::mem::size_of::<Labeldesc>() as usize) as u32
+            (!(0 as size_t)).wrapping_div(size_of::<Labeldesc>() as usize) as u32
         }) as i32,
         c"labels/gotos".as_ptr(),
     ) as *mut Labeldesc;
@@ -5578,8 +5554,8 @@ unsafe extern "C-unwind" fn undefgoto(mut ls: *mut LexState, mut gt: *mut Labeld
         == luaS_newlstr(
             (*ls).L,
             c"break".as_ptr(),
-            (::core::mem::size_of::<[std::ffi::c_char; 6]>() as usize)
-                .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+            (size_of::<[std::ffi::c_char; 6]>() as usize)
+                .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1),
         )
     {
@@ -5608,8 +5584,8 @@ unsafe extern "C-unwind" fn leaveblock(mut fs: *mut FuncState) {
             luaS_newlstr(
                 (*ls).L,
                 c"break".as_ptr(),
-                (::core::mem::size_of::<[std::ffi::c_char; 6]>() as usize)
-                    .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+                (size_of::<[std::ffi::c_char; 6]>() as usize)
+                    .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                     .wrapping_sub(1),
             ),
             0,
@@ -5643,13 +5619,13 @@ unsafe extern "C-unwind" fn addprototype(mut ls: *mut LexState) -> *mut Proto {
             (*f).p as *mut c_void,
             (*fs).np,
             &mut (*f).sizep,
-            ::core::mem::size_of::<*mut Proto>() as usize as i32,
+            size_of::<*mut Proto>() as usize as i32,
             (if (((1 as i32) << 8 as i32 + 8 as i32 + 1 as i32) - 1 as i32) as size_t
-                <= (!(0 as size_t)).wrapping_div(::core::mem::size_of::<*mut Proto>() as usize)
+                <= (!(0 as size_t)).wrapping_div(size_of::<*mut Proto>() as usize)
             {
                 (((1 as i32) << 8 as i32 + 8 as i32 + 1 as i32) - 1 as i32) as u32
             } else {
-                (!(0 as size_t)).wrapping_div(::core::mem::size_of::<*mut Proto>() as usize) as u32
+                (!(0 as size_t)).wrapping_div(size_of::<*mut Proto>() as usize) as u32
             }) as i32,
             c"functions".as_ptr(),
         ) as *mut *mut Proto;
@@ -5736,49 +5712,49 @@ unsafe extern "C-unwind" fn close_func(mut ls: *mut LexState) {
         (*f).code as *mut c_void,
         &mut (*f).sizecode,
         (*fs).pc,
-        ::core::mem::size_of::<Instruction>() as usize as i32,
+        size_of::<Instruction>() as usize as i32,
     ) as *mut Instruction;
     (*f).lineinfo = luaM_shrinkvector_(
         L,
         (*f).lineinfo as *mut c_void,
         &mut (*f).sizelineinfo,
         (*fs).pc,
-        ::core::mem::size_of::<ls_byte>() as usize as i32,
+        size_of::<ls_byte>() as usize as i32,
     ) as *mut ls_byte;
     (*f).abslineinfo = luaM_shrinkvector_(
         L,
         (*f).abslineinfo as *mut c_void,
         &mut (*f).sizeabslineinfo,
         (*fs).nabslineinfo,
-        ::core::mem::size_of::<AbsLineInfo>() as usize as i32,
+        size_of::<AbsLineInfo>() as usize as i32,
     ) as *mut AbsLineInfo;
     (*f).k = luaM_shrinkvector_(
         L,
         (*f).k as *mut c_void,
         &mut (*f).sizek,
         (*fs).nk,
-        ::core::mem::size_of::<TValue>() as usize as i32,
+        size_of::<TValue>() as usize as i32,
     ) as *mut TValue;
     (*f).p = luaM_shrinkvector_(
         L,
         (*f).p as *mut c_void,
         &mut (*f).sizep,
         (*fs).np,
-        ::core::mem::size_of::<*mut Proto>() as usize as i32,
+        size_of::<*mut Proto>() as usize as i32,
     ) as *mut *mut Proto;
     (*f).locvars = luaM_shrinkvector_(
         L,
         (*f).locvars as *mut c_void,
         &mut (*f).sizelocvars,
         (*fs).ndebugvars as i32,
-        ::core::mem::size_of::<LocVar>() as usize as i32,
+        size_of::<LocVar>() as usize as i32,
     ) as *mut LocVar;
     (*f).upvalues = luaM_shrinkvector_(
         L,
         (*f).upvalues as *mut c_void,
         &mut (*f).sizeupvalues,
         (*fs).nups as i32,
-        ::core::mem::size_of::<Upvaldesc>() as usize as i32,
+        size_of::<Upvaldesc>() as usize as i32,
     ) as *mut Upvaldesc;
     (*ls).fs = (*fs).prev;
     if (*(*L).l_G).GCdebt > 0 as l_mem {
@@ -6030,8 +6006,8 @@ unsafe extern "C-unwind" fn body(
             luaX_newstring(
                 ls,
                 c"self".as_ptr(),
-                (::core::mem::size_of::<[std::ffi::c_char; 5]>() as usize)
-                    .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+                (size_of::<[std::ffi::c_char; 5]>() as usize)
+                    .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                     .wrapping_sub(1),
             ),
         );
@@ -6580,8 +6556,8 @@ unsafe extern "C-unwind" fn breakstat(mut ls: *mut LexState) {
         luaS_newlstr(
             (*ls).L,
             c"break".as_ptr(),
-            (::core::mem::size_of::<[std::ffi::c_char; 6]>() as usize)
-                .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+            (size_of::<[std::ffi::c_char; 6]>() as usize)
+                .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1),
         ),
         line,
@@ -6752,8 +6728,8 @@ unsafe extern "C-unwind" fn fornum(
         luaX_newstring(
             ls,
             c"(for state)".as_ptr(),
-            (::core::mem::size_of::<[std::ffi::c_char; 12]>() as usize)
-                .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+            (size_of::<[std::ffi::c_char; 12]>() as usize)
+                .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1),
         ),
     );
@@ -6762,8 +6738,8 @@ unsafe extern "C-unwind" fn fornum(
         luaX_newstring(
             ls,
             c"(for state)".as_ptr(),
-            (::core::mem::size_of::<[std::ffi::c_char; 12]>() as usize)
-                .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+            (size_of::<[std::ffi::c_char; 12]>() as usize)
+                .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1),
         ),
     );
@@ -6772,8 +6748,8 @@ unsafe extern "C-unwind" fn fornum(
         luaX_newstring(
             ls,
             c"(for state)".as_ptr(),
-            (::core::mem::size_of::<[std::ffi::c_char; 12]>() as usize)
-                .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+            (size_of::<[std::ffi::c_char; 12]>() as usize)
+                .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1),
         ),
     );
@@ -6807,8 +6783,8 @@ unsafe extern "C-unwind" fn forlist(mut ls: *mut LexState, mut indexname: *mut T
         luaX_newstring(
             ls,
             c"(for state)".as_ptr(),
-            (::core::mem::size_of::<[std::ffi::c_char; 12]>() as usize)
-                .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+            (size_of::<[std::ffi::c_char; 12]>() as usize)
+                .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1),
         ),
     );
@@ -6817,8 +6793,8 @@ unsafe extern "C-unwind" fn forlist(mut ls: *mut LexState, mut indexname: *mut T
         luaX_newstring(
             ls,
             c"(for state)".as_ptr(),
-            (::core::mem::size_of::<[std::ffi::c_char; 12]>() as usize)
-                .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+            (size_of::<[std::ffi::c_char; 12]>() as usize)
+                .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1),
         ),
     );
@@ -6827,8 +6803,8 @@ unsafe extern "C-unwind" fn forlist(mut ls: *mut LexState, mut indexname: *mut T
         luaX_newstring(
             ls,
             c"(for state)".as_ptr(),
-            (::core::mem::size_of::<[std::ffi::c_char; 12]>() as usize)
-                .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+            (size_of::<[std::ffi::c_char; 12]>() as usize)
+                .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1),
         ),
     );
@@ -6837,8 +6813,8 @@ unsafe extern "C-unwind" fn forlist(mut ls: *mut LexState, mut indexname: *mut T
         luaX_newstring(
             ls,
             c"(for state)".as_ptr(),
-            (::core::mem::size_of::<[std::ffi::c_char; 12]>() as usize)
-                .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+            (size_of::<[std::ffi::c_char; 12]>() as usize)
+                .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1),
         ),
     );
@@ -6916,8 +6892,8 @@ unsafe extern "C-unwind" fn test_then_block(mut ls: *mut LexState, mut escapelis
             luaS_newlstr(
                 (*ls).L,
                 c"break".as_ptr(),
-                (::core::mem::size_of::<[std::ffi::c_char; 6]>() as usize)
-                    .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+                (size_of::<[std::ffi::c_char; 6]>() as usize)
+                    .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                     .wrapping_sub(1),
             ),
             line,
@@ -7613,8 +7589,8 @@ pub unsafe extern "C-unwind" fn lua_setlocal(
 unsafe extern "C-unwind" fn funcinfo(mut ar: *mut lua_Debug, mut cl: *mut Closure) {
     if !(!cl.is_null() && (*cl).c.tt as i32 == 6 as i32 | (0) << 4 as i32) {
         (*ar).source = c"=[C]".as_ptr();
-        (*ar).srclen = (::core::mem::size_of::<[std::ffi::c_char; 5]>() as usize)
-            .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+        (*ar).srclen = (size_of::<[std::ffi::c_char; 5]>() as usize)
+            .wrapping_div(size_of::<std::ffi::c_char>() as usize)
             .wrapping_sub(1);
         (*ar).linedefined = -(1 as i32);
         (*ar).lastlinedefined = -(1 as i32);
@@ -7630,8 +7606,8 @@ unsafe extern "C-unwind" fn funcinfo(mut ar: *mut lua_Debug, mut cl: *mut Closur
             };
         } else {
             (*ar).source = c"=?".as_ptr();
-            (*ar).srclen = (::core::mem::size_of::<[std::ffi::c_char; 3]>() as usize)
-                .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+            (*ar).srclen = (size_of::<[std::ffi::c_char; 3]>() as usize)
+                .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                 .wrapping_sub(1);
         }
         (*ar).linedefined = (*p).linedefined;
@@ -8518,7 +8494,7 @@ pub unsafe extern "C-unwind" fn luaF_newCclosure(
     let mut o: *mut GCObject = luaC_newobj(
         L,
         6 as i32 | (2 as i32) << 4 as i32,
-        (32 as usize as i32 + ::core::mem::size_of::<TValue>() as usize as i32 * nupvals) as size_t,
+        (32 as usize as i32 + size_of::<TValue>() as usize as i32 * nupvals) as size_t,
     );
     let mut c: *mut CClosure = &mut (*(o as *mut GCUnion)).cl.c;
     (*c).nupvalues = nupvals as lu_byte;
@@ -8532,8 +8508,7 @@ pub unsafe extern "C-unwind" fn luaF_newLclosure(
     let mut o: *mut GCObject = luaC_newobj(
         L,
         6 as i32 | (0) << 4 as i32,
-        (32 as usize as i32 + ::core::mem::size_of::<*mut TValue>() as usize as i32 * nupvals)
-            as size_t,
+        (32 as usize as i32 + size_of::<*mut TValue>() as usize as i32 * nupvals) as size_t,
     );
     let mut c: *mut LClosure = &mut (*(o as *mut GCUnion)).cl.l;
     (*c).p = 0 as *mut Proto;
@@ -8554,11 +8529,8 @@ pub unsafe extern "C-unwind" fn luaF_initupvals(mut L: *mut lua_State, mut cl: *
     let mut i: i32 = 0;
     i = 0;
     while i < (*cl).nupvalues as i32 {
-        let mut o: *mut GCObject = luaC_newobj(
-            L,
-            9 as i32 | (0) << 4 as i32,
-            ::core::mem::size_of::<UpVal>() as usize,
-        );
+        let mut o: *mut GCObject =
+            luaC_newobj(L, 9 as i32 | (0) << 4 as i32, size_of::<UpVal>() as usize);
         let mut uv: *mut UpVal = &mut (*(o as *mut GCUnion)).upv;
         (*uv).v.p = &mut (*uv).u.value;
         (*(*uv).v.p).tt_ = (0 | (0) << 4 as i32) as lu_byte;
@@ -8583,11 +8555,8 @@ unsafe extern "C-unwind" fn newupval(
     mut level: StkId,
     mut prev: *mut *mut UpVal,
 ) -> *mut UpVal {
-    let mut o: *mut GCObject = luaC_newobj(
-        L,
-        9 as i32 | (0) << 4 as i32,
-        ::core::mem::size_of::<UpVal>() as usize,
-    );
+    let mut o: *mut GCObject =
+        luaC_newobj(L, 9 as i32 | (0) << 4 as i32, size_of::<UpVal>() as usize);
     let mut uv: *mut UpVal = &mut (*(o as *mut GCUnion)).upv;
     let mut next: *mut UpVal = *prev;
     (*uv).v.p = &mut (*level).val;
@@ -8715,18 +8684,12 @@ pub unsafe extern "C-unwind" fn luaF_newtbcupval(mut L: *mut lua_State, mut leve
     }
     checkclosemth(L, level);
     while level.offset_from((*L).tbclist.p) as std::ffi::c_long as u32 as usize
-        > ((256 as usize)
-            << (::core::mem::size_of::<u16>() as usize)
-                .wrapping_sub(1)
-                .wrapping_mul(8))
-        .wrapping_sub(1)
+        > ((256 as usize) << (size_of::<u16>() as usize).wrapping_sub(1).wrapping_mul(8))
+            .wrapping_sub(1)
     {
         (*L).tbclist.p = ((*L).tbclist.p).offset(
-            ((256 as usize)
-                << (::core::mem::size_of::<u16>() as usize)
-                    .wrapping_sub(1)
-                    .wrapping_mul(8))
-            .wrapping_sub(1) as isize,
+            ((256 as usize) << (size_of::<u16>() as usize).wrapping_sub(1).wrapping_mul(8))
+                .wrapping_sub(1) as isize,
         );
         (*(*L).tbclist.p).tbclist.delta = 0 as u16;
     }
@@ -8794,11 +8757,8 @@ unsafe extern "C-unwind" fn poptbclist(mut L: *mut lua_State) {
     tbc = tbc.offset(-((*tbc).tbclist.delta as i32 as isize));
     while tbc > (*L).stack.p && (*tbc).tbclist.delta as i32 == 0 {
         tbc = tbc.offset(
-            -(((256 as usize)
-                << (::core::mem::size_of::<u16>() as usize)
-                    .wrapping_sub(1)
-                    .wrapping_mul(8))
-            .wrapping_sub(1) as isize),
+            -(((256 as usize) << (size_of::<u16>() as usize).wrapping_sub(1).wrapping_mul(8))
+                .wrapping_sub(1) as isize),
         );
     }
     (*L).tbclist.p = tbc;
@@ -8826,7 +8786,7 @@ pub unsafe extern "C-unwind" fn luaF_newproto(mut L: *mut lua_State) -> *mut Pro
     let mut o: *mut GCObject = luaC_newobj(
         L,
         9 as i32 + 1 as i32 | (0) << 4 as i32,
-        ::core::mem::size_of::<Proto>() as usize,
+        size_of::<Proto>() as usize,
     );
     let mut f: *mut Proto = &mut (*(o as *mut GCUnion)).p;
     (*f).k = 0 as *mut TValue;
@@ -8856,44 +8816,39 @@ pub unsafe extern "C-unwind" fn luaF_freeproto(mut L: *mut lua_State, mut f: *mu
     luaM_free_(
         L,
         (*f).code as *mut c_void,
-        ((*f).sizecode as usize).wrapping_mul(::core::mem::size_of::<Instruction>() as usize),
+        ((*f).sizecode as usize).wrapping_mul(size_of::<Instruction>() as usize),
     );
     luaM_free_(
         L,
         (*f).p as *mut c_void,
-        ((*f).sizep as usize).wrapping_mul(::core::mem::size_of::<*mut Proto>() as usize),
+        ((*f).sizep as usize).wrapping_mul(size_of::<*mut Proto>() as usize),
     );
     luaM_free_(
         L,
         (*f).k as *mut c_void,
-        ((*f).sizek as usize).wrapping_mul(::core::mem::size_of::<TValue>() as usize),
+        ((*f).sizek as usize).wrapping_mul(size_of::<TValue>() as usize),
     );
     luaM_free_(
         L,
         (*f).lineinfo as *mut c_void,
-        ((*f).sizelineinfo as usize).wrapping_mul(::core::mem::size_of::<ls_byte>() as usize),
+        ((*f).sizelineinfo as usize).wrapping_mul(size_of::<ls_byte>() as usize),
     );
     luaM_free_(
         L,
         (*f).abslineinfo as *mut c_void,
-        ((*f).sizeabslineinfo as usize)
-            .wrapping_mul(::core::mem::size_of::<AbsLineInfo>() as usize),
+        ((*f).sizeabslineinfo as usize).wrapping_mul(size_of::<AbsLineInfo>() as usize),
     );
     luaM_free_(
         L,
         (*f).locvars as *mut c_void,
-        ((*f).sizelocvars as usize).wrapping_mul(::core::mem::size_of::<LocVar>() as usize),
+        ((*f).sizelocvars as usize).wrapping_mul(size_of::<LocVar>() as usize),
     );
     luaM_free_(
         L,
         (*f).upvalues as *mut c_void,
-        ((*f).sizeupvalues as usize).wrapping_mul(::core::mem::size_of::<Upvaldesc>() as usize),
+        ((*f).sizeupvalues as usize).wrapping_mul(size_of::<Upvaldesc>() as usize),
     );
-    luaM_free_(
-        L,
-        f as *mut c_void,
-        ::core::mem::size_of::<Proto>() as usize,
-    );
+    luaM_free_(L, f as *mut c_void, size_of::<Proto>() as usize);
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaF_getlocalname(
@@ -9516,8 +9471,8 @@ pub unsafe extern "C-unwind" fn luaS_resize(mut L: *mut lua_State, mut nsize: i3
     newvect = luaM_realloc_(
         L,
         (*tb).hash as *mut c_void,
-        (osize as size_t).wrapping_mul(::core::mem::size_of::<*mut TString>() as usize),
-        (nsize as size_t).wrapping_mul(::core::mem::size_of::<*mut TString>() as usize),
+        (osize as size_t).wrapping_mul(size_of::<*mut TString>() as usize),
+        (nsize as size_t).wrapping_mul(size_of::<*mut TString>() as usize),
     ) as *mut *mut TString;
     if ((newvect == 0 as *mut c_void as *mut *mut TString) as i32 != 0) as i32 as std::ffi::c_long
         != 0
@@ -9562,7 +9517,7 @@ pub unsafe extern "C-unwind" fn luaS_init(mut L: *mut lua_State) {
     let mut tb: *mut stringtable = &mut (*(*L).l_G).strt;
     (*tb).hash = luaM_malloc_(
         L,
-        (128usize).wrapping_mul(::core::mem::size_of::<*mut TString>() as usize),
+        (128usize).wrapping_mul(size_of::<*mut TString>() as usize),
         0,
     ) as *mut *mut TString;
     tablerehash((*tb).hash, 0, 128 as i32);
@@ -9570,8 +9525,8 @@ pub unsafe extern "C-unwind" fn luaS_init(mut L: *mut lua_State) {
     (*g).memerrmsg = luaS_newlstr(
         L,
         c"not enough memory".as_ptr(),
-        (::core::mem::size_of::<[std::ffi::c_char; 18]>() as usize)
-            .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+        (size_of::<[std::ffi::c_char; 18]>() as usize)
+            .wrapping_div(size_of::<std::ffi::c_char>() as usize)
             .wrapping_sub(1),
     );
     luaC_fix(L, &mut (*((*g).memerrmsg as *mut GCUnion)).gc);
@@ -9598,7 +9553,7 @@ unsafe extern "C-unwind" fn createstrobj(
     let mut totalsize: size_t = 0;
     totalsize = (24 as usize).wrapping_add(
         l.wrapping_add(1 as i32 as size_t)
-            .wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+            .wrapping_mul(size_of::<std::ffi::c_char>() as usize),
     );
     o = luaC_newobj(L, tag, totalsize);
     ts = &mut (*(o as *mut GCUnion)).ts;
@@ -9640,11 +9595,11 @@ unsafe extern "C-unwind" fn growstrtab(mut L: *mut lua_State, mut tb: *mut strin
     }
     if (*tb).size
         <= (if 2147483647 as i32 as size_t
-            <= (!(0 as size_t)).wrapping_div(::core::mem::size_of::<*mut TString>() as usize)
+            <= (!(0 as size_t)).wrapping_div(size_of::<*mut TString>() as usize)
         {
             2147483647
         } else {
-            (!(0 as size_t)).wrapping_div(::core::mem::size_of::<*mut TString>() as usize) as u32
+            (!(0 as size_t)).wrapping_div(size_of::<*mut TString>() as usize) as u32
         }) as i32
             / 2 as i32
     {
@@ -9669,7 +9624,7 @@ unsafe extern "C-unwind" fn internshrstr(
             && memcmp(
                 str as *const c_void,
                 ((*ts).contents).as_mut_ptr() as *const c_void,
-                l.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+                l.wrapping_mul(size_of::<std::ffi::c_char>() as usize),
             ) == 0
         {
             if (*ts).marked as i32
@@ -9694,7 +9649,7 @@ unsafe extern "C-unwind" fn internshrstr(
     memcpy(
         ((*ts).contents).as_mut_ptr() as *mut c_void,
         str as *const c_void,
-        l.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+        l.wrapping_mul(size_of::<std::ffi::c_char>() as usize),
     );
     (*ts).u.hnext = *list;
     *list = ts;
@@ -9712,15 +9667,13 @@ pub unsafe extern "C-unwind" fn luaS_newlstr(
         return internshrstr(L, str, l);
     } else {
         let mut ts: *mut TString = 0 as *mut TString;
-        if ((l.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize)
-            >= (if (::core::mem::size_of::<size_t>() as usize)
-                < ::core::mem::size_of::<lua_Integer>() as usize
-            {
+        if ((l.wrapping_mul(size_of::<std::ffi::c_char>() as usize)
+            >= (if (size_of::<size_t>() as usize) < size_of::<lua_Integer>() as usize {
                 !(0 as size_t)
             } else {
                 9223372036854775807 as std::ffi::c_longlong as size_t
             })
-            .wrapping_sub(::core::mem::size_of::<TString>() as usize)) as i32
+            .wrapping_sub(size_of::<TString>() as usize)) as i32
             != 0) as i32 as std::ffi::c_long
             != 0
         {
@@ -9730,7 +9683,7 @@ pub unsafe extern "C-unwind" fn luaS_newlstr(
         memcpy(
             ((*ts).contents).as_mut_ptr() as *mut c_void,
             str as *const c_void,
-            l.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+            l.wrapping_mul(size_of::<std::ffi::c_char>() as usize),
         );
         return ts;
     };
@@ -9776,9 +9729,7 @@ pub unsafe extern "C-unwind" fn luaS_newudata(
     let mut i: i32 = 0;
     let mut o: *mut GCObject = 0 as *mut GCObject;
     if ((s
-        > (if (::core::mem::size_of::<size_t>() as usize)
-            < ::core::mem::size_of::<lua_Integer>() as usize
-        {
+        > (if (size_of::<size_t>() as usize) < size_of::<lua_Integer>() as usize {
             !(0 as size_t)
         } else {
             9223372036854775807 as std::ffi::c_longlong as size_t
@@ -9787,9 +9738,8 @@ pub unsafe extern "C-unwind" fn luaS_newudata(
             (if nuvalue == 0 {
                 32 as usize
             } else {
-                (40 as usize).wrapping_add(
-                    (::core::mem::size_of::<UValue>() as usize).wrapping_mul(nuvalue as usize),
-                )
+                (40 as usize)
+                    .wrapping_add((size_of::<UValue>() as usize).wrapping_mul(nuvalue as usize))
             }),
         )) as i32
         != 0) as i32 as std::ffi::c_long
@@ -9803,9 +9753,8 @@ pub unsafe extern "C-unwind" fn luaS_newudata(
         (if nuvalue == 0 {
             32 as usize
         } else {
-            (40 as usize).wrapping_add(
-                (::core::mem::size_of::<UValue>() as usize).wrapping_mul(nuvalue as usize),
-            )
+            (40 as usize)
+                .wrapping_add((size_of::<UValue>() as usize).wrapping_mul(nuvalue as usize))
         })
         .wrapping_add(s),
     );
@@ -10060,18 +10009,13 @@ unsafe extern "C-unwind" fn getgeneric(
 }
 unsafe extern "C-unwind" fn arrayindex(mut k: lua_Integer) -> u32 {
     if (k as lua_Unsigned).wrapping_sub(1 as u32 as lua_Unsigned)
-        < (if ((1 as u32)
-            << (::core::mem::size_of::<i32>() as usize)
-                .wrapping_mul(8)
-                .wrapping_sub(1) as i32) as size_t
-            <= (!(0 as size_t)).wrapping_div(::core::mem::size_of::<TValue>() as usize)
+        < (if ((1 as u32) << (size_of::<i32>() as usize).wrapping_mul(8).wrapping_sub(1) as i32)
+            as size_t
+            <= (!(0 as size_t)).wrapping_div(size_of::<TValue>() as usize)
         {
-            (1 as u32)
-                << (::core::mem::size_of::<i32>() as usize)
-                    .wrapping_mul(8)
-                    .wrapping_sub(1) as i32
+            (1 as u32) << (size_of::<i32>() as usize).wrapping_mul(8).wrapping_sub(1) as i32
         } else {
-            (!(0 as size_t)).wrapping_div(::core::mem::size_of::<TValue>() as usize) as u32
+            (!(0 as size_t)).wrapping_div(size_of::<TValue>() as usize) as u32
         }) as lua_Unsigned
     {
         return k as u32;
@@ -10185,7 +10129,7 @@ unsafe extern "C-unwind" fn freehash(mut L: *mut lua_State, mut t: *mut Table) {
             L,
             (*t).node as *mut c_void,
             (((1 as i32) << (*t).lsizenode as i32) as size_t)
-                .wrapping_mul(::core::mem::size_of::<Node>() as usize),
+                .wrapping_mul(size_of::<Node>() as usize),
         );
     }
 }
@@ -10229,11 +10173,7 @@ unsafe extern "C-unwind" fn numusearray(mut t: *const Table, mut nums: *mut u32)
     let mut asize: u32 = (*t).alimit;
     lg = 0;
     ttlg = 1;
-    while lg
-        <= (::core::mem::size_of::<i32>() as usize)
-            .wrapping_mul(8)
-            .wrapping_sub(1) as i32
-    {
+    while lg <= (size_of::<i32>() as usize).wrapping_mul(8).wrapping_sub(1) as i32 {
         let mut lc: u32 = 0 as u32;
         let mut lim: u32 = ttlg;
         if lim > asize {
@@ -10293,26 +10233,18 @@ unsafe extern "C-unwind" fn setnodevector(mut L: *mut lua_State, mut t: *mut Tab
     } else {
         let mut i: i32 = 0;
         let mut lsize: i32 = luaO_ceillog2(size);
-        if lsize
-            > (::core::mem::size_of::<i32>() as usize)
-                .wrapping_mul(8)
-                .wrapping_sub(1) as i32
-                - 1 as i32
+        if lsize > (size_of::<i32>() as usize).wrapping_mul(8).wrapping_sub(1) as i32 - 1 as i32
             || (1 as u32) << lsize
                 > (if ((1 as u32)
-                    << (::core::mem::size_of::<i32>() as usize)
-                        .wrapping_mul(8)
-                        .wrapping_sub(1) as i32
+                    << (size_of::<i32>() as usize).wrapping_mul(8).wrapping_sub(1) as i32
                         - 1 as i32) as size_t
-                    <= (!(0 as size_t)).wrapping_div(::core::mem::size_of::<Node>() as usize)
+                    <= (!(0 as size_t)).wrapping_div(size_of::<Node>() as usize)
                 {
                     (1 as u32)
-                        << (::core::mem::size_of::<i32>() as usize)
-                            .wrapping_mul(8)
-                            .wrapping_sub(1) as i32
+                        << (size_of::<i32>() as usize).wrapping_mul(8).wrapping_sub(1) as i32
                             - 1 as i32
                 } else {
-                    (!(0 as size_t)).wrapping_div(::core::mem::size_of::<Node>() as usize) as u32
+                    (!(0 as size_t)).wrapping_div(size_of::<Node>() as usize) as u32
                 })
         {
             luaG_runerror(L, c"table overflow".as_ptr());
@@ -10320,7 +10252,7 @@ unsafe extern "C-unwind" fn setnodevector(mut L: *mut lua_State, mut t: *mut Tab
         size = ((1 as i32) << lsize) as u32;
         (*t).node = luaM_malloc_(
             L,
-            (size as usize).wrapping_mul(::core::mem::size_of::<Node>() as usize),
+            (size as usize).wrapping_mul(size_of::<Node>() as usize),
             0,
         ) as *mut Node;
         i = 0;
@@ -10426,8 +10358,8 @@ pub unsafe extern "C-unwind" fn luaH_resize(
     newarray = luaM_realloc_(
         L,
         (*t).array as *mut c_void,
-        (oldasize as size_t).wrapping_mul(::core::mem::size_of::<TValue>() as usize),
-        (newasize as size_t).wrapping_mul(::core::mem::size_of::<TValue>() as usize),
+        (oldasize as size_t).wrapping_mul(size_of::<TValue>() as usize),
+        (newasize as size_t).wrapping_mul(size_of::<TValue>() as usize),
     ) as *mut TValue;
     if ((newarray.is_null() && newasize > 0 as u32) as i32 != 0) as i32 as std::ffi::c_long != 0 {
         freehash(L, &mut newt);
@@ -10469,11 +10401,7 @@ unsafe extern "C-unwind" fn rehash(
     let mut i: i32 = 0;
     let mut totaluse: i32 = 0;
     i = 0;
-    while i
-        <= (::core::mem::size_of::<i32>() as usize)
-            .wrapping_mul(8)
-            .wrapping_sub(1) as i32
-    {
+    while i <= (size_of::<i32>() as usize).wrapping_mul(8).wrapping_sub(1) as i32 {
         nums[i as usize] = 0 as u32;
         i += 1;
         i;
@@ -10492,11 +10420,8 @@ unsafe extern "C-unwind" fn rehash(
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaH_new(mut L: *mut lua_State) -> *mut Table {
-    let mut o: *mut GCObject = luaC_newobj(
-        L,
-        5 as i32 | (0) << 4 as i32,
-        ::core::mem::size_of::<Table>() as usize,
-    );
+    let mut o: *mut GCObject =
+        luaC_newobj(L, 5 as i32 | (0) << 4 as i32, size_of::<Table>() as usize);
     let mut t: *mut Table = &mut (*(o as *mut GCUnion)).h;
     (*t).metatable = 0 as *mut Table;
     (*t).flags = !(!(0 as u32) << TM_EQ as i32 + 1 as i32) as lu_byte;
@@ -10511,13 +10436,9 @@ pub unsafe extern "C-unwind" fn luaH_free(mut L: *mut lua_State, mut t: *mut Tab
     luaM_free_(
         L,
         (*t).array as *mut c_void,
-        (luaH_realasize(t) as usize).wrapping_mul(::core::mem::size_of::<TValue>() as usize),
+        (luaH_realasize(t) as usize).wrapping_mul(size_of::<TValue>() as usize),
     );
-    luaM_free_(
-        L,
-        t as *mut c_void,
-        ::core::mem::size_of::<Table>() as usize,
-    );
+    luaM_free_(L, t as *mut c_void, size_of::<Table>() as usize);
 }
 unsafe extern "C-unwind" fn getfreepos(mut t: *mut Table) -> *mut Node {
     if !((*t).lastfree).is_null() {
@@ -11665,7 +11586,7 @@ unsafe extern "C-unwind" fn copy2buff(mut top: StkId, mut n: i32, mut buff: *mut
         memcpy(
             buff.offset(tl as isize) as *mut c_void,
             ((*st).contents).as_mut_ptr() as *const c_void,
-            l.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+            l.wrapping_mul(size_of::<std::ffi::c_char>() as usize),
         );
         tl = tl.wrapping_add(l);
         n -= 1;
@@ -11765,14 +11686,12 @@ pub unsafe extern "C-unwind" fn luaV_concat(mut L: *mut lua_State, mut total: i3
                             .lnglen
                     };
                 if ((l
-                    >= (if (::core::mem::size_of::<size_t>() as usize)
-                        < ::core::mem::size_of::<lua_Integer>() as usize
-                    {
+                    >= (if (size_of::<size_t>() as usize) < size_of::<lua_Integer>() as usize {
                         !(0 as size_t)
                     } else {
                         9223372036854775807 as std::ffi::c_longlong as size_t
                     })
-                    .wrapping_sub(::core::mem::size_of::<TString>() as usize)
+                    .wrapping_sub(size_of::<TString>() as usize)
                     .wrapping_sub(tl)) as i32
                     != 0) as i32 as std::ffi::c_long
                     != 0
@@ -11932,16 +11851,12 @@ pub unsafe extern "C-unwind" fn luaV_modf(
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaV_shiftl(mut x: lua_Integer, mut y: lua_Integer) -> lua_Integer {
     if y < 0 as lua_Integer {
-        if y <= -((::core::mem::size_of::<lua_Integer>() as usize).wrapping_mul(8) as i32)
-            as lua_Integer
-        {
+        if y <= -((size_of::<lua_Integer>() as usize).wrapping_mul(8) as i32) as lua_Integer {
             return 0 as lua_Integer;
         } else {
             return (x as lua_Unsigned >> -y as lua_Unsigned) as lua_Integer;
         }
-    } else if y
-        >= (::core::mem::size_of::<lua_Integer>() as usize).wrapping_mul(8) as i32 as lua_Integer
-    {
+    } else if y >= (size_of::<lua_Integer>() as usize).wrapping_mul(8) as i32 as lua_Integer {
         return 0 as lua_Integer;
     } else {
         return ((x as lua_Unsigned) << y as lua_Unsigned) as lua_Integer;
@@ -15556,7 +15471,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         memcpy(
                             ra_74.offset(4) as *mut c_void,
                             ra_74 as *const c_void,
-                            (3usize).wrapping_mul(::core::mem::size_of::<StackValue>() as usize),
+                            (3usize).wrapping_mul(size_of::<StackValue>() as usize),
                         );
                         (*L).top.p = ra_74.offset(4).offset(3);
                         (*ci).u.l.savedpc = pc;
@@ -16171,12 +16086,10 @@ unsafe extern "C-unwind" fn touserdata(mut o: *const TValue) -> *mut c_void {
                     {
                         32 as usize
                     } else {
-                        (40 as usize).wrapping_add(
-                            (::core::mem::size_of::<UValue>() as usize).wrapping_mul(
-                                (*(&mut (*((*o).value_.gc as *mut GCUnion)).u as *mut Udata))
-                                    .nuvalue as usize,
-                            ),
-                        )
+                        (40 as usize).wrapping_add((size_of::<UValue>() as usize).wrapping_mul(
+                            (*(&mut (*((*o).value_.gc as *mut GCUnion)).u as *mut Udata)).nuvalue
+                                as usize,
+                        ))
                     }) as isize,
                 ) as *mut c_void;
         }
@@ -17573,9 +17486,8 @@ pub unsafe extern "C-unwind" fn lua_newuserdatauv(
         (if (*u).nuvalue as i32 == 0 {
             32 as usize
         } else {
-            (40 as usize).wrapping_add(
-                (::core::mem::size_of::<UValue>() as usize).wrapping_mul((*u).nuvalue as usize),
-            )
+            (40 as usize)
+                .wrapping_add((size_of::<UValue>() as usize).wrapping_mul((*u).nuvalue as usize))
         }) as isize,
     ) as *mut c_void;
 }
@@ -18376,8 +18288,7 @@ static mut boxmt: [luaL_Reg; 3] = unsafe {
     ]
 };
 unsafe extern "C-unwind" fn newbox(mut L: *mut lua_State) {
-    let mut box_0: *mut UBox =
-        lua_newuserdatauv(L, ::core::mem::size_of::<UBox>() as usize, 0) as *mut UBox;
+    let mut box_0: *mut UBox = lua_newuserdatauv(L, size_of::<UBox>() as usize, 0) as *mut UBox;
     (*box_0).box_0 = 0 as *mut c_void;
     (*box_0).bsize = 0 as size_t;
     if luaL_newmetatable(L, c"_UBOX*".as_ptr()) != 0 {
@@ -18418,7 +18329,7 @@ unsafe extern "C-unwind" fn prepbuffsize(
             memcpy(
                 newbuff as *mut c_void,
                 (*B).b as *const c_void,
-                ((*B).n).wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+                ((*B).n).wrapping_mul(size_of::<std::ffi::c_char>() as usize),
             );
         }
         (*B).b = newbuff;
@@ -18444,7 +18355,7 @@ pub unsafe extern "C-unwind" fn luaL_addlstring(
         memcpy(
             b as *mut c_void,
             s as *const c_void,
-            l.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+            l.wrapping_mul(size_of::<std::ffi::c_char>() as usize),
         );
         (*B).n = ((*B).n).wrapping_add(l);
     }
@@ -18480,7 +18391,7 @@ pub unsafe extern "C-unwind" fn luaL_addvalue(mut B: *mut luaL_Buffer) {
     memcpy(
         b as *mut c_void,
         s as *const c_void,
-        len.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+        len.wrapping_mul(size_of::<std::ffi::c_char>() as usize),
     );
     (*B).n = ((*B).n).wrapping_add(len);
     lua_settop(L, -(1 as i32) - 1 as i32);
@@ -18491,9 +18402,8 @@ pub unsafe extern "C-unwind" fn luaL_buffinit(mut L: *mut lua_State, mut B: *mut
     (*B).b = ((*B).init.b).as_mut_ptr();
     (*B).n = 0 as size_t;
     (*B).size = (16usize)
-        .wrapping_mul(::core::mem::size_of::<*mut c_void>() as usize)
-        .wrapping_mul(::core::mem::size_of::<lua_Number>() as usize) as i32
-        as size_t;
+        .wrapping_mul(size_of::<*mut c_void>() as usize)
+        .wrapping_mul(size_of::<lua_Number>() as usize) as i32 as size_t;
     lua_pushlightuserdata(L, B as *mut c_void);
 }
 #[unsafe(no_mangle)]
@@ -18556,7 +18466,7 @@ unsafe extern "C-unwind" fn getF(
         *size = fread(
             ((*lf).buff).as_mut_ptr() as *mut c_void,
             1,
-            ::core::mem::size_of::<[std::ffi::c_char; 8192]>() as usize,
+            size_of::<[std::ffi::c_char; 8192]>() as usize,
             (*lf).f,
         );
     }
@@ -19095,9 +19005,9 @@ pub unsafe extern "C-unwind" fn luaL_checkversion_(
 ) {
     let mut v: lua_Number = lua_version(L);
     if sz
-        != (::core::mem::size_of::<lua_Integer>() as usize)
+        != (size_of::<lua_Integer>() as usize)
             .wrapping_mul(16)
-            .wrapping_add(::core::mem::size_of::<lua_Number>() as usize)
+            .wrapping_add(size_of::<lua_Number>() as usize)
     {
         luaL_error(
             L,
@@ -19122,14 +19032,14 @@ unsafe extern "C-unwind" fn luaB_print(mut L: *mut lua_State) -> i32 {
         if i > 1 as i32 {
             fwrite(
                 c"\t".as_ptr() as *const c_void,
-                ::core::mem::size_of::<std::ffi::c_char>() as usize,
+                size_of::<std::ffi::c_char>() as usize,
                 1,
                 stdout,
             );
         }
         fwrite(
             s as *const c_void,
-            ::core::mem::size_of::<std::ffi::c_char>() as usize,
+            size_of::<std::ffi::c_char>() as usize,
             l,
             stdout,
         );
@@ -19139,7 +19049,7 @@ unsafe extern "C-unwind" fn luaB_print(mut L: *mut lua_State) -> i32 {
     }
     fwrite(
         c"\n".as_ptr() as *const c_void,
-        ::core::mem::size_of::<std::ffi::c_char>() as usize,
+        size_of::<std::ffi::c_char>() as usize,
         1,
         stdout,
     );
@@ -20106,15 +20016,15 @@ pub unsafe extern "C-unwind" fn luaopen_coroutine(mut L: *mut lua_State) -> i32 
     luaL_checkversion_(
         L,
         504 as i32 as lua_Number,
-        (::core::mem::size_of::<lua_Integer>() as usize)
+        (size_of::<lua_Integer>() as usize)
             .wrapping_mul(16)
-            .wrapping_add(::core::mem::size_of::<lua_Number>() as usize),
+            .wrapping_add(size_of::<lua_Number>() as usize),
     );
     lua_createtable(
         L,
         0,
-        (::core::mem::size_of::<[luaL_Reg; 9]>() as usize)
-            .wrapping_div(::core::mem::size_of::<luaL_Reg>() as usize)
+        (size_of::<[luaL_Reg; 9]>() as usize)
+            .wrapping_div(size_of::<luaL_Reg>() as usize)
             .wrapping_sub(1) as i32,
     );
     luaL_setfuncs(L, (&raw const co_funcs).cast(), 0);
@@ -20556,7 +20466,7 @@ unsafe extern "C-unwind" fn db_debug(mut L: *mut lua_State) -> i32 {
         fflush(stderr);
         if (fgets(
             buffer.as_mut_ptr(),
-            ::core::mem::size_of::<[std::ffi::c_char; 250]>() as usize as i32,
+            size_of::<[std::ffi::c_char; 250]>() as usize as i32,
             stdin,
         ))
         .is_null()
@@ -20740,15 +20650,15 @@ pub unsafe extern "C-unwind" fn luaopen_debug(mut L: *mut lua_State) -> i32 {
     luaL_checkversion_(
         L,
         504 as i32 as lua_Number,
-        (::core::mem::size_of::<lua_Integer>() as usize)
+        (size_of::<lua_Integer>() as usize)
             .wrapping_mul(16)
-            .wrapping_add(::core::mem::size_of::<lua_Number>() as usize),
+            .wrapping_add(size_of::<lua_Number>() as usize),
     );
     lua_createtable(
         L,
         0,
-        (::core::mem::size_of::<[luaL_Reg; 18]>() as usize)
-            .wrapping_div(::core::mem::size_of::<luaL_Reg>() as usize)
+        (size_of::<[luaL_Reg; 18]>() as usize)
+            .wrapping_div(size_of::<luaL_Reg>() as usize)
             .wrapping_sub(1) as i32,
     );
     luaL_setfuncs(L, (&raw const dblib).cast(), 0);
@@ -20799,7 +20709,7 @@ unsafe extern "C-unwind" fn tofile(mut L: *mut lua_State) -> *mut FILE {
 }
 unsafe extern "C-unwind" fn newprefile(mut L: *mut lua_State) -> *mut LStream {
     let mut p: *mut LStream =
-        lua_newuserdatauv(L, ::core::mem::size_of::<LStream>() as usize, 0) as *mut LStream;
+        lua_newuserdatauv(L, size_of::<LStream>() as usize, 0) as *mut LStream;
     (*p).closef = None;
     luaL_setmetatable(L, c"FILE*".as_ptr());
     return p;
@@ -20922,8 +20832,8 @@ unsafe extern "C-unwind" fn getiofile(
             L,
             c"default %s file is closed".as_ptr(),
             findex.offset(
-                (::core::mem::size_of::<[std::ffi::c_char; 5]>() as usize)
-                    .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+                (size_of::<[std::ffi::c_char; 5]>() as usize)
+                    .wrapping_div(size_of::<std::ffi::c_char>() as usize)
                     .wrapping_sub(1) as isize,
             ),
         );
@@ -21118,16 +21028,15 @@ unsafe extern "C-unwind" fn read_line(
         let mut buff: *mut std::ffi::c_char = luaL_prepbuffsize(
             &mut b,
             (16usize)
-                .wrapping_mul(::core::mem::size_of::<*mut c_void>() as usize)
-                .wrapping_mul(::core::mem::size_of::<lua_Number>() as usize) as i32
-                as size_t,
+                .wrapping_mul(size_of::<*mut c_void>() as usize)
+                .wrapping_mul(size_of::<lua_Number>() as usize) as i32 as size_t,
         );
         let mut i: i32 = 0;
         flockfile(f);
         while i
             < (16usize)
-                .wrapping_mul(::core::mem::size_of::<*mut c_void>() as usize)
-                .wrapping_mul(::core::mem::size_of::<lua_Number>() as usize) as i32
+                .wrapping_mul(size_of::<*mut c_void>() as usize)
+                .wrapping_mul(size_of::<lua_Number>() as usize) as i32
             && {
                 c = getc_unlocked(f);
                 c != -(1 as i32)
@@ -21167,25 +21076,22 @@ unsafe extern "C-unwind" fn read_all(mut L: *mut lua_State, mut f: *mut FILE) {
         let mut p: *mut std::ffi::c_char = luaL_prepbuffsize(
             &mut b,
             (16usize)
-                .wrapping_mul(::core::mem::size_of::<*mut c_void>() as usize)
-                .wrapping_mul(::core::mem::size_of::<lua_Number>() as usize) as i32
-                as size_t,
+                .wrapping_mul(size_of::<*mut c_void>() as usize)
+                .wrapping_mul(size_of::<lua_Number>() as usize) as i32 as size_t,
         );
         nr = fread(
             p as *mut c_void,
-            ::core::mem::size_of::<std::ffi::c_char>() as usize,
+            size_of::<std::ffi::c_char>() as usize,
             (16usize)
-                .wrapping_mul(::core::mem::size_of::<*mut c_void>() as usize)
-                .wrapping_mul(::core::mem::size_of::<lua_Number>() as usize) as i32
-                as usize,
+                .wrapping_mul(size_of::<*mut c_void>() as usize)
+                .wrapping_mul(size_of::<lua_Number>() as usize) as i32 as usize,
             f,
         );
         b.n = (b.n).wrapping_add(nr);
         if !(nr
             == (16usize)
-                .wrapping_mul(::core::mem::size_of::<*mut c_void>() as usize)
-                .wrapping_mul(::core::mem::size_of::<lua_Number>() as usize) as i32
-                as size_t)
+                .wrapping_mul(size_of::<*mut c_void>() as usize)
+                .wrapping_mul(size_of::<lua_Number>() as usize) as i32 as size_t)
         {
             break;
         }
@@ -21210,7 +21116,7 @@ unsafe extern "C-unwind" fn read_chars(
     p = luaL_prepbuffsize(&mut b, n);
     nr = fread(
         p as *mut c_void,
-        ::core::mem::size_of::<std::ffi::c_char>() as usize,
+        size_of::<std::ffi::c_char>() as usize,
         n,
         f,
     );
@@ -21345,7 +21251,7 @@ unsafe extern "C-unwind" fn g_write(mut L: *mut lua_State, mut f: *mut FILE, mut
             status = (status != 0
                 && fwrite(
                     s as *const c_void,
-                    ::core::mem::size_of::<std::ffi::c_char>() as usize,
+                    size_of::<std::ffi::c_char>() as usize,
                     l,
                     f,
                 ) == l) as i32;
@@ -21409,9 +21315,8 @@ unsafe extern "C-unwind" fn f_setvbuf(mut L: *mut lua_State) -> i32 {
         L,
         3 as i32,
         (16usize)
-            .wrapping_mul(::core::mem::size_of::<*mut c_void>() as usize)
-            .wrapping_mul(::core::mem::size_of::<lua_Number>() as usize) as i32
-            as lua_Integer,
+            .wrapping_mul(size_of::<*mut c_void>() as usize)
+            .wrapping_mul(size_of::<lua_Number>() as usize) as i32 as lua_Integer,
     );
     let mut res: i32 = 0;
     *__errno_location() = 0;
@@ -21626,8 +21531,8 @@ unsafe extern "C-unwind" fn createmeta(mut L: *mut lua_State) {
     lua_createtable(
         L,
         0,
-        (::core::mem::size_of::<[luaL_Reg; 8]>() as usize)
-            .wrapping_div(::core::mem::size_of::<luaL_Reg>() as usize)
+        (size_of::<[luaL_Reg; 8]>() as usize)
+            .wrapping_div(size_of::<luaL_Reg>() as usize)
             .wrapping_sub(1) as i32,
     );
     luaL_setfuncs(L, (&raw const meth).cast(), 0);
@@ -21661,15 +21566,15 @@ pub unsafe extern "C-unwind" fn luaopen_io(mut L: *mut lua_State) -> i32 {
     luaL_checkversion_(
         L,
         504 as i32 as lua_Number,
-        (::core::mem::size_of::<lua_Integer>() as usize)
+        (size_of::<lua_Integer>() as usize)
             .wrapping_mul(16)
-            .wrapping_add(::core::mem::size_of::<lua_Number>() as usize),
+            .wrapping_add(size_of::<lua_Number>() as usize),
     );
     lua_createtable(
         L,
         0,
-        (::core::mem::size_of::<[luaL_Reg; 12]>() as usize)
-            .wrapping_div(::core::mem::size_of::<luaL_Reg>() as usize)
+        (size_of::<[luaL_Reg; 12]>() as usize)
+            .wrapping_div(size_of::<luaL_Reg>() as usize)
             .wrapping_sub(1) as i32,
     );
     luaL_setfuncs(L, (&raw const iolib).cast(), 0);
@@ -22051,7 +21956,7 @@ static mut randfuncs: [luaL_Reg; 3] = unsafe {
 };
 unsafe extern "C-unwind" fn setrandfunc(mut L: *mut lua_State) {
     let mut state: *mut RanState =
-        lua_newuserdatauv(L, ::core::mem::size_of::<RanState>() as usize, 0) as *mut RanState;
+        lua_newuserdatauv(L, size_of::<RanState>() as usize, 0) as *mut RanState;
     randseed(L, state);
     lua_settop(L, -(2 as i32) - 1 as i32);
     luaL_setfuncs(L, (&raw const randfuncs).cast(), 1 as i32);
@@ -22261,15 +22166,15 @@ pub unsafe extern "C-unwind" fn luaopen_math(mut L: *mut lua_State) -> i32 {
     luaL_checkversion_(
         L,
         504 as i32 as lua_Number,
-        (::core::mem::size_of::<lua_Integer>() as usize)
+        (size_of::<lua_Integer>() as usize)
             .wrapping_mul(16)
-            .wrapping_add(::core::mem::size_of::<lua_Number>() as usize),
+            .wrapping_add(size_of::<lua_Number>() as usize),
     );
     lua_createtable(
         L,
         0,
-        (::core::mem::size_of::<[luaL_Reg; 28]>() as usize)
-            .wrapping_div(::core::mem::size_of::<luaL_Reg>() as usize)
+        (size_of::<[luaL_Reg; 28]>() as usize)
+            .wrapping_div(size_of::<luaL_Reg>() as usize)
             .wrapping_sub(1) as i32,
     );
     luaL_setfuncs(L, (&raw const mathlib).cast(), 0);
@@ -22855,8 +22760,8 @@ unsafe extern "C-unwind" fn createsearcherstable(mut L: *mut lua_State) {
     let mut i: i32 = 0;
     lua_createtable(
         L,
-        (::core::mem::size_of::<[lua_CFunction; 5]>() as usize)
-            .wrapping_div(::core::mem::size_of::<lua_CFunction>() as usize)
+        (size_of::<[lua_CFunction; 5]>() as usize)
+            .wrapping_div(size_of::<lua_CFunction>() as usize)
             .wrapping_sub(1) as i32,
         0,
     );
@@ -22887,15 +22792,15 @@ pub unsafe extern "C-unwind" fn luaopen_package(mut L: *mut lua_State) -> i32 {
     luaL_checkversion_(
         L,
         504 as i32 as lua_Number,
-        (::core::mem::size_of::<lua_Integer>() as usize)
+        (size_of::<lua_Integer>() as usize)
             .wrapping_mul(16)
-            .wrapping_add(::core::mem::size_of::<lua_Number>() as usize),
+            .wrapping_add(size_of::<lua_Number>() as usize),
     );
     lua_createtable(
         L,
         0,
-        (::core::mem::size_of::<[luaL_Reg; 8]>() as usize)
-            .wrapping_div(::core::mem::size_of::<luaL_Reg>() as usize)
+        (size_of::<[luaL_Reg; 8]>() as usize)
+            .wrapping_div(size_of::<luaL_Reg>() as usize)
             .wrapping_sub(1) as i32,
     );
     luaL_setfuncs(L, (&raw const pk_funcs).cast(), 0);
@@ -23337,15 +23242,15 @@ pub unsafe extern "C-unwind" fn luaopen_os(mut L: *mut lua_State) -> i32 {
     luaL_checkversion_(
         L,
         504 as i32 as lua_Number,
-        (::core::mem::size_of::<lua_Integer>() as usize)
+        (size_of::<lua_Integer>() as usize)
             .wrapping_mul(16)
-            .wrapping_add(::core::mem::size_of::<lua_Number>() as usize),
+            .wrapping_add(size_of::<lua_Number>() as usize),
     );
     lua_createtable(
         L,
         0,
-        (::core::mem::size_of::<[luaL_Reg; 12]>() as usize)
-            .wrapping_div(::core::mem::size_of::<luaL_Reg>() as usize)
+        (size_of::<[luaL_Reg; 12]>() as usize)
+            .wrapping_div(size_of::<luaL_Reg>() as usize)
             .wrapping_sub(1) as i32,
     );
     luaL_setfuncs(L, (&raw const syslib).cast(), 0);
@@ -23479,9 +23384,7 @@ unsafe extern "C-unwind" fn str_rep(mut L: *mut lua_State) -> i32 {
         lua_pushstring(L, c"".as_ptr());
     } else if ((l.wrapping_add(lsep) < l
         || l.wrapping_add(lsep) as u64
-            > ((if (::core::mem::size_of::<size_t>() as usize)
-                < ::core::mem::size_of::<i32>() as usize
-            {
+            > ((if (size_of::<size_t>() as usize) < size_of::<i32>() as usize {
                 !(0 as size_t)
             } else {
                 2147483647 as i32 as size_t
@@ -23511,14 +23414,14 @@ unsafe extern "C-unwind" fn str_rep(mut L: *mut lua_State) -> i32 {
             memcpy(
                 p as *mut c_void,
                 s as *const c_void,
-                l.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+                l.wrapping_mul(size_of::<std::ffi::c_char>() as usize),
             );
             p = p.offset(l as isize);
             if lsep > 0 as size_t {
                 memcpy(
                     p as *mut c_void,
                     sep as *const c_void,
-                    lsep.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+                    lsep.wrapping_mul(size_of::<std::ffi::c_char>() as usize),
                 );
                 p = p.offset(lsep as isize);
             }
@@ -23526,7 +23429,7 @@ unsafe extern "C-unwind" fn str_rep(mut L: *mut lua_State) -> i32 {
         memcpy(
             p as *mut c_void,
             s as *const c_void,
-            l.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+            l.wrapping_mul(size_of::<std::ffi::c_char>() as usize),
         );
         luaL_pushresultsize(&mut b, totallen);
     }
@@ -24559,8 +24462,7 @@ unsafe extern "C-unwind" fn gmatch(mut L: *mut lua_State) -> i32 {
         .wrapping_sub(1 as i32 as size_t);
     let mut gm: *mut GMatchState = 0 as *mut GMatchState;
     lua_settop(L, 2 as i32);
-    gm =
-        lua_newuserdatauv(L, ::core::mem::size_of::<GMatchState>() as usize, 0) as *mut GMatchState;
+    gm = lua_newuserdatauv(L, size_of::<GMatchState>() as usize, 0) as *mut GMatchState;
     if init > ls {
         init = ls.wrapping_add(1 as i32 as size_t);
     }
@@ -24782,14 +24684,14 @@ unsafe extern "C-unwind" fn addquoted(
             {
                 snprintf(
                     buff.as_mut_ptr(),
-                    ::core::mem::size_of::<[std::ffi::c_char; 10]>() as usize,
+                    size_of::<[std::ffi::c_char; 10]>() as usize,
                     c"\\%d".as_ptr(),
                     *s as u8 as i32,
                 );
             } else {
                 snprintf(
                     buff.as_mut_ptr(),
-                    ::core::mem::size_of::<[std::ffi::c_char; 10]>() as usize,
+                    size_of::<[std::ffi::c_char; 10]>() as usize,
                     c"\\%03d".as_ptr(),
                     *s as u8 as i32,
                 );
@@ -24929,7 +24831,7 @@ unsafe extern "C-unwind" fn getformat(
     memcpy(
         form as *mut c_void,
         strfrmt as *const c_void,
-        len.wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+        len.wrapping_mul(size_of::<std::ffi::c_char>() as usize),
     );
     *form.offset(len as isize) = '\0' as i32 as std::ffi::c_char;
     return strfrmt.offset(len as isize).offset(-(1));
@@ -25118,9 +25020,7 @@ unsafe extern "C-unwind" fn getnum(mut fmt: *mut *const std::ffi::c_char, mut df
             *fmt = (*fmt).offset(1);
             a = a * 10 + (*fresh185 as i32 - '0' as i32);
             if !(digit(**fmt as i32) != 0
-                && a <= ((if (::core::mem::size_of::<size_t>() as usize)
-                    < ::core::mem::size_of::<i32>() as usize
-                {
+                && a <= ((if (size_of::<size_t>() as usize) < size_of::<i32>() as usize {
                     !(0 as size_t)
                 } else {
                     2147483647 as i32 as size_t
@@ -25166,63 +25066,63 @@ unsafe extern "C-unwind" fn getoption(
     *size = 0;
     match opt {
         98 => {
-            *size = ::core::mem::size_of::<std::ffi::c_char>() as usize as i32;
+            *size = size_of::<std::ffi::c_char>() as usize as i32;
             return Kint;
         }
         66 => {
-            *size = ::core::mem::size_of::<std::ffi::c_char>() as usize as i32;
+            *size = size_of::<std::ffi::c_char>() as usize as i32;
             return Kuint;
         }
         104 => {
-            *size = ::core::mem::size_of::<i16>() as usize as i32;
+            *size = size_of::<i16>() as usize as i32;
             return Kint;
         }
         72 => {
-            *size = ::core::mem::size_of::<i16>() as usize as i32;
+            *size = size_of::<i16>() as usize as i32;
             return Kuint;
         }
         108 => {
-            *size = ::core::mem::size_of::<std::ffi::c_long>() as usize as i32;
+            *size = size_of::<std::ffi::c_long>() as usize as i32;
             return Kint;
         }
         76 => {
-            *size = ::core::mem::size_of::<std::ffi::c_long>() as usize as i32;
+            *size = size_of::<std::ffi::c_long>() as usize as i32;
             return Kuint;
         }
         106 => {
-            *size = ::core::mem::size_of::<lua_Integer>() as usize as i32;
+            *size = size_of::<lua_Integer>() as usize as i32;
             return Kint;
         }
         74 => {
-            *size = ::core::mem::size_of::<lua_Integer>() as usize as i32;
+            *size = size_of::<lua_Integer>() as usize as i32;
             return Kuint;
         }
         84 => {
-            *size = ::core::mem::size_of::<size_t>() as usize as i32;
+            *size = size_of::<size_t>() as usize as i32;
             return Kuint;
         }
         102 => {
-            *size = ::core::mem::size_of::<std::ffi::c_float>() as usize as i32;
+            *size = size_of::<std::ffi::c_float>() as usize as i32;
             return Kfloat;
         }
         110 => {
-            *size = ::core::mem::size_of::<lua_Number>() as usize as i32;
+            *size = size_of::<lua_Number>() as usize as i32;
             return Knumber;
         }
         100 => {
-            *size = ::core::mem::size_of::<std::ffi::c_double>() as usize as i32;
+            *size = size_of::<std::ffi::c_double>() as usize as i32;
             return Kdouble;
         }
         105 => {
-            *size = getnumlimit(h, fmt, ::core::mem::size_of::<i32>() as usize as i32);
+            *size = getnumlimit(h, fmt, size_of::<i32>() as usize as i32);
             return Kint;
         }
         73 => {
-            *size = getnumlimit(h, fmt, ::core::mem::size_of::<i32>() as usize as i32);
+            *size = getnumlimit(h, fmt, size_of::<i32>() as usize as i32);
             return Kuint;
         }
         115 => {
-            *size = getnumlimit(h, fmt, ::core::mem::size_of::<size_t>() as usize as i32);
+            *size = getnumlimit(h, fmt, size_of::<size_t>() as usize as i32);
             return Kstring;
         }
         99 => {
@@ -25320,8 +25220,8 @@ unsafe extern "C-unwind" fn packint(
         i += 1;
         i;
     }
-    if neg != 0 && size > ::core::mem::size_of::<lua_Integer>() as usize as i32 {
-        i = ::core::mem::size_of::<lua_Integer>() as usize as i32;
+    if neg != 0 && size > size_of::<lua_Integer>() as usize as i32 {
+        i = size_of::<lua_Integer>() as usize as i32;
         while i < size {
             *buff.offset(
                 (if islittle != 0 {
@@ -25401,7 +25301,7 @@ unsafe extern "C-unwind" fn str_pack(mut L: *mut lua_State) -> i32 {
         match opt as u32 {
             0 => {
                 let mut n: lua_Integer = luaL_checkinteger(L, arg);
-                if size < ::core::mem::size_of::<lua_Integer>() as usize as i32 {
+                if size < size_of::<lua_Integer>() as usize as i32 {
                     let mut lim: lua_Integer =
                         (1 as i32 as lua_Integer) << size * 8 as i32 - 1 as i32;
                     (((-lim <= n && n < lim) as i32 != 0) as i32 as std::ffi::c_long != 0
@@ -25419,7 +25319,7 @@ unsafe extern "C-unwind" fn str_pack(mut L: *mut lua_State) -> i32 {
             }
             1 => {
                 let mut n_0: lua_Integer = luaL_checkinteger(L, arg);
-                if size < ::core::mem::size_of::<lua_Integer>() as usize as i32 {
+                if size < size_of::<lua_Integer>() as usize as i32 {
                     ((((n_0 as lua_Unsigned) < (1 as i32 as lua_Unsigned) << size * 8 as i32)
                         as i32
                         != 0) as i32 as std::ffi::c_long
@@ -25433,11 +25333,11 @@ unsafe extern "C-unwind" fn str_pack(mut L: *mut lua_State) -> i32 {
             2 => {
                 let mut f: std::ffi::c_float = luaL_checknumber(L, arg) as std::ffi::c_float;
                 let mut buff: *mut std::ffi::c_char =
-                    luaL_prepbuffsize(&mut b, ::core::mem::size_of::<std::ffi::c_float>() as usize);
+                    luaL_prepbuffsize(&mut b, size_of::<std::ffi::c_float>() as usize);
                 copywithendian(
                     buff,
                     &mut f as *mut std::ffi::c_float as *mut std::ffi::c_char,
-                    ::core::mem::size_of::<std::ffi::c_float>() as usize as i32,
+                    size_of::<std::ffi::c_float>() as usize as i32,
                     h.islittle,
                 );
                 b.n = (b.n).wrapping_add(size as size_t);
@@ -25446,11 +25346,11 @@ unsafe extern "C-unwind" fn str_pack(mut L: *mut lua_State) -> i32 {
             3 => {
                 let mut f_0: lua_Number = luaL_checknumber(L, arg);
                 let mut buff_0: *mut std::ffi::c_char =
-                    luaL_prepbuffsize(&mut b, ::core::mem::size_of::<lua_Number>() as usize);
+                    luaL_prepbuffsize(&mut b, size_of::<lua_Number>() as usize);
                 copywithendian(
                     buff_0,
                     &mut f_0 as *mut lua_Number as *mut std::ffi::c_char,
-                    ::core::mem::size_of::<lua_Number>() as usize as i32,
+                    size_of::<lua_Number>() as usize as i32,
                     h.islittle,
                 );
                 b.n = (b.n).wrapping_add(size as size_t);
@@ -25458,14 +25358,12 @@ unsafe extern "C-unwind" fn str_pack(mut L: *mut lua_State) -> i32 {
             }
             4 => {
                 let mut f_1: std::ffi::c_double = luaL_checknumber(L, arg);
-                let mut buff_1: *mut std::ffi::c_char = luaL_prepbuffsize(
-                    &mut b,
-                    ::core::mem::size_of::<std::ffi::c_double>() as usize,
-                );
+                let mut buff_1: *mut std::ffi::c_char =
+                    luaL_prepbuffsize(&mut b, size_of::<std::ffi::c_double>() as usize);
                 copywithendian(
                     buff_1,
                     &mut f_1 as *mut std::ffi::c_double as *mut std::ffi::c_char,
-                    ::core::mem::size_of::<std::ffi::c_double>() as usize as i32,
+                    size_of::<std::ffi::c_double>() as usize as i32,
                     h.islittle,
                 );
                 b.n = (b.n).wrapping_add(size as size_t);
@@ -25495,7 +25393,7 @@ unsafe extern "C-unwind" fn str_pack(mut L: *mut lua_State) -> i32 {
             6 => {
                 let mut len_0: size_t = 0;
                 let mut s_0: *const std::ffi::c_char = luaL_checklstring(L, arg, &mut len_0);
-                (((size >= ::core::mem::size_of::<size_t>() as usize as i32
+                (((size >= size_of::<size_t>() as usize as i32
                     || len_0 < (1 as i32 as size_t) << size * 8 as i32) as i32
                     != 0) as i32 as std::ffi::c_long
                     != 0
@@ -25564,9 +25462,7 @@ unsafe extern "C-unwind" fn str_packsize(mut L: *mut lua_State) -> i32 {
             || luaL_argerror(L, 1 as i32, c"variable-length format".as_ptr()) != 0) as i32;
         size += ntoalign;
         (((totalsize
-            <= (if (::core::mem::size_of::<size_t>() as usize)
-                < ::core::mem::size_of::<i32>() as usize
-            {
+            <= (if (size_of::<size_t>() as usize) < size_of::<i32>() as usize {
                 !(0 as size_t)
             } else {
                 2147483647 as i32 as size_t
@@ -25589,10 +25485,10 @@ unsafe extern "C-unwind" fn unpackint(
 ) -> lua_Integer {
     let mut res: lua_Unsigned = 0 as lua_Unsigned;
     let mut i: i32 = 0;
-    let mut limit: i32 = if size <= ::core::mem::size_of::<lua_Integer>() as usize as i32 {
+    let mut limit: i32 = if size <= size_of::<lua_Integer>() as usize as i32 {
         size
     } else {
-        ::core::mem::size_of::<lua_Integer>() as usize as i32
+        size_of::<lua_Integer>() as usize as i32
     };
     i = limit - 1 as i32;
     while i >= 0 {
@@ -25607,12 +25503,12 @@ unsafe extern "C-unwind" fn unpackint(
         i -= 1;
         i;
     }
-    if size < ::core::mem::size_of::<lua_Integer>() as usize as i32 {
+    if size < size_of::<lua_Integer>() as usize as i32 {
         if issigned != 0 {
             let mut mask: lua_Unsigned = (1 as i32 as lua_Unsigned) << size * 8 as i32 - 1 as i32;
             res = (res ^ mask).wrapping_sub(mask);
         }
-    } else if size > ::core::mem::size_of::<lua_Integer>() as usize as i32 {
+    } else if size > size_of::<lua_Integer>() as usize as i32 {
         let mut mask_0: i32 = if issigned == 0 || res as lua_Integer >= 0 as lua_Integer {
             0
         } else {
@@ -25686,7 +25582,7 @@ unsafe extern "C-unwind" fn str_unpack(mut L: *mut lua_State) -> i32 {
                 copywithendian(
                     &mut f as *mut std::ffi::c_float as *mut std::ffi::c_char,
                     data.offset(pos as isize),
-                    ::core::mem::size_of::<std::ffi::c_float>() as usize as i32,
+                    size_of::<std::ffi::c_float>() as usize as i32,
                     h.islittle,
                 );
                 lua_pushnumber(L, f as lua_Number);
@@ -25696,7 +25592,7 @@ unsafe extern "C-unwind" fn str_unpack(mut L: *mut lua_State) -> i32 {
                 copywithendian(
                     &mut f_0 as *mut lua_Number as *mut std::ffi::c_char,
                     data.offset(pos as isize),
-                    ::core::mem::size_of::<lua_Number>() as usize as i32,
+                    size_of::<lua_Number>() as usize as i32,
                     h.islittle,
                 );
                 lua_pushnumber(L, f_0);
@@ -25706,7 +25602,7 @@ unsafe extern "C-unwind" fn str_unpack(mut L: *mut lua_State) -> i32 {
                 copywithendian(
                     &mut f_1 as *mut std::ffi::c_double as *mut std::ffi::c_char,
                     data.offset(pos as isize),
-                    ::core::mem::size_of::<std::ffi::c_double>() as usize as i32,
+                    size_of::<std::ffi::c_double>() as usize as i32,
                     h.islittle,
                 );
                 lua_pushnumber(L, f_1);
@@ -25878,8 +25774,8 @@ unsafe extern "C-unwind" fn createmetatable(mut L: *mut lua_State) {
     lua_createtable(
         L,
         0,
-        (::core::mem::size_of::<[luaL_Reg; 10]>() as usize)
-            .wrapping_div(::core::mem::size_of::<luaL_Reg>() as usize)
+        (size_of::<[luaL_Reg; 10]>() as usize)
+            .wrapping_div(size_of::<luaL_Reg>() as usize)
             .wrapping_sub(1) as i32,
     );
     luaL_setfuncs(L, (&raw const stringmetamethods).cast(), 0);
@@ -25896,15 +25792,15 @@ pub unsafe extern "C-unwind" fn luaopen_string(mut L: *mut lua_State) -> i32 {
     luaL_checkversion_(
         L,
         504 as i32 as lua_Number,
-        (::core::mem::size_of::<lua_Integer>() as usize)
+        (size_of::<lua_Integer>() as usize)
             .wrapping_mul(16)
-            .wrapping_add(::core::mem::size_of::<lua_Number>() as usize),
+            .wrapping_add(size_of::<lua_Number>() as usize),
     );
     lua_createtable(
         L,
         0,
-        (::core::mem::size_of::<[luaL_Reg; 18]>() as usize)
-            .wrapping_div(::core::mem::size_of::<luaL_Reg>() as usize)
+        (size_of::<[luaL_Reg; 18]>() as usize)
+            .wrapping_div(size_of::<luaL_Reg>() as usize)
             .wrapping_sub(1) as i32,
     );
     luaL_setfuncs(L, (&raw const strlib).cast(), 0);
@@ -26139,25 +26035,21 @@ unsafe extern "C-unwind" fn l_randomizePivot() -> u32 {
     memcpy(
         buff.as_mut_ptr() as *mut c_void,
         &mut c as *mut clock_t as *const c_void,
-        (::core::mem::size_of::<clock_t>() as usize)
-            .wrapping_div(::core::mem::size_of::<u32>() as usize)
-            .wrapping_mul(::core::mem::size_of::<u32>() as usize),
+        (size_of::<clock_t>() as usize)
+            .wrapping_div(size_of::<u32>() as usize)
+            .wrapping_mul(size_of::<u32>() as usize),
     );
     memcpy(
         buff.as_mut_ptr().offset(
-            (::core::mem::size_of::<clock_t>() as usize)
-                .wrapping_div(::core::mem::size_of::<u32>() as usize) as isize,
+            (size_of::<clock_t>() as usize).wrapping_div(size_of::<u32>() as usize) as isize,
         ) as *mut c_void,
         &mut t as *mut time_t as *const c_void,
-        (::core::mem::size_of::<time_t>() as usize)
-            .wrapping_div(::core::mem::size_of::<u32>() as usize)
-            .wrapping_mul(::core::mem::size_of::<u32>() as usize),
+        (size_of::<time_t>() as usize)
+            .wrapping_div(size_of::<u32>() as usize)
+            .wrapping_mul(size_of::<u32>() as usize),
     );
     i = 0 as u32;
-    while (i as usize)
-        < (::core::mem::size_of::<[u32; 4]>() as usize)
-            .wrapping_div(::core::mem::size_of::<u32>() as usize)
-    {
+    while (i as usize) < (size_of::<[u32; 4]>() as usize).wrapping_div(size_of::<u32>() as usize) {
         rnd = rnd.wrapping_add(buff[i as usize]);
         i = i.wrapping_add(1);
         i;
@@ -26367,15 +26259,15 @@ pub unsafe extern "C-unwind" fn luaopen_table(mut L: *mut lua_State) -> i32 {
     luaL_checkversion_(
         L,
         504 as i32 as lua_Number,
-        (::core::mem::size_of::<lua_Integer>() as usize)
+        (size_of::<lua_Integer>() as usize)
             .wrapping_mul(16)
-            .wrapping_add(::core::mem::size_of::<lua_Number>() as usize),
+            .wrapping_add(size_of::<lua_Number>() as usize),
     );
     lua_createtable(
         L,
         0,
-        (::core::mem::size_of::<[luaL_Reg; 8]>() as usize)
-            .wrapping_div(::core::mem::size_of::<luaL_Reg>() as usize)
+        (size_of::<[luaL_Reg; 8]>() as usize)
+            .wrapping_div(size_of::<luaL_Reg>() as usize)
             .wrapping_sub(1) as i32,
     );
     luaL_setfuncs(L, (&raw const tab_funcs).cast(), 0);
@@ -26705,23 +26597,23 @@ pub unsafe extern "C-unwind" fn luaopen_utf8(mut L: *mut lua_State) -> i32 {
     luaL_checkversion_(
         L,
         504 as i32 as lua_Number,
-        (::core::mem::size_of::<lua_Integer>() as usize)
+        (size_of::<lua_Integer>() as usize)
             .wrapping_mul(16)
-            .wrapping_add(::core::mem::size_of::<lua_Number>() as usize),
+            .wrapping_add(size_of::<lua_Number>() as usize),
     );
     lua_createtable(
         L,
         0,
-        (::core::mem::size_of::<[luaL_Reg; 7]>() as usize)
-            .wrapping_div(::core::mem::size_of::<luaL_Reg>() as usize)
+        (size_of::<[luaL_Reg; 7]>() as usize)
+            .wrapping_div(size_of::<luaL_Reg>() as usize)
             .wrapping_sub(1) as i32,
     );
     luaL_setfuncs(L, (&raw const funcs).cast(), 0);
     lua_pushlstring(
         L,
         b"[\0-\x7F\xC2-\xFD][\x80-\xBF]*\0" as *const u8 as *const std::ffi::c_char,
-        (::core::mem::size_of::<[std::ffi::c_char; 15]>() as usize)
-            .wrapping_div(::core::mem::size_of::<std::ffi::c_char>() as usize)
+        (size_of::<[std::ffi::c_char; 15]>() as usize)
+            .wrapping_div(size_of::<std::ffi::c_char>() as usize)
             .wrapping_sub(1),
     );
     lua_setfield(L, -(2 as i32), c"charpattern".as_ptr());

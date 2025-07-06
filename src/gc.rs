@@ -926,11 +926,7 @@ unsafe extern "C-unwind" fn freeupval(mut L: *mut lua_State, mut uv: *mut UpVal)
     if (*uv).v.p != &mut (*uv).u.value as *mut TValue {
         luaF_unlinkupval(uv);
     }
-    luaM_free_(
-        L,
-        uv as *mut c_void,
-        ::core::mem::size_of::<UpVal>() as usize,
-    );
+    luaM_free_(L, uv as *mut c_void, size_of::<UpVal>() as usize);
 }
 unsafe extern "C-unwind" fn freeobj(mut L: *mut lua_State, mut o: *mut GCObject) {
     match (*o).tt {
@@ -946,8 +942,8 @@ unsafe extern "C-unwind" fn freeobj(mut L: *mut lua_State, mut o: *mut GCObject)
                 L,
                 cl as *mut c_void,
                 (32 as usize as i32
-                    + ::core::mem::size_of::<*mut TValue>() as usize as i32
-                        * (*cl).nupvalues as i32) as size_t,
+                    + size_of::<*mut TValue>() as usize as i32 * (*cl).nupvalues as i32)
+                    as size_t,
             );
         }
         LUA_VCCL => {
@@ -956,7 +952,7 @@ unsafe extern "C-unwind" fn freeobj(mut L: *mut lua_State, mut o: *mut GCObject)
                 L,
                 cl_0 as *mut c_void,
                 (32 as usize as i32
-                    + ::core::mem::size_of::<TValue>() as usize as i32 * (*cl_0).nupvalues as i32)
+                    + size_of::<TValue>() as usize as i32 * (*cl_0).nupvalues as i32)
                     as size_t,
             );
         }
@@ -975,8 +971,7 @@ unsafe extern "C-unwind" fn freeobj(mut L: *mut lua_State, mut o: *mut GCObject)
                     32 as usize
                 } else {
                     (40 as usize).wrapping_add(
-                        (::core::mem::size_of::<UValue>() as usize)
-                            .wrapping_mul((*u).nuvalue as usize),
+                        (size_of::<UValue>() as usize).wrapping_mul((*u).nuvalue as usize),
                     )
                 })
                 .wrapping_add((*u).len),
@@ -990,7 +985,7 @@ unsafe extern "C-unwind" fn freeobj(mut L: *mut lua_State, mut o: *mut GCObject)
                 ts as *mut c_void,
                 (24 as usize).wrapping_add(
                     (((*ts).shrlen as i32 + 1 as i32) as usize)
-                        .wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+                        .wrapping_mul(size_of::<std::ffi::c_char>() as usize),
                 ),
             );
         }
@@ -1002,7 +997,7 @@ unsafe extern "C-unwind" fn freeobj(mut L: *mut lua_State, mut o: *mut GCObject)
                 (24 as usize).wrapping_add(
                     ((*ts_0).u.lnglen)
                         .wrapping_add(1 as i32 as size_t)
-                        .wrapping_mul(::core::mem::size_of::<std::ffi::c_char>() as usize),
+                        .wrapping_mul(size_of::<std::ffi::c_char>() as usize),
                 ),
             );
         }
@@ -1736,15 +1731,15 @@ pub unsafe extern "C-unwind" fn luaC_runtilstate(mut L: *mut lua_State, mut stat
 unsafe extern "C-unwind" fn incstep(mut L: *mut lua_State, mut g: *mut global_State) {
     let mut stepmul: i32 = (*g).gcstepmul as i32 * 4 as i32 | 1 as i32;
     let mut debt: l_mem = ((*g).GCdebt as usize)
-        .wrapping_div(::core::mem::size_of::<TValue>() as usize)
+        .wrapping_div(size_of::<TValue>() as usize)
         .wrapping_mul(stepmul as usize) as l_mem;
     let mut stepsize: l_mem = (if (*g).gcstepsize as usize
-        <= (::core::mem::size_of::<l_mem>() as usize)
+        <= (size_of::<l_mem>() as usize)
             .wrapping_mul(8)
             .wrapping_sub(2)
     {
         (((1 as i32 as l_mem) << (*g).gcstepsize as i32) as usize)
-            .wrapping_div(::core::mem::size_of::<TValue>() as usize)
+            .wrapping_div(size_of::<TValue>() as usize)
             .wrapping_mul(stepmul as usize)
     } else {
         (!(0 as lu_mem) >> 1 as i32) as l_mem as usize
@@ -1759,8 +1754,8 @@ unsafe extern "C-unwind" fn incstep(mut L: *mut lua_State, mut g: *mut global_St
     if (*g).gcstate as i32 == 8 as i32 {
         setpause(g);
     } else {
-        debt = ((debt / stepmul as l_mem) as usize)
-            .wrapping_mul(::core::mem::size_of::<TValue>() as usize) as l_mem;
+        debt = ((debt / stepmul as l_mem) as usize).wrapping_mul(size_of::<TValue>() as usize)
+            as l_mem;
         luaE_setdebt(g, debt);
     };
 }
