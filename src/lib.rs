@@ -39,23 +39,8 @@ unsafe extern "C-unwind" {
     fn flockfile(__stream: *mut FILE);
     fn funlockfile(__stream: *mut FILE);
     fn clock() -> clock_t;
-    fn acos(_: std::ffi::c_double) -> std::ffi::c_double;
-    fn asin(_: std::ffi::c_double) -> std::ffi::c_double;
-    fn atan2(_: std::ffi::c_double, _: std::ffi::c_double) -> std::ffi::c_double;
-    fn cos(_: std::ffi::c_double) -> std::ffi::c_double;
-    fn sin(_: std::ffi::c_double) -> std::ffi::c_double;
-    fn tan(_: std::ffi::c_double) -> std::ffi::c_double;
-    fn exp(_: std::ffi::c_double) -> std::ffi::c_double;
     fn frexp(_: std::ffi::c_double, _: *mut i32) -> std::ffi::c_double;
     fn ldexp(_: std::ffi::c_double, _: i32) -> std::ffi::c_double;
-    fn log(_: std::ffi::c_double) -> std::ffi::c_double;
-    fn log10(_: std::ffi::c_double) -> std::ffi::c_double;
-    fn log2(_: std::ffi::c_double) -> std::ffi::c_double;
-    fn pow(_: std::ffi::c_double, _: std::ffi::c_double) -> std::ffi::c_double;
-    fn sqrt(_: std::ffi::c_double) -> std::ffi::c_double;
-    fn ceil(_: std::ffi::c_double) -> std::ffi::c_double;
-    fn fabs(_: std::ffi::c_double) -> std::ffi::c_double;
-    fn floor(_: std::ffi::c_double) -> std::ffi::c_double;
     fn fmod(_: std::ffi::c_double, _: std::ffi::c_double) -> std::ffi::c_double;
     fn __ctype_b_loc() -> *mut *const u16;
 }
@@ -11808,10 +11793,10 @@ unsafe extern "C-unwind" fn numarith(
             return (if v2 == 2 as i32 as lua_Number {
                 v1 * v1
             } else {
-                pow(v1, v2)
+                v1.powf(v2)
             });
         }
-        6 => return floor(v1 / v2),
+        6 => return (v1 / v2).floor(),
         12 => return -v1,
         3 => return luaV_modf(L, v1, v2),
         _ => return 0 as lua_Number,
@@ -14542,7 +14527,7 @@ pub unsafe extern "C-unwind" fn luaV_flttointeger(
     mut p: *mut lua_Integer,
     mut mode: F2Imod,
 ) -> i32 {
-    let mut f: lua_Number = floor(n);
+    let mut f: lua_Number = n.floor();
     if n != f {
         if mode as u32 == F2Ieq as i32 as u32 {
             return 0;
@@ -17059,7 +17044,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             (*io_14).value_.n = (if n2_3 == 2 as i32 as lua_Number {
                                 n1_3 * n1_3
                             } else {
-                                pow(n1_3, n2_3)
+                                n1_3.powf(n2_3)
                             });
                             (*io_14).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
                         }
@@ -17171,7 +17156,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 pc = pc.offset(1);
                                 pc;
                                 let mut io_17: *mut TValue = &mut (*ra_26).val;
-                                (*io_17).value_.n = floor(n1_5 / n2_5);
+                                (*io_17).value_.n = (n1_5 / n2_5).floor();
                                 (*io_17).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
                             }
                         }
@@ -17659,7 +17644,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             (*io_31).value_.n = (if n2_10 == 2 as i32 as lua_Number {
                                 n1_10 * n1_10
                             } else {
-                                pow(n1_10, n2_10)
+                                n1_10.powf(n2_10)
                             });
                             (*io_31).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
                         }
@@ -17773,7 +17758,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 pc = pc.offset(1);
                                 pc;
                                 let mut io_34: *mut TValue = &mut (*ra_38).val;
-                                (*io_34).value_.n = floor(n1_12 / n2_12);
+                                (*io_34).value_.n = (n1_12 / n2_12).floor();
                                 (*io_34).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
                             }
                         }
@@ -25348,34 +25333,34 @@ unsafe extern "C-unwind" fn math_abs(mut L: *mut lua_State) -> i32 {
         }
         lua_pushinteger(L, n);
     } else {
-        lua_pushnumber(L, fabs(luaL_checknumber(L, 1 as i32)));
+        lua_pushnumber(L, luaL_checknumber(L, 1 as i32).abs());
     }
     return 1 as i32;
 }
 unsafe extern "C-unwind" fn math_sin(mut L: *mut lua_State) -> i32 {
-    lua_pushnumber(L, sin(luaL_checknumber(L, 1 as i32)));
+    lua_pushnumber(L, luaL_checknumber(L, 1 as i32).sin());
     return 1 as i32;
 }
 unsafe extern "C-unwind" fn math_cos(mut L: *mut lua_State) -> i32 {
-    lua_pushnumber(L, cos(luaL_checknumber(L, 1 as i32)));
+    lua_pushnumber(L, luaL_checknumber(L, 1 as i32).cos());
     return 1 as i32;
 }
 unsafe extern "C-unwind" fn math_tan(mut L: *mut lua_State) -> i32 {
-    lua_pushnumber(L, tan(luaL_checknumber(L, 1 as i32)));
+    lua_pushnumber(L, luaL_checknumber(L, 1 as i32).tan());
     return 1 as i32;
 }
 unsafe extern "C-unwind" fn math_asin(mut L: *mut lua_State) -> i32 {
-    lua_pushnumber(L, asin(luaL_checknumber(L, 1 as i32)));
+    lua_pushnumber(L, luaL_checknumber(L, 1 as i32).asin());
     return 1 as i32;
 }
 unsafe extern "C-unwind" fn math_acos(mut L: *mut lua_State) -> i32 {
-    lua_pushnumber(L, acos(luaL_checknumber(L, 1 as i32)));
+    lua_pushnumber(L, luaL_checknumber(L, 1 as i32).acos());
     return 1 as i32;
 }
 unsafe extern "C-unwind" fn math_atan(mut L: *mut lua_State) -> i32 {
     let mut y: lua_Number = luaL_checknumber(L, 1 as i32);
     let mut x: lua_Number = luaL_optnumber(L, 2 as i32, 1 as i32 as lua_Number);
-    lua_pushnumber(L, atan2(y, x));
+    lua_pushnumber(L, y.atan2(x));
     return 1 as i32;
 }
 unsafe extern "C-unwind" fn math_toint(mut L: *mut lua_State) -> i32 {
@@ -25409,7 +25394,7 @@ unsafe extern "C-unwind" fn math_floor(mut L: *mut lua_State) -> i32 {
     if lua_isinteger(L, 1 as i32) != 0 {
         lua_settop(L, 1 as i32);
     } else {
-        let mut d: lua_Number = floor(luaL_checknumber(L, 1 as i32));
+        let mut d: lua_Number = luaL_checknumber(L, 1 as i32).floor();
         pushnumint(L, d);
     }
     return 1 as i32;
@@ -25418,7 +25403,7 @@ unsafe extern "C-unwind" fn math_ceil(mut L: *mut lua_State) -> i32 {
     if lua_isinteger(L, 1 as i32) != 0 {
         lua_settop(L, 1 as i32);
     } else {
-        let mut d: lua_Number = ceil(luaL_checknumber(L, 1 as i32));
+        let mut d: lua_Number = luaL_checknumber(L, 1 as i32).ceil();
         pushnumint(L, d);
     }
     return 1 as i32;
@@ -25448,9 +25433,9 @@ unsafe extern "C-unwind" fn math_modf(mut L: *mut lua_State) -> i32 {
     } else {
         let mut n: lua_Number = luaL_checknumber(L, 1 as i32);
         let mut ip: lua_Number = if n < 0 as lua_Number {
-            ceil(n)
+            n.ceil()
         } else {
-            floor(n)
+            n.floor()
         };
         pushnumint(L, ip);
         lua_pushnumber(L, if n == ip { 0.0f64 } else { n - ip });
@@ -25458,7 +25443,7 @@ unsafe extern "C-unwind" fn math_modf(mut L: *mut lua_State) -> i32 {
     return 2 as i32;
 }
 unsafe extern "C-unwind" fn math_sqrt(mut L: *mut lua_State) -> i32 {
-    lua_pushnumber(L, sqrt(luaL_checknumber(L, 1 as i32)));
+    lua_pushnumber(L, luaL_checknumber(L, 1 as i32).sqrt());
     return 1 as i32;
 }
 unsafe extern "C-unwind" fn math_ult(mut L: *mut lua_State) -> i32 {
@@ -25471,22 +25456,22 @@ unsafe extern "C-unwind" fn math_log(mut L: *mut lua_State) -> i32 {
     let mut x: lua_Number = luaL_checknumber(L, 1 as i32);
     let mut res: lua_Number = 0.;
     if lua_type(L, 2 as i32) <= 0 {
-        res = log(x);
+        res = x.ln();
     } else {
         let mut base: lua_Number = luaL_checknumber(L, 2 as i32);
         if base == 2.0f64 {
-            res = log2(x);
+            res = x.log2();
         } else if base == 10.0f64 {
-            res = log10(x);
+            res = x.log10();
         } else {
-            res = log(x) / log(base);
+            res = x.log(base);
         }
     }
     lua_pushnumber(L, res);
     return 1 as i32;
 }
 unsafe extern "C-unwind" fn math_exp(mut L: *mut lua_State) -> i32 {
-    lua_pushnumber(L, exp(luaL_checknumber(L, 1 as i32)));
+    lua_pushnumber(L, luaL_checknumber(L, 1 as i32).exp());
     return 1 as i32;
 }
 unsafe extern "C-unwind" fn math_deg(mut L: *mut lua_State) -> i32 {
