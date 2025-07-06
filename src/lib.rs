@@ -11915,7 +11915,7 @@ unsafe extern "C-unwind" fn intarith(
     match op {
         0 => return (v1 as lua_Unsigned).wrapping_add(v2 as lua_Unsigned) as lua_Integer,
         1 => return (v1 as lua_Unsigned).wrapping_sub(v2 as lua_Unsigned) as lua_Integer,
-        2 => return (v1 as lua_Unsigned * v2 as lua_Unsigned) as lua_Integer,
+        2 => return ((v1 as lua_Unsigned).wrapping_mul(v2 as lua_Unsigned)) as lua_Integer,
         3 => return luaV_mod(L, v1, v2),
         6 => return luaV_idiv(L, v1, v2),
         7 => return (v1 as lua_Unsigned & v2 as lua_Unsigned) as lua_Integer,
@@ -12190,7 +12190,7 @@ unsafe extern "C-unwind" fn l_str2int(
             & (1 as i32) << 4 as i32
             != 0
         {
-            a = (a * 16 as i32 as lua_Unsigned)
+            a = a.wrapping_mul(16)
                 .wrapping_add(luaO_hexavalue(*s as i32) as lua_Unsigned);
             empty = 0;
             s = s.offset(1);
@@ -17056,7 +17056,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             pc;
                             let mut io_10: *mut TValue = &mut (*ra_22).val;
                             (*io_10).value_.i =
-                                (i1_1 as lua_Unsigned * i2_1 as lua_Unsigned) as lua_Integer;
+                                ((i1_1 as lua_Unsigned).wrapping_mul(i2_1 as lua_Unsigned)) as lua_Integer;
                             (*io_10).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
                         } else {
                             let mut n1_1: lua_Number = 0.;
@@ -17654,7 +17654,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             pc;
                             let mut io_27: *mut TValue = &mut (*ra_34).val;
                             (*io_27).value_.i =
-                                (i1_9 as lua_Unsigned * i2_9 as lua_Unsigned) as lua_Integer;
+                                ((i1_9 as lua_Unsigned).wrapping_mul(i2_9 as lua_Unsigned)) as lua_Integer;
                             (*io_27).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
                         } else {
                             let mut n1_8: lua_Number = 0.;
