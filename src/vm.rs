@@ -1,5 +1,48 @@
 use crate::*;
 
+/// Fast track for 'gettable': if 't' is a table and 't[k]' is present,
+/// return 1 with 'slot' pointing to 't[k]' (position of final result).
+/// Otherwise, return 0 (meaning it will have to check metamethod)
+/// with 'slot' pointing to an empty 't[k]' (if 't' is a table) or NULL
+/// (otherwise). 'f' is the raw get function to use.
+#[inline]
+unsafe fn luaV_fastget<K>(
+    t: *const TValue,
+    k: K,
+    slot: &mut *const TValue,
+    f: impl FnOnce(*mut Table, K) -> *const TValue,
+) -> bool {
+    if tt_is_table(t) {
+        *slot = f((*t).value_.gc.cast(), k);
+        !tt_is_nil(*slot)
+    } else {
+        *slot = ptr::null_mut();
+        false
+    }
+}
+
+/// Special case of 'luaV_fastget' for integers, inlining the fast case
+/// of 'luaH_getint'.
+#[inline]
+unsafe fn luaV_fastgeti(t: *const TValue, k: lua_Integer, slot: &mut *const TValue) -> bool {
+    if tt_is_table(t) {
+        let t = (*t).value_.gc.cast::<Table>();
+
+        // If the index is within the array part of the table, return it.
+        // Else take the slow path through 'luaH_getint'
+        *slot = if (k as lua_Unsigned).wrapping_sub(1) < (*t).alimit as u64 {
+            (*t).array.offset(k.wrapping_sub(1) as isize)
+        } else {
+            luaH_getint(t, k)
+        };
+
+        !tt_is_nil(*slot)
+    } else {
+        *slot = ptr::null_mut();
+        false
+    }
+}
+
 unsafe extern "C-unwind" fn l_strton(mut obj: *const TValue, mut result: *mut TValue) -> i32 {
     if !((*obj).tt_ as i32 & 0xf as i32 == 4 as i32) {
         return 0;
@@ -1316,28 +1359,17 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 .p;
                         let mut rc: *mut TValue = k.add(getarg_c(i) as usize);
                         let mut key: *mut TString = &mut (*((*rc).value_.gc as *mut GCUnion)).ts;
-                        if if !((*upval).tt_ as i32
-                            == 5 as i32 | (0) << 4 as i32 | (1 as i32) << 6 as i32)
-                        {
-                            slot = 0 as *const TValue;
-                            0
+
+                        if luaV_fastget(upval, key, &mut slot, |t, k| luaH_getshortstr(t, k)) {
+                            setobj(ra, slot);
                         } else {
-                            slot = luaH_getshortstr(
-                                &mut (*((*upval).value_.gc as *mut GCUnion)).h,
-                                key,
-                            );
-                            !((*slot).tt_ as i32 & 0xf as i32 == 0) as i32
-                        } != 0
-                        {
-                            let mut io1: *mut TValue = &mut (*ra).val;
-                            let mut io2: *const TValue = slot;
-                            setobj(io1, io2);
-                        } else {
+                            // TODO: Protect macro
                             (*ci).u.l.savedpc = pc;
                             (*L).top.p = (*ci).top.p;
                             luaV_finishget(L, upval, rc, ra, slot);
                             trap = (*ci).u.l.trap;
                         }
+
                         continue;
                     }
                     OP_GETTABLE => {
@@ -1345,47 +1377,15 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         let mut slot: *const TValue = 0 as *const TValue;
                         let mut rb: *mut TValue = &mut (*base.add(getarg_b(i) as usize)).val;
                         let mut rc: *mut TValue = &mut (*base.add(getarg_c(i) as usize)).val;
-                        let mut n: lua_Unsigned = 0;
-                        if if (*rc).tt_ as i32 == 3 as i32 | (0) << 4 as i32 {
-                            n = (*rc).value_.i as lua_Unsigned;
-                            (if !((*rb).tt_ as i32
-                                == 5 as i32 | (0) << 4 as i32 | (1 as i32) << 6 as i32)
-                            {
-                                slot = 0 as *const TValue;
-                                0
-                            } else {
-                                slot = (if n.wrapping_sub(1 as u32 as lua_Unsigned)
-                                    < (*(&mut (*((*rb).value_.gc as *mut GCUnion)).h as *mut Table))
-                                        .alimit
-                                        as lua_Unsigned
-                                {
-                                    &mut *((*(&mut (*((*rb).value_.gc as *mut GCUnion)).h
-                                        as *mut Table))
-                                        .array)
-                                        .offset(n.wrapping_sub(1 as i32 as lua_Unsigned) as isize)
-                                        as *mut TValue
-                                        as *const TValue
-                                } else {
-                                    luaH_getint(
-                                        &mut (*((*rb).value_.gc as *mut GCUnion)).h,
-                                        n as lua_Integer,
-                                    )
-                                });
-                                !((*slot).tt_ as i32 & 0xf as i32 == 0) as i32
-                            })
-                        } else if !((*rb).tt_ as i32
-                            == 5 as i32 | (0) << 4 as i32 | (1 as i32) << 6 as i32)
-                        {
-                            slot = 0 as *const TValue;
-                            0
+
+                        let ok = if tt_is_integer(rc) {
+                            luaV_fastgeti(rb, (*rc).value_.i, &mut slot)
                         } else {
-                            slot = luaH_get(&mut (*((*rb).value_.gc as *mut GCUnion)).h, rc);
-                            !((*slot).tt_ as i32 & 0xf as i32 == 0) as i32
-                        } != 0
-                        {
-                            let mut io1: *mut TValue = &mut (*ra).val;
-                            let mut io2: *const TValue = slot;
-                            setobj(io1, io2);
+                            luaV_fastget(rb, rc, &mut slot, |t, k| luaH_get(t, k))
+                        };
+
+                        if ok {
+                            setobj(ra, slot);
                         } else {
                             (*ci).u.l.savedpc = pc;
                             (*L).top.p = (*ci).top.p;
@@ -1399,33 +1399,8 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         let mut slot: *const TValue = 0 as *const TValue;
                         let mut rb: *mut TValue = &mut (*base.add(getarg_b(i) as usize)).val;
                         let mut c: i32 = getarg_c(i) as i32;
-                        if if !((*rb).tt_ as i32
-                            == 5 as i32 | (0) << 4 as i32 | (1 as i32) << 6 as i32)
-                        {
-                            slot = 0 as *const TValue;
-                            0
-                        } else {
-                            slot = (if (c as lua_Unsigned).wrapping_sub(1 as u32 as lua_Unsigned)
-                                < (*(&mut (*((*rb).value_.gc as *mut GCUnion)).h as *mut Table))
-                                    .alimit as lua_Unsigned
-                            {
-                                &mut *((*(&mut (*((*rb).value_.gc as *mut GCUnion)).h
-                                    as *mut Table))
-                                    .array)
-                                    .offset((c - 1 as i32) as isize)
-                                    as *mut TValue as *const TValue
-                            } else {
-                                luaH_getint(
-                                    &mut (*((*rb).value_.gc as *mut GCUnion)).h,
-                                    c as lua_Integer,
-                                )
-                            });
-                            !((*slot).tt_ as i32 & 0xf as i32 == 0) as i32
-                        } != 0
-                        {
-                            let mut io1: *mut TValue = &mut (*ra).val;
-                            let mut io2: *const TValue = slot;
-                            setobj(io1, io2);
+                        if luaV_fastgeti(rb, c as i64, &mut slot) {
+                            setobj(ra, slot);
                         } else {
                             let mut key_0: TValue = TValue {
                                 value_: Value {
@@ -1433,9 +1408,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 },
                                 tt_: 0,
                             };
-                            let mut io_1: *mut TValue = &mut key_0;
-                            (*io_1).value_.i = c as lua_Integer;
-                            (*io_1).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
+                            setivalue(&raw mut key_0, c as i64);
                             (*ci).u.l.savedpc = pc;
                             (*L).top.p = (*ci).top.p;
                             luaV_finishget(L, rb, &mut key_0, ra, slot);
@@ -1448,24 +1421,12 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         let mut slot: *const TValue = 0 as *const TValue;
                         let mut rb: *mut TValue = &mut (*base.add(getarg_b(i) as usize)).val;
                         let mut rc: *mut TValue = k.add(getarg_c(i) as usize);
-                        let mut key_1: *mut TString = &mut (*((*rc).value_.gc as *mut GCUnion)).ts;
-                        if if !((*rb).tt_ as i32
-                            == 5 as i32 | (0) << 4 as i32 | (1 as i32) << 6 as i32)
-                        {
-                            slot = 0 as *const TValue;
-                            0
+                        let mut key: *mut TString = &mut (*((*rc).value_.gc as *mut GCUnion)).ts;
+
+                        if luaV_fastget(rb, key, &mut slot, |t, k| luaH_getshortstr(t, k)) {
+                            setobj(ra, slot);
                         } else {
-                            slot = luaH_getshortstr(
-                                &mut (*((*rb).value_.gc as *mut GCUnion)).h,
-                                key_1,
-                            );
-                            !((*slot).tt_ as i32 & 0xf as i32 == 0) as i32
-                        } != 0
-                        {
-                            let mut io1: *mut TValue = &mut (*ra).val;
-                            let mut io2: *const TValue = slot;
-                            setobj(io1, io2);
-                        } else {
+                            // TODO: Protect macro
                             (*ci).u.l.savedpc = pc;
                             (*L).top.p = (*ci).top.p;
                             luaV_finishget(L, rb, rc, ra, slot);
