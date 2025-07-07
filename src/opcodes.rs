@@ -120,6 +120,12 @@ const OFFSET_sBx: i32 = (((1 << SIZE_Bx) - 1) >> 1) as i32;
 const OFFSET_sJ: i32 = (((1 << SIZE_sJ) - 1) >> 1) as i32;
 const OFFSET_sC: i32 = (((1 << SIZE_C) - 1) >> 1) as i32;
 
+pub(super) const MAXARG_A: u32 = (1 << SIZE_A) - 1;
+pub(super) const MAXARG_Ax: u32 = (1 << SIZE_Ax) - 1;
+pub(super) const MAXARG_B: u32 = (1 << SIZE_B) - 1;
+pub(super) const MAXARG_Bx: u32 = (1 << SIZE_Bx) - 1;
+pub(super) const MAXARG_C: u32 = (1 << SIZE_C) - 1;
+
 #[inline]
 const fn get<const S: u32, const P: u32>(i: u32) -> u32 {
     (i >> P) & const { !(u32::MAX << S) }
