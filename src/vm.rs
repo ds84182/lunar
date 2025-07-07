@@ -12,8 +12,8 @@ unsafe fn luaV_fastget<K>(
     slot: &mut *const TValue,
     f: impl FnOnce(*mut Table, K) -> *const TValue,
 ) -> bool {
-    if tt_is_table(t) {
-        *slot = f((*t).value_.gc.cast(), k);
+    if let Some(t) = try_hvalue(t) {
+        *slot = f(t.as_ptr(), k);
         !tt_is_nil(*slot)
     } else {
         *slot = ptr::null_mut();
@@ -25,9 +25,8 @@ unsafe fn luaV_fastget<K>(
 /// of 'luaH_getint'.
 #[inline]
 unsafe fn luaV_fastgeti(t: *const TValue, k: lua_Integer, slot: &mut *const TValue) -> bool {
-    if tt_is_table(t) {
-        let t = (*t).value_.gc.cast::<Table>();
-
+    if let Some(t) = try_hvalue(t) {
+        let t = t.as_ptr();
         // If the index is within the array part of the table, return it.
         // Else take the slow path through 'luaH_getint'
         *slot = if (k as lua_Unsigned).wrapping_sub(1) < (*t).alimit as u64 {

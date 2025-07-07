@@ -273,6 +273,27 @@ pub(super) unsafe fn tt_is_table(v: impl TValueFields) -> bool {
     checktag(v, ctb(LUA_VTABLE))
 }
 
+#[inline]
+pub(super) unsafe fn hvalue(v: impl TValueFields) -> *mut Table {
+    debug_assert!(tt_is_table(v));
+    (*v.value()).gc.cast()
+}
+
+#[inline]
+pub(super) unsafe fn try_hvalue(v: impl TValueFields) -> Option<NonNull<Table>> {
+    if tt_is_table(v) {
+        Some(NonNull::new_unchecked((*v.value()).gc.cast()))
+    } else {
+        None
+    }
+}
+
+#[inline]
+pub(super) unsafe fn sethvalue(obj: impl TValueFields, x: *mut Table) {
+    (*obj.value()).gc = x.cast();
+    obj.tt().write(ctb(LUA_VTABLE));
+}
+
 pub(super) const BIT_ISCOLLECTABLE: u8 = 1 << 6;
 
 #[inline]
