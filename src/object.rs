@@ -247,6 +247,8 @@ pub(super) unsafe fn chgivalue(obj: impl TValueFields, x: lua_Integer) {
 pub(super) const LUA_VSHRSTR: u8 = makevariant(LUA_TSTRING, 0);
 pub(super) const LUA_VLNGSTR: u8 = makevariant(LUA_TSTRING, 1);
 
+pub(super) const LUA_VLNGSTR_CTB: u8 = ctb(makevariant(LUA_TSTRING, 1));
+
 #[inline]
 pub(super) unsafe fn tt_is_string(v: impl TValueFields) -> bool {
     checktype(v, LUA_TSTRING as u8)
@@ -302,7 +304,7 @@ pub(super) unsafe fn iscollectable(o: impl TValueFields) -> bool {
 }
 
 #[inline]
-pub(super) fn ctb(t: u8) -> u8 {
+pub(super) const fn ctb(t: u8) -> u8 {
     t | BIT_ISCOLLECTABLE
 }
 
