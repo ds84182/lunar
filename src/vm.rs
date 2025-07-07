@@ -42,6 +42,12 @@ unsafe fn luaV_fastgeti(t: *const TValue, k: lua_Integer, slot: &mut *const TVal
     }
 }
 
+#[inline]
+unsafe fn getupval(cl: *mut LClosure, idx: usize) -> *mut UpVal {
+    // TODO: UB if done by ref (Reading past the end of an array)
+    *(&raw mut (*cl).upvals).cast::<*mut UpVal>().add(idx)
+}
+
 unsafe extern "C-unwind" fn l_strton(mut obj: *const TValue, mut result: *mut TValue) -> i32 {
     if !((*obj).tt_ as i32 & 0xf as i32 == 4 as i32) {
         return 0;
@@ -1330,19 +1336,15 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                     }
                     OP_GETUPVAL => {
                         let mut ra: StkId = base.add(getarg_a(i) as usize);
-                        let mut b = getarg_b(i);
+                        let mut uv = getupval(cl, getarg_b(i) as usize);
                         let mut io1: *mut TValue = &mut (*ra).val;
-                        // TODO: UB if done by ref (Reading past the end of an array)
-                        let mut io2: *const TValue =
-                            (**((*cl).upvals).as_mut_ptr().add(b as usize)).v.p;
+                        let mut io2: *const TValue = (*uv).v.p;
                         setobj(io1, io2);
                         continue;
                     }
                     OP_SETUPVAL => {
                         let mut ra: StkId = base.add(getarg_a(i) as usize);
-                        // TODO: UB if done by ref (Reading past the end of an array)
-                        let mut uv: *mut UpVal =
-                            *((*cl).upvals).as_mut_ptr().add(getarg_b(i) as usize);
+                        let mut uv: *mut UpVal = getupval(cl, getarg_b(i) as usize);
                         let mut io1: *mut TValue = (*uv).v.p;
                         let mut io2: *const TValue = &mut (*ra).val;
                         setobj(io1, io2);
@@ -1352,10 +1354,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                     OP_GETTABUP => {
                         let mut ra: StkId = base.add(getarg_a(i) as usize);
                         let mut slot: *const TValue = 0 as *const TValue;
-                        let mut upval: *mut TValue =
-                            (**((*cl).upvals).as_mut_ptr().add(getarg_b(i) as usize))
-                                .v
-                                .p;
+                        let mut upval: *mut TValue = (*getupval(cl, getarg_b(i) as usize)).v.p;
                         let mut rc: *mut TValue = k.add(getarg_c(i) as usize);
                         let mut key: *mut TString = &mut (*((*rc).value_.gc as *mut GCUnion)).ts;
 
@@ -1435,10 +1434,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                     }
                     OP_SETTABUP => {
                         let mut slot: *const TValue = 0 as *const TValue;
-                        let mut upval: *mut TValue =
-                            (**((*cl).upvals).as_mut_ptr().add(getarg_a(i) as usize))
-                                .v
-                                .p;
+                        let mut upval: *mut TValue = (*getupval(cl, getarg_a(i) as usize)).v.p;
                         let mut rb: *mut TValue = k.add(getarg_b(i) as usize);
                         let c = getarg_c(i) as usize;
                         let mut rc: *mut TValue = if getarg_k(i) {
