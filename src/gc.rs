@@ -29,7 +29,7 @@ unsafe fn keep_invariant(g: *mut global_State) -> bool {
 
 #[inline]
 fn resetbits(x: &mut u8, m: u8) {
-    *x &= m;
+    *x &= !m;
 }
 
 #[inline]
@@ -106,6 +106,10 @@ unsafe fn to_finalize(x: *mut GCObject) -> bool {
     testbit::<FINALIZEDBIT>((*x).marked)
 }
 
+unsafe fn luaC_white(g: *mut global_State) -> u8 {
+    (*g).currentwhite & WHITEBITS
+}
+
 // Object age in generational mode
 const G_NEW: u8 = 0;
 const G_SURVIVAL: u8 = 1;
@@ -116,6 +120,55 @@ const G_TOUCHED1: u8 = 5;
 const G_TOUCHED2: u8 = 6;
 
 const AGEBITS: u8 = 7;
+
+const MASKCOLORS: u8 = bitmask(BLACKBIT) | WHITEBITS;
+const MASKGCBITS: u8 = MASKCOLORS | AGEBITS;
+
+/// erase all color bits then set only the current white bit
+#[inline]
+unsafe fn makewhite(g: *mut global_State, x: *mut GCObject) {
+    (*x).marked = ((*x).marked & !MASKCOLORS) | luaC_white(g);
+}
+
+/// make an object gray (neither white nor black)
+#[inline]
+unsafe fn set2gray(x: *mut GCObject) {
+    resetbits(&mut (*x).marked, MASKCOLORS);
+}
+
+/// make an object black (coming from any color)
+#[inline]
+unsafe fn set2black(x: *mut GCObject) {
+    (*x).marked = ((*x).marked & !WHITEBITS) | const { bitmask(BLACKBIT) };
+}
+
+#[inline]
+unsafe fn valiswhite(x: impl TValueFields) -> bool {
+    iscollectable(x) && is_white((*x.value()).gc)
+}
+
+#[inline]
+unsafe fn try_gcvalue(x: impl TValueFields) -> Option<NonNull<GCObject>> {
+    if iscollectable(x) {
+        Some(unsafe { NonNull::new_unchecked((*x.value()).gc) })
+    } else {
+        None
+    }
+}
+
+#[inline]
+unsafe fn markvalue(g: *mut global_State, o: impl TValueFields) {
+    if valiswhite(o) {
+        reallymarkobject(g, (*o.value()).gc);
+    }
+}
+
+#[inline]
+unsafe fn markobject(g: *mut global_State, t: *mut GCObject) {
+    if is_white(t) {
+        reallymarkobject(g, t);
+    }
+}
 
 #[inline]
 pub(super) unsafe fn luaC_objbarrier(L: *mut lua_State, p: *mut GCObject, o: *mut GCObject) {
@@ -179,27 +232,38 @@ unsafe extern "C-unwind" fn linkgclist_(
 ) {
     *pnext = *list;
     *list = o;
-    (*o).marked = ((*o).marked as i32
-        & !((1 as i32) << 5 as i32 | ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)) as lu_byte
-            as i32) as lu_byte;
+    set2gray(o);
 }
+
+/// Clear keys for empty entries in tables. If entry is empty, mark its
+/// entry as dead. This allows the collectio nof the key, but keeps its
+/// entry in the table: its removal could break a chain and could break
+/// a table traversal. Other places never manipulate dead keys, because
+/// its associated empty value is enough to signal that the entry is
+/// logically empty.
 unsafe extern "C-unwind" fn clearkey(mut n: *mut Node) {
-    if (*n).u.key_tt as i32 & (1 as i32) << 6 as i32 != 0 {
-        (*n).u.key_tt = (9 as i32 + 2 as i32) as lu_byte;
+    if iscollectable(KeyTV(n)) {
+        setdeadkey(n)
     }
 }
+
+/// Tells whether a key or value can be cleared from a weak
+/// table. Non-collectable objects are never removed from weak
+/// tables. Strings behave as 'values', so are never removed too. For
+/// other objects: if really collected, cannot keep them; for objects
+/// being finalized, keep them in keys, but not in values.
 unsafe extern "C-unwind" fn iscleared(mut g: *mut global_State, mut o: *const GCObject) -> i32 {
     if o.is_null() {
         return 0;
-    } else if (*o).tt as i32 & 0xf as i32 == 4 as i32 {
-        if (*o).marked as i32 & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32) != 0 {
-            reallymarkobject(g, &mut (*(o as *mut GCUnion)).gc);
-        }
+    } else if novariant((*o).tt) == LUA_TSTRING as u8 {
+        // strings are 'values', so are never weak
+        markobject(g, o.cast_mut());
         return 0;
     } else {
         return (*o).marked as i32 & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32);
     };
 }
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaC_barrier_(
     mut L: *mut lua_State,
@@ -209,16 +273,17 @@ pub unsafe extern "C-unwind" fn luaC_barrier_(
     let mut g: *mut global_State = (*L).l_G;
     if keep_invariant(g) {
         reallymarkobject(g, v);
+        // if is_old(o) {
+        //   setage(v, G_OLD0)
+        // }
         if (*o).marked as i32 & 7 as i32 > 1 as i32 {
             (*v).marked = ((*v).marked as i32 & !(7 as i32) | 2 as i32) as lu_byte;
         }
     } else if (*g).gckind as i32 == 0 {
-        (*o).marked = ((*o).marked as i32
-            & !((1 as i32) << 5 as i32 | ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32))
-            | ((*g).currentwhite as i32 & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32))
-                as lu_byte as i32) as lu_byte;
+        makewhite(g, o);
     }
 }
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaC_barrierback_(mut L: *mut lua_State, mut o: *mut GCObject) {
     let mut g: *mut global_State = (*L).l_G;
@@ -237,17 +302,20 @@ pub unsafe extern "C-unwind" fn luaC_barrierback_(mut L: *mut lua_State, mut o: 
         (*o).marked = ((*o).marked as i32 & !(7 as i32) | 5 as i32) as lu_byte;
     }
 }
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaC_fix(mut L: *mut lua_State, mut o: *mut GCObject) {
     let mut g: *mut global_State = (*L).l_G;
-    (*o).marked = ((*o).marked as i32
-        & !((1 as i32) << 5 as i32 | ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)) as lu_byte
-            as i32) as lu_byte;
+    set2gray(o);
+    // setage(o, G_OLD);
     (*o).marked = ((*o).marked as i32 & !(7 as i32) | 4 as i32) as lu_byte;
     (*g).allgc = (*o).next;
     (*o).next = (*g).fixedgc;
     (*g).fixedgc = o;
 }
+
+/// Create a new collectable object (with given type, size, and offset)
+/// and link it to 'allgc' list.
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaC_newobjdt(
     mut L: *mut lua_State,
@@ -257,75 +325,61 @@ pub unsafe extern "C-unwind" fn luaC_newobjdt(
 ) -> *mut GCObject {
     let mut g: *mut global_State = (*L).l_G;
     let mut p: *mut std::ffi::c_char =
-        luaM_malloc_(L, sz, tt & 0xf as i32) as *mut std::ffi::c_char;
-    let mut o: *mut GCObject = p.offset(offset as isize) as *mut GCObject;
-    (*o).marked =
-        ((*g).currentwhite as i32 & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)) as lu_byte;
+        luaM_malloc_(L, sz, novariant(tt as u8) as i32) as *mut std::ffi::c_char;
+    let mut o: *mut GCObject = p.add(offset) as *mut GCObject;
+    (*o).marked = luaC_white(g);
     (*o).tt = tt as lu_byte;
     (*o).next = (*g).allgc;
     (*g).allgc = o;
     return o;
 }
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaC_newobj(
     mut L: *mut lua_State,
     mut tt: i32,
     mut sz: size_t,
 ) -> *mut GCObject {
-    return luaC_newobjdt(L, tt, sz, 0 as size_t);
+    return luaC_newobjdt(L, tt, sz, 0);
 }
+
+/// Mark an object. Userdata with no user values, string, and closed
+/// upvalues are visited and turned black here. Open upvalues are
+/// already indirectly linked through their respective threads in the
+/// 'twups' list, so they don't go to the gray list; nevertheless, they
+/// are kept gray to avoid barriers, as their values will be revisited
+/// by the thread or by 'remarkupvals'. Other objects are added to the
+/// gray list to be visited (and turned black) later. Both userdata and
+/// upvalues can call this function recursively, but this recursion goes
+/// for at most two levels: An upvalue cannot refer to another upvalue
+/// (only closures can), and a userdata's metatable must be a table.
 unsafe extern "C-unwind" fn reallymarkobject(mut g: *mut global_State, mut o: *mut GCObject) {
     let mut current_block_18: u64;
     match (*o).tt {
         LUA_VSHRSTR | LUA_VLNGSTR => {
             (*o).marked = ((*o).marked as i32 & !((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
                 | (1 as i32) << 5 as i32) as lu_byte;
+            // Nothing to visit
+            set2black(o);
             current_block_18 = 18317007320854588510;
         }
         LUA_VUPVAL => {
             let mut uv: *mut UpVal = &mut (*(o as *mut GCUnion)).upv;
             if (*uv).v.p != &mut (*uv).u.value as *mut TValue {
-                (*uv).marked = ((*uv).marked as i32
-                    & !((1 as i32) << 5 as i32 | ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32))
-                        as lu_byte as i32) as lu_byte;
+                set2gray(uv.cast());
             } else {
-                (*uv).marked = ((*uv).marked as i32
-                    & !((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
-                    | (1 as i32) << 5 as i32) as lu_byte;
+                set2black(uv.cast());
             }
-            if (*(*uv).v.p).tt_ as i32 & (1 as i32) << 6 as i32 == 0
-                || (*(*uv).v.p).tt_ as i32 & 0x3f as i32 == (*(*(*uv).v.p).value_.gc).tt as i32
-                    && (((*g).mainthread).is_null()
-                        || (*(*(*uv).v.p).value_.gc).marked as i32
-                            & ((*(*(*g).mainthread).l_G).currentwhite as i32
-                                ^ ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32))
-                            == 0)
-            {
-            } else {
-            };
-            if (*(*uv).v.p).tt_ as i32 & (1 as i32) << 6 as i32 != 0
-                && (*(*(*uv).v.p).value_.gc).marked as i32
-                    & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
-                    != 0
-            {
-                reallymarkobject(g, (*(*uv).v.p).value_.gc);
-            }
+            markvalue(g, (*uv).v.p);
             current_block_18 = 18317007320854588510;
         }
         LUA_VUSERDATA => {
             let mut u: *mut Udata = &mut (*(o as *mut GCUnion)).u;
             if (*u).nuvalue as i32 == 0 {
                 if !((*u).metatable).is_null() {
-                    if (*(*u).metatable).marked as i32
-                        & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
-                        != 0
-                    {
-                        reallymarkobject(g, &mut (*((*u).metatable as *mut GCUnion)).gc);
-                    }
+                    markobject(g, (*u).metatable.cast());
                 }
-                (*u).marked = ((*u).marked as i32
-                    & !((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
-                    | (1 as i32) << 5 as i32) as lu_byte;
+                set2black(u.cast());
                 current_block_18 = 18317007320854588510;
             } else {
                 current_block_18 = 15904375183555213903;
@@ -345,42 +399,46 @@ unsafe extern "C-unwind" fn reallymarkobject(mut g: *mut global_State, mut o: *m
         _ => {}
     };
 }
+
+/// Mark metamethods for basic types.
 unsafe extern "C-unwind" fn markmt(mut g: *mut global_State) {
     let mut i: i32 = 0;
     i = 0;
     while i < 9 as i32 {
-        if !((*g).mt[i as usize]).is_null() {
-            if (*(*g).mt[i as usize]).marked as i32
-                & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
-                != 0
-            {
-                reallymarkobject(
-                    g,
-                    &mut (*(*((*g).mt).as_mut_ptr().offset(i as isize) as *mut GCUnion)).gc,
-                );
-            }
+        let o = (*g).mt[i as usize];
+        if !o.is_null() {
+            markobject(g, o.cast());
         }
         i += 1;
-        i;
     }
 }
+
+/// Mark all objects in list of being-finalized.
 unsafe extern "C-unwind" fn markbeingfnz(mut g: *mut global_State) -> lu_mem {
     let mut o: *mut GCObject = 0 as *mut GCObject;
     let mut count: lu_mem = 0 as lu_mem;
     o = (*g).tobefnz;
     while !o.is_null() {
         count = count.wrapping_add(1);
-        count;
-        if (*o).marked as i32 & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32) != 0 {
-            reallymarkobject(g, &mut (*(o as *mut GCUnion)).gc);
-        }
+        markobject(g, o);
         o = (*o).next;
     }
     return count;
 }
+
+/// For each non-marked thread, simulates a barrier between each open
+/// upvalue and its value. (If the thread is collected, the value will be
+/// assigned to the upvalue, but then it can be too late for the barrier
+/// to act. The "barrier" does not need to check colors: A non-marked
+/// thread must be young; upvalues cannot be older than their threads; so
+/// any visited upvalue must be young too.) Also removes the thread from
+/// the list, as it was already visited. Removes also threads with no
+/// upvalues, as they have nothing to be checked. (If the thread gets an
+/// upvalue later, it will be linked in the list again.)
 unsafe extern "C-unwind" fn remarkupvals(mut g: *mut global_State) -> i32 {
     let mut thread: *mut lua_State = 0 as *mut lua_State;
     let mut p: *mut *mut lua_State = &mut (*g).twups;
+    // estimate of how much work was done here
     let mut work: i32 = 0;
     loop {
         thread = *p;
@@ -388,38 +446,20 @@ unsafe extern "C-unwind" fn remarkupvals(mut g: *mut global_State) -> i32 {
             break;
         }
         work += 1;
-        work;
-        if (*thread).marked as i32 & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32) == 0
-            && !((*thread).openupval).is_null()
-        {
+        if !is_white(thread.cast()) && !((*thread).openupval).is_null() {
+            // keep marked thread with upvalues in the list
             p = &mut (*thread).twups;
         } else {
+            // thread is not marked or without upvalues
             let mut uv: *mut UpVal = 0 as *mut UpVal;
             *p = (*thread).twups;
             (*thread).twups = thread;
             uv = (*thread).openupval;
             while !uv.is_null() {
                 work += 1;
-                work;
-                if (*uv).marked as i32 & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32) == 0 {
-                    if (*(*uv).v.p).tt_ as i32 & (1 as i32) << 6 as i32 == 0
-                        || (*(*uv).v.p).tt_ as i32 & 0x3f as i32
-                            == (*(*(*uv).v.p).value_.gc).tt as i32
-                            && (((*g).mainthread).is_null()
-                                || (*(*(*uv).v.p).value_.gc).marked as i32
-                                    & ((*(*(*g).mainthread).l_G).currentwhite as i32
-                                        ^ ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32))
-                                    == 0)
-                    {
-                    } else {
-                    };
-                    if (*(*uv).v.p).tt_ as i32 & (1 as i32) << 6 as i32 != 0
-                        && (*(*(*uv).v.p).value_.gc).marked as i32
-                            & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
-                            != 0
-                    {
-                        reallymarkobject(g, (*(*uv).v.p).value_.gc);
-                    }
+                if !is_white(uv.cast()) {
+                    // upvalue already visited?
+                    markvalue(g, (*uv).v.p); // mark its value
                 }
                 uv = (*uv).u.open.next;
             }
@@ -427,6 +467,7 @@ unsafe extern "C-unwind" fn remarkupvals(mut g: *mut global_State) -> i32 {
     }
     return work;
 }
+
 unsafe extern "C-unwind" fn cleargraylists(mut g: *mut global_State) {
     (*g).grayagain = 0 as *mut GCObject;
     (*g).gray = (*g).grayagain;
@@ -434,31 +475,16 @@ unsafe extern "C-unwind" fn cleargraylists(mut g: *mut global_State) {
     (*g).allweak = (*g).ephemeron;
     (*g).weak = (*g).allweak;
 }
+
+/// Mark root set and reset all gray lists, to start a new collection.
 unsafe extern "C-unwind" fn restartcollection(mut g: *mut global_State) {
     cleargraylists(g);
-    if (*(*g).mainthread).marked as i32 & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32) != 0 {
-        reallymarkobject(g, &mut (*((*g).mainthread as *mut GCUnion)).gc);
-    }
-    if (*g).l_registry.tt_ as i32 & (1 as i32) << 6 as i32 == 0
-        || (*g).l_registry.tt_ as i32 & 0x3f as i32 == (*(*g).l_registry.value_.gc).tt as i32
-            && (((*g).mainthread).is_null()
-                || (*(*g).l_registry.value_.gc).marked as i32
-                    & ((*(*(*g).mainthread).l_G).currentwhite as i32
-                        ^ ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32))
-                    == 0)
-    {
-    } else {
-    };
-    if (*g).l_registry.tt_ as i32 & (1 as i32) << 6 as i32 != 0
-        && (*(*g).l_registry.value_.gc).marked as i32
-            & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
-            != 0
-    {
-        reallymarkobject(g, (*g).l_registry.value_.gc);
-    }
+    markobject(g, (*g).mainthread.cast());
+    markvalue(g, &raw mut (*g).l_registry);
     markmt(g);
-    markbeingfnz(g);
+    markbeingfnz(g); // mark any finalizing object left from previous cycle
 }
+
 unsafe extern "C-unwind" fn genlink(mut g: *mut global_State, mut o: *mut GCObject) {
     if (*o).marked as i32 & 7 as i32 == 5 as i32 {
         linkgclist_(

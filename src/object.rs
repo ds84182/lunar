@@ -2,11 +2,11 @@ use std::mem::offset_of;
 
 use super::*;
 
-pub(super) const LUA_TUPVAL: i8 = LUA_NUMTYPES;
-pub(super) const LUA_TPROTO: i8 = LUA_NUMTYPES + 1;
-pub(super) const LUA_TDEADKEY: i8 = LUA_NUMTYPES + 2;
+pub(super) const LUA_TUPVAL: u8 = LUA_NUMTYPES as u8;
+pub(super) const LUA_TPROTO: u8 = LUA_NUMTYPES as u8 + 1;
+pub(super) const LUA_TDEADKEY: u8 = LUA_NUMTYPES as u8 + 2;
 
-pub(super) const LUA_TOTALTYPES: i8 = LUA_TPROTO + 2;
+pub(super) const LUA_TOTALTYPES: u8 = LUA_TPROTO + 2;
 
 pub(super) trait TValueFields: Copy {
     unsafe fn value(self) -> *mut Value;
@@ -70,6 +70,33 @@ impl TValueFields for *mut NodeKey {
     #[inline]
     unsafe fn tt(self) -> *mut u8 {
         unsafe { self.byte_add(offset_of!(NodeKey, tt_)).cast() }
+    }
+}
+
+#[derive(Copy, Clone)]
+pub(super) struct KeyTV<T>(pub(super) T);
+
+impl TValueFields for KeyTV<*mut NodeKey> {
+    #[inline]
+    unsafe fn value(self) -> *mut Value {
+        &raw mut (*self.0).key_val
+    }
+
+    #[inline]
+    unsafe fn tt(self) -> *mut u8 {
+        &raw mut (*self.0).key_tt
+    }
+}
+
+impl TValueFields for KeyTV<*mut Node> {
+    #[inline]
+    unsafe fn value(self) -> *mut Value {
+        &raw mut (*self.0).u.key_val
+    }
+
+    #[inline]
+    unsafe fn tt(self) -> *mut u8 {
+        &raw mut (*self.0).u.key_tt
     }
 }
 
@@ -257,9 +284,9 @@ pub(super) unsafe fn tt_is_string(v: impl TValueFields) -> bool {
 pub(super) const LUA_VLIGHTUSERDATA: u8 = makevariant(LUA_TLIGHTUSERDATA, 0);
 pub(super) const LUA_VUSERDATA: u8 = makevariant(LUA_TUSERDATA, 0);
 
-pub(super) const LUA_VPROTO: u8 = makevariant(LUA_TPROTO, 0);
+pub(super) const LUA_VPROTO: u8 = makevariant(LUA_TPROTO as i8, 0);
 
-pub(super) const LUA_VUPVAL: u8 = makevariant(LUA_TUPVAL, 0);
+pub(super) const LUA_VUPVAL: u8 = makevariant(LUA_TUPVAL as i8, 0);
 
 /// Lua closure
 pub(super) const LUA_VLCL: u8 = makevariant(LUA_TFUNCTION, 0);
@@ -294,6 +321,26 @@ pub(super) unsafe fn try_hvalue(v: impl TValueFields) -> Option<NonNull<Table>> 
 pub(super) unsafe fn sethvalue(obj: impl TValueFields, x: *mut Table) {
     (*obj.value()).gc = x.cast();
     obj.tt().write(ctb(LUA_VTABLE));
+}
+
+#[inline]
+pub(super) unsafe fn setnodekey(node: *mut Node, val: impl TValueFields) {
+    setobj(KeyTV(node), val);
+}
+
+#[inline]
+pub(super) unsafe fn getnodekey(val: impl TValueFields, node: *const Node) {
+    setobj(val, KeyTV(node.cast_mut()));
+}
+
+#[inline]
+pub(super) unsafe fn setdeadkey(node: *mut Node) {
+    *KeyTV(node).tt() = LUA_TDEADKEY;
+}
+
+#[inline]
+pub(super) unsafe fn keyisdead(node: *mut Node) -> bool {
+    *KeyTV(node).tt() == LUA_TDEADKEY
 }
 
 pub(super) const BIT_ISCOLLECTABLE: u8 = 1 << 6;
