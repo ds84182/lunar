@@ -210,7 +210,6 @@ pub unsafe extern "C-unwind" fn luaD_reallocstack(
     while i < newsize + 5 as i32 {
         (*newstack.offset(i as isize)).val.tt_ = (0 | (0) << 4 as i32) as lu_byte;
         i += 1;
-        i;
     }
     return 1 as i32;
 }
@@ -440,7 +439,6 @@ unsafe extern "C-unwind" fn tryfuncTM(mut L: *mut lua_State, mut func: StkId) ->
         } else {
         };
         p = p.offset(-1);
-        p;
     }
     (*L).top.p = ((*L).top.p).offset(1);
     (*L).top.p;
@@ -482,16 +480,6 @@ unsafe extern "C-unwind" fn moveresults(
                 let mut io2: *const TValue = &mut (*((*L).top.p).offset(-(nres as isize))).val;
                 (*io1).value_ = (*io2).value_;
                 (*io1).tt_ = (*io2).tt_;
-                if (*io1).tt_ as i32 & (1 as i32) << 6 as i32 == 0
-                    || (*io1).tt_ as i32 & 0x3f as i32 == (*(*io1).value_.gc).tt as i32
-                        && (L.is_null()
-                            || (*(*io1).value_.gc).marked as i32
-                                & ((*(*L).l_G).currentwhite as i32
-                                    ^ ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32))
-                                == 0)
-                {
-                } else {
-                };
             }
             (*L).top.p = res.offset(1);
             return;
@@ -531,23 +519,11 @@ unsafe extern "C-unwind" fn moveresults(
         let mut io2_0: *const TValue = &mut (*firstresult.offset(i as isize)).val;
         (*io1_0).value_ = (*io2_0).value_;
         (*io1_0).tt_ = (*io2_0).tt_;
-        if (*io1_0).tt_ as i32 & (1 as i32) << 6 as i32 == 0
-            || (*io1_0).tt_ as i32 & 0x3f as i32 == (*(*io1_0).value_.gc).tt as i32
-                && (L.is_null()
-                    || (*(*io1_0).value_.gc).marked as i32
-                        & ((*(*L).l_G).currentwhite as i32
-                            ^ ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32))
-                        == 0)
-        {
-        } else {
-        };
         i += 1;
-        i;
     }
     while i < wanted {
         (*res.offset(i as isize)).val.tt_ = (0 | (0) << 4 as i32) as lu_byte;
         i += 1;
-        i;
     }
     (*L).top.p = res.offset(wanted as isize);
 }
@@ -667,24 +643,12 @@ pub unsafe extern "C-unwind" fn luaD_pretailcall(
                     let mut io2: *const TValue = &mut (*func.offset(i as isize)).val;
                     (*io1).value_ = (*io2).value_;
                     (*io1).tt_ = (*io2).tt_;
-                    if (*io1).tt_ as i32 & (1 as i32) << 6 as i32 == 0
-                        || (*io1).tt_ as i32 & 0x3f as i32 == (*(*io1).value_.gc).tt as i32
-                            && (L.is_null()
-                                || (*(*io1).value_.gc).marked as i32
-                                    & ((*(*L).l_G).currentwhite as i32
-                                        ^ ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32))
-                                    == 0)
-                    {
-                    } else {
-                    };
                     i += 1;
-                    i;
                 }
                 func = (*ci).func.p;
                 while narg1 <= nfixparams {
                     (*func.offset(narg1 as isize)).val.tt_ = (0 | (0) << 4 as i32) as lu_byte;
                     narg1 += 1;
-                    narg1;
                 }
                 (*ci).top.p = func.offset(1).offset(fsize as isize);
                 (*ci).u.l.savedpc = (*p).code;
@@ -695,7 +659,6 @@ pub unsafe extern "C-unwind" fn luaD_pretailcall(
             _ => {
                 func = tryfuncTM(L, func);
                 narg1 += 1;
-                narg1;
             }
         }
     }
@@ -749,7 +712,6 @@ pub unsafe extern "C-unwind" fn luaD_precall(
                     (*L).top.p = ((*L).top.p).offset(1);
                     (*fresh129).val.tt_ = (0 | (0) << 4 as i32) as lu_byte;
                     narg += 1;
-                    narg;
                 }
                 return ci;
             }
@@ -877,16 +839,6 @@ unsafe extern "C-unwind" fn resume_error(
     let mut x_: *mut TString = luaS_new(L, msg);
     (*io).value_.gc = &mut (*(x_ as *mut GCUnion)).gc;
     (*io).tt_ = ((*x_).tt as i32 | (1 as i32) << 6 as i32) as lu_byte;
-    if (*io).tt_ as i32 & (1 as i32) << 6 as i32 == 0
-        || (*io).tt_ as i32 & 0x3f as i32 == (*(*io).value_.gc).tt as i32
-            && (L.is_null()
-                || (*(*io).value_.gc).marked as i32
-                    & ((*(*L).l_G).currentwhite as i32
-                        ^ ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32))
-                    == 0)
-    {
-    } else {
-    };
     (*L).top.p = ((*L).top.p).offset(1);
     (*L).top.p;
     return 2 as i32;
