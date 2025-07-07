@@ -10,3 +10,4 @@ path = "src/lua.rs"
 [dependencies]
 c2rust-bitfields = { git = "https://github.com/immunant/c2rust.git", rev = "e56acbc" }
 libc = "0.2.174"
+talc = "4.4.3"

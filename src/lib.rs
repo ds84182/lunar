@@ -27,7 +27,10 @@ use libc::{
     strcoll, strcpy, strerror, strftime, strlen, strncmp, strpbrk, strspn, strstr, strtod, system,
     time, tm, tmpfile, tolower, toupper, ungetc,
 };
-use std::{ffi::c_void, ptr};
+use std::{
+    ffi::c_void,
+    ptr::{self, NonNull},
+};
 
 use gc::*;
 use ldo::*;
@@ -14175,17 +14178,83 @@ unsafe extern "C-unwind" fn warnfon(
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaL_newstate() -> *mut lua_State {
+    // TODO: Track allocated blocks, free them on drop/no longer used
+    struct AllocOom;
+
+    impl talc::OomHandler for AllocOom {
+        fn handle_oom(talc: &mut talc::Talc<Self>, layout: std::alloc::Layout) -> Result<(), ()> {
+            const BLOCK_SIZE: usize = 4; // Multiplied by BLOCK_ALIGN bytes
+            const BLOCK_ALIGN: usize = 4096;
+
+            let mut min_size = BLOCK_SIZE * BLOCK_ALIGN;
+            while min_size <= layout.pad_to_align().size() {
+                min_size *= 2;
+            }
+            let mut min_align = BLOCK_ALIGN.max(layout.align());
+
+            let ptr = unsafe {
+                std::alloc::alloc(std::alloc::Layout::from_size_align_unchecked(
+                    min_size, min_align,
+                ))
+            };
+
+            if ptr.is_null() {
+                return Err(());
+            }
+
+            unsafe { talc.claim(talc::Span::from_base_size(ptr, min_size))? };
+
+            Ok(())
+        }
+    }
+
+    unsafe extern "C-unwind" fn alloc_talc(
+        ud: *mut c_void,
+        ptr: *mut c_void,
+        osize: usize,
+        nsize: usize,
+    ) -> *mut c_void {
+        let talc = &mut *ud.cast::<talc::Talc<AllocOom>>();
+        if nsize == 0 {
+            if !ptr.is_null() {
+                talc.free(
+                    NonNull::new_unchecked(ptr.cast()),
+                    std::alloc::Layout::from_size_align_unchecked(osize, 8),
+                );
+            }
+            ptr::null_mut()
+        } else {
+            let ptr = if ptr.is_null() {
+                let layout = std::alloc::Layout::from_size_align_unchecked(nsize, 8);
+                talc.malloc(layout)
+            } else {
+                let layout = std::alloc::Layout::from_size_align_unchecked(osize, 8);
+                talc.grow(NonNull::new_unchecked(ptr.cast()), layout, nsize)
+            };
+
+            let Ok(ptr) = ptr else {
+                return ptr::null_mut();
+            };
+            ptr.as_ptr().cast()
+        }
+    }
+
+    // TODO: Drop allocator on lua_close. Somehow.
+    let mut talc = Box::new(talc::Talc::new(AllocOom));
+
     let mut L: *mut lua_State = lua_newstate(
-        Some(
-            l_alloc
-                as unsafe extern "C-unwind" fn(
-                    *mut c_void,
-                    *mut c_void,
-                    size_t,
-                    size_t,
-                ) -> *mut c_void,
-        ),
-        0 as *mut c_void,
+        // Some(
+        //     l_alloc
+        //         as unsafe extern "C-unwind" fn(
+        //             *mut c_void,
+        //             *mut c_void,
+        //             size_t,
+        //             size_t,
+        //         ) -> *mut c_void,
+        // ),
+        // 0 as *mut c_void,
+        Some(alloc_talc),
+        Box::into_raw(talc) as *mut c_void,
     );
     if (L != 0 as *mut lua_State) as i32 as std::ffi::c_long != 0 {
         lua_atpanic(
