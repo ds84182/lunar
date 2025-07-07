@@ -14178,8 +14178,19 @@ unsafe extern "C-unwind" fn warnfon(
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaL_newstate() -> *mut lua_State {
-    // TODO: Track allocated blocks, free them on drop/no longer used
-    struct AllocOom;
+    struct AllocOom {
+        // Heap base ptr -> heap size
+        heaps: std::collections::BTreeMap<usize, std::alloc::Layout>,
+    }
+
+    impl Drop for AllocOom {
+        fn drop(&mut self) {
+            for (ptr, layout) in self.heaps.iter() {
+                let ptr = *ptr as *mut u8;
+                unsafe { std::alloc::dealloc(ptr, *layout) };
+            }
+        }
+    }
 
     impl talc::OomHandler for AllocOom {
         fn handle_oom(talc: &mut talc::Talc<Self>, layout: std::alloc::Layout) -> Result<(), ()> {
@@ -14192,15 +14203,16 @@ pub unsafe extern "C-unwind" fn luaL_newstate() -> *mut lua_State {
             }
             let mut min_align = BLOCK_ALIGN.max(layout.align());
 
-            let ptr = unsafe {
-                std::alloc::alloc(std::alloc::Layout::from_size_align_unchecked(
-                    min_size, min_align,
-                ))
-            };
+            let block_layout =
+                unsafe { std::alloc::Layout::from_size_align_unchecked(min_size, min_align) };
+
+            let ptr = unsafe { std::alloc::alloc(block_layout) };
 
             if ptr.is_null() {
                 return Err(());
             }
+
+            talc.oom_handler.heaps.insert(ptr as usize, block_layout);
 
             unsafe { talc.claim(talc::Span::from_base_size(ptr, min_size))? };
 
@@ -14221,6 +14233,8 @@ pub unsafe extern "C-unwind" fn luaL_newstate() -> *mut lua_State {
                     NonNull::new_unchecked(ptr.cast()),
                     std::alloc::Layout::from_size_align_unchecked(osize, 8),
                 );
+
+                // TODO: Periodically free unused heaps
             }
             ptr::null_mut()
         } else {
@@ -14240,7 +14254,9 @@ pub unsafe extern "C-unwind" fn luaL_newstate() -> *mut lua_State {
     }
 
     // TODO: Drop allocator on lua_close. Somehow.
-    let mut talc = Box::new(talc::Talc::new(AllocOom));
+    let mut talc = Box::new(talc::Talc::new(AllocOom {
+        heaps: Default::default(),
+    }));
 
     let mut L: *mut lua_State = lua_newstate(
         // Some(
