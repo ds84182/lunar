@@ -220,8 +220,8 @@ pub(super) unsafe fn tt_is_table(v: impl TValueFields) -> bool {
 pub(super) const BIT_ISCOLLECTABLE: u8 = 1 << 6;
 
 #[inline]
-pub(super) fn iscollectable(t: u8) -> bool {
-    (t & BIT_ISCOLLECTABLE) != 0
+pub(super) unsafe fn iscollectable(o: impl TValueFields) -> bool {
+    (raw_tt(o) & BIT_ISCOLLECTABLE) != 0
 }
 
 #[inline]

@@ -1318,7 +1318,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         let mut io2: *const TValue = &mut (*ra).val;
                         (*io1).value_ = (*io2).value_;
                         (*io1).tt_ = (*io2).tt_;
-                        if iscollectable((*ra).val.tt_) {
+                        if iscollectable(&raw mut (*ra).val) {
                             if (*uv).marked as i32 & (1 as i32) << 5 as i32 != 0
                                 && (*(*ra).val.value_.gc).marked as i32
                                     & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
@@ -1537,7 +1537,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             (*io1).value_ = (*io2).value_;
                             (*io1).tt_ = (*io2).tt_;
 
-                            if iscollectable((*rc).tt_) {
+                            if iscollectable(rc) {
                                 if (*(*upval).value_.gc).marked as i32 & (1 as i32) << 5 as i32 != 0
                                     && (*(*rc).value_.gc).marked as i32
                                         & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
@@ -1608,7 +1608,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             (*io1_9).value_ = (*io2_9).value_;
                             (*io1_9).tt_ = (*io2_9).tt_;
 
-                            if iscollectable((*rc).tt_) {
+                            if iscollectable(rc) {
                                 if (*(*ra).val.value_.gc).marked as i32 & (1 as i32) << 5 as i32
                                     != 0
                                     && (*(*rc).value_.gc).marked as i32
@@ -1664,7 +1664,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             let mut io2_10: *const TValue = rc;
                             (*io1_10).value_ = (*io2_10).value_;
                             (*io1_10).tt_ = (*io2_10).tt_;
-                            if iscollectable((*rc).tt_) {
+                            if iscollectable(rc) {
                                 if (*(*ra).val.value_.gc).marked as i32 & (1 as i32) << 5 as i32
                                     != 0
                                     && (*(*rc).value_.gc).marked as i32
@@ -1736,7 +1736,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             let mut io2_11: *const TValue = rc_5;
                             (*io1_11).value_ = (*io2_11).value_;
                             (*io1_11).tt_ = (*io2_11).tt_;
-                            if iscollectable((*rc_5).tt_) {
+                            if iscollectable(rc_5) {
                                 if (*(*ra_16).val.value_.gc).marked as i32 & (1 as i32) << 5 as i32
                                     != 0
                                     && (*(*rc_5).value_.gc).marked as i32
