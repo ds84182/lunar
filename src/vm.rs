@@ -1223,9 +1223,8 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                     trap = luaG_traceexec(L, pc);
                     base = ((*ci).func.p).offset(1);
                 }
-                let fresh134 = pc;
+                i = *pc;
                 pc = pc.offset(1);
-                i = *fresh134;
                 match (i >> 0 & !(!(0 as Instruction) << 7 as i32) << 0) as OpCode as u32 {
                     OP_MOVE => {
                         let mut ra: StkId = base.add(getarg_a(i) as usize);
@@ -1319,7 +1318,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         let mut io2: *const TValue = &mut (*ra).val;
                         (*io1).value_ = (*io2).value_;
                         (*io1).tt_ = (*io2).tt_;
-                        if (*ra).val.tt_ as i32 & (1 as i32) << 6 as i32 != 0 {
+                        if iscollectable((*ra).val.tt_) {
                             if (*uv).marked as i32 & (1 as i32) << 5 as i32 != 0
                                 && (*(*ra).val.value_.gc).marked as i32
                                     & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
@@ -1426,46 +1425,36 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         continue;
                     }
                     OP_GETI => {
-                        let mut ra_12: StkId = base.offset(
-                            (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
-                                as isize,
-                        );
-                        let mut slot_1: *const TValue = 0 as *const TValue;
-                        let mut rb_2: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut c: i32 = (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32 + 8 as i32
-                            & !(!(0 as Instruction) << 8 as i32) << 0)
-                            as i32;
-                        if if !((*rb_2).tt_ as i32
+                        let mut ra: StkId = base.add(getarg_a(i) as usize);
+                        let mut slot: *const TValue = 0 as *const TValue;
+                        let mut rb: *mut TValue = &mut (*base.add(getarg_b(i) as usize)).val;
+                        let mut c: i32 = getarg_c(i) as i32;
+                        if if !((*rb).tt_ as i32
                             == 5 as i32 | (0) << 4 as i32 | (1 as i32) << 6 as i32)
                         {
-                            slot_1 = 0 as *const TValue;
+                            slot = 0 as *const TValue;
                             0
                         } else {
-                            slot_1 = (if (c as lua_Unsigned).wrapping_sub(1 as u32 as lua_Unsigned)
-                                < (*(&mut (*((*rb_2).value_.gc as *mut GCUnion)).h as *mut Table))
+                            slot = (if (c as lua_Unsigned).wrapping_sub(1 as u32 as lua_Unsigned)
+                                < (*(&mut (*((*rb).value_.gc as *mut GCUnion)).h as *mut Table))
                                     .alimit as lua_Unsigned
                             {
-                                &mut *((*(&mut (*((*rb_2).value_.gc as *mut GCUnion)).h
+                                &mut *((*(&mut (*((*rb).value_.gc as *mut GCUnion)).h
                                     as *mut Table))
                                     .array)
                                     .offset((c - 1 as i32) as isize)
                                     as *mut TValue as *const TValue
                             } else {
                                 luaH_getint(
-                                    &mut (*((*rb_2).value_.gc as *mut GCUnion)).h,
+                                    &mut (*((*rb).value_.gc as *mut GCUnion)).h,
                                     c as lua_Integer,
                                 )
                             });
-                            !((*slot_1).tt_ as i32 & 0xf as i32 == 0) as i32
+                            !((*slot).tt_ as i32 & 0xf as i32 == 0) as i32
                         } != 0
                         {
-                            let mut io1: *mut TValue = &mut (*ra_12).val;
-                            let mut io2: *const TValue = slot_1;
+                            let mut io1: *mut TValue = &mut (*ra).val;
+                            let mut io2: *const TValue = slot;
                             (*io1).value_ = (*io2).value_;
                             (*io1).tt_ = (*io2).tt_;
                         } else {
@@ -1480,281 +1469,211 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             (*io_1).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
                             (*ci).u.l.savedpc = pc;
                             (*L).top.p = (*ci).top.p;
-                            luaV_finishget(L, rb_2, &mut key_0, ra_12, slot_1);
+                            luaV_finishget(L, rb, &mut key_0, ra, slot);
                             trap = (*ci).u.l.trap;
                         }
                         continue;
                     }
                     OP_GETFIELD => {
-                        let mut ra_13: StkId = base.offset(
-                            (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
-                                as isize,
-                        );
-                        let mut slot_2: *const TValue = 0 as *const TValue;
-                        let mut rb_3: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut rc_1: *mut TValue = k.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32 + 8 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        );
-                        let mut key_1: *mut TString =
-                            &mut (*((*rc_1).value_.gc as *mut GCUnion)).ts;
-                        if if !((*rb_3).tt_ as i32
+                        let mut ra: StkId = base.add(getarg_a(i) as usize);
+                        let mut slot: *const TValue = 0 as *const TValue;
+                        let mut rb: *mut TValue = &mut (*base.add(getarg_b(i) as usize)).val;
+                        let mut rc: *mut TValue = k.add(getarg_c(i) as usize);
+                        let mut key_1: *mut TString = &mut (*((*rc).value_.gc as *mut GCUnion)).ts;
+                        if if !((*rb).tt_ as i32
                             == 5 as i32 | (0) << 4 as i32 | (1 as i32) << 6 as i32)
                         {
-                            slot_2 = 0 as *const TValue;
+                            slot = 0 as *const TValue;
                             0
                         } else {
-                            slot_2 = luaH_getshortstr(
-                                &mut (*((*rb_3).value_.gc as *mut GCUnion)).h,
+                            slot = luaH_getshortstr(
+                                &mut (*((*rb).value_.gc as *mut GCUnion)).h,
                                 key_1,
                             );
-                            !((*slot_2).tt_ as i32 & 0xf as i32 == 0) as i32
+                            !((*slot).tt_ as i32 & 0xf as i32 == 0) as i32
                         } != 0
                         {
-                            let mut io1: *mut TValue = &mut (*ra_13).val;
-                            let mut io2: *const TValue = slot_2;
+                            let mut io1: *mut TValue = &mut (*ra).val;
+                            let mut io2: *const TValue = slot;
                             (*io1).value_ = (*io2).value_;
                             (*io1).tt_ = (*io2).tt_;
                         } else {
                             (*ci).u.l.savedpc = pc;
                             (*L).top.p = (*ci).top.p;
-                            luaV_finishget(L, rb_3, rc_1, ra_13, slot_2);
+                            luaV_finishget(L, rb, rc, ra, slot);
                             trap = (*ci).u.l.trap;
                         }
                         continue;
                     }
                     OP_SETTABUP => {
-                        let mut slot_3: *const TValue = 0 as *const TValue;
-                        let mut upval_0: *mut TValue = (**((*cl).upvals).as_mut_ptr().offset(
-                            (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
-                                as isize,
-                        ))
-                        .v
-                        .p;
-                        let mut rb_4: *mut TValue = k.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        );
-                        let mut rc_2: *mut TValue =
-                            if (i & (1 as u32) << 0 + 7 as i32 + 8 as i32) as i32 != 0 {
-                                k.offset(
-                                    (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32 + 8 as i32
-                                        & !(!(0 as Instruction) << 8 as i32) << 0)
-                                        as i32 as isize,
-                                )
-                            } else {
-                                &mut (*base.offset(
-                                    (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32 + 8 as i32
-                                        & !(!(0 as Instruction) << 8 as i32) << 0)
-                                        as i32 as isize,
-                                ))
-                                .val
-                            };
-                        let mut key_2: *mut TString =
-                            &mut (*((*rb_4).value_.gc as *mut GCUnion)).ts;
-                        if if !((*upval_0).tt_ as i32
+                        let mut slot: *const TValue = 0 as *const TValue;
+                        let mut upval: *mut TValue =
+                            (**((*cl).upvals).as_mut_ptr().add(getarg_a(i) as usize))
+                                .v
+                                .p;
+                        let mut rb: *mut TValue = k.add(getarg_b(i) as usize);
+                        let c = getarg_c(i) as usize;
+                        let mut rc: *mut TValue = if getarg_k(i) {
+                            k.add(c)
+                        } else {
+                            &mut (*base.add(c)).val
+                        };
+                        let mut key: *mut TString = &mut (*((*rb).value_.gc as *mut GCUnion)).ts;
+                        if if !((*upval).tt_ as i32
                             == 5 as i32 | (0) << 4 as i32 | (1 as i32) << 6 as i32)
                         {
-                            slot_3 = 0 as *const TValue;
+                            slot = 0 as *const TValue;
                             0
                         } else {
-                            slot_3 = luaH_getshortstr(
-                                &mut (*((*upval_0).value_.gc as *mut GCUnion)).h,
-                                key_2,
+                            slot = luaH_getshortstr(
+                                &mut (*((*upval).value_.gc as *mut GCUnion)).h,
+                                key,
                             );
-                            !((*slot_3).tt_ as i32 & 0xf as i32 == 0) as i32
+                            !((*slot).tt_ as i32 & 0xf as i32 == 0) as i32
                         } != 0
                         {
-                            let mut io1: *mut TValue = slot_3 as *mut TValue;
-                            let mut io2: *const TValue = rc_2;
+                            let mut io1: *mut TValue = slot as *mut TValue;
+                            let mut io2: *const TValue = rc;
                             (*io1).value_ = (*io2).value_;
                             (*io1).tt_ = (*io2).tt_;
 
-                            if (*rc_2).tt_ as i32 & (1 as i32) << 6 as i32 != 0 {
-                                if (*(*upval_0).value_.gc).marked as i32 & (1 as i32) << 5 as i32
-                                    != 0
-                                    && (*(*rc_2).value_.gc).marked as i32
+                            if iscollectable((*rc).tt_) {
+                                if (*(*upval).value_.gc).marked as i32 & (1 as i32) << 5 as i32 != 0
+                                    && (*(*rc).value_.gc).marked as i32
                                         & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
                                         != 0
                                 {
-                                    luaC_barrierback_(L, (*upval_0).value_.gc);
-                                } else {
-                                };
-                            } else {
-                            };
+                                    luaC_barrierback_(L, (*upval).value_.gc);
+                                }
+                            }
                         } else {
                             (*ci).u.l.savedpc = pc;
                             (*L).top.p = (*ci).top.p;
-                            luaV_finishset(L, upval_0, rb_4, rc_2, slot_3);
+                            luaV_finishset(L, upval, rb, rc, slot);
                             trap = (*ci).u.l.trap;
                         }
                         continue;
                     }
                     OP_SETTABLE => {
-                        let mut ra_14: StkId = base.offset(
-                            (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
-                                as isize,
-                        );
-                        let mut slot_4: *const TValue = 0 as *const TValue;
-                        let mut rb_5: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut rc_3: *mut TValue =
-                            if (i & (1 as u32) << 0 + 7 as i32 + 8 as i32) as i32 != 0 {
-                                k.offset(
-                                    (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32 + 8 as i32
-                                        & !(!(0 as Instruction) << 8 as i32) << 0)
-                                        as i32 as isize,
-                                )
-                            } else {
-                                &mut (*base.offset(
-                                    (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32 + 8 as i32
-                                        & !(!(0 as Instruction) << 8 as i32) << 0)
-                                        as i32 as isize,
-                                ))
-                                .val
-                            };
-                        let mut n_0: lua_Unsigned = 0;
-                        if if (*rb_5).tt_ as i32 == 3 as i32 | (0) << 4 as i32 {
-                            n_0 = (*rb_5).value_.i as lua_Unsigned;
-                            (if !((*ra_14).val.tt_ as i32
+                        let mut ra: StkId = base.add(getarg_a(i) as usize);
+                        let mut slot: *const TValue = 0 as *const TValue;
+                        let mut rb: *mut TValue = &mut (*base.add(getarg_b(i) as usize)).val;
+                        let c = getarg_c(i) as usize;
+                        let mut rc: *mut TValue = if getarg_k(i) {
+                            k.add(c)
+                        } else {
+                            &mut (*base.add(c)).val
+                        };
+                        let mut n: lua_Unsigned = 0;
+                        if if (*rb).tt_ as i32 == 3 as i32 | (0) << 4 as i32 {
+                            n = (*rb).value_.i as lua_Unsigned;
+                            (if !((*ra).val.tt_ as i32
                                 == 5 as i32 | (0) << 4 as i32 | (1 as i32) << 6 as i32)
                             {
-                                slot_4 = 0 as *const TValue;
+                                slot = 0 as *const TValue;
                                 0
                             } else {
-                                slot_4 = (if n_0.wrapping_sub(1 as u32 as lua_Unsigned)
-                                    < (*(&mut (*((*ra_14).val.value_.gc as *mut GCUnion)).h
+                                slot = (if n.wrapping_sub(1 as u32 as lua_Unsigned)
+                                    < (*(&mut (*((*ra).val.value_.gc as *mut GCUnion)).h
                                         as *mut Table))
                                         .alimit
                                         as lua_Unsigned
                                 {
-                                    &mut *((*(&mut (*((*ra_14).val.value_.gc as *mut GCUnion)).h
+                                    &mut *((*(&mut (*((*ra).val.value_.gc as *mut GCUnion)).h
                                         as *mut Table))
                                         .array)
-                                        .offset(n_0.wrapping_sub(1 as i32 as lua_Unsigned) as isize)
+                                        .offset(n.wrapping_sub(1 as i32 as lua_Unsigned) as isize)
                                         as *mut TValue
                                         as *const TValue
                                 } else {
                                     luaH_getint(
-                                        &mut (*((*ra_14).val.value_.gc as *mut GCUnion)).h,
-                                        n_0 as lua_Integer,
+                                        &mut (*((*ra).val.value_.gc as *mut GCUnion)).h,
+                                        n as lua_Integer,
                                     )
                                 });
-                                !((*slot_4).tt_ as i32 & 0xf as i32 == 0) as i32
+                                !((*slot).tt_ as i32 & 0xf as i32 == 0) as i32
                             })
-                        } else if !((*ra_14).val.tt_ as i32
+                        } else if !((*ra).val.tt_ as i32
                             == 5 as i32 | (0) << 4 as i32 | (1 as i32) << 6 as i32)
                         {
-                            slot_4 = 0 as *const TValue;
+                            slot = 0 as *const TValue;
                             0
                         } else {
-                            slot_4 =
-                                luaH_get(&mut (*((*ra_14).val.value_.gc as *mut GCUnion)).h, rb_5);
-                            !((*slot_4).tt_ as i32 & 0xf as i32 == 0) as i32
+                            slot = luaH_get(&mut (*((*ra).val.value_.gc as *mut GCUnion)).h, rb);
+                            !((*slot).tt_ as i32 & 0xf as i32 == 0) as i32
                         } != 0
                         {
-                            let mut io1_9: *mut TValue = slot_4 as *mut TValue;
-                            let mut io2_9: *const TValue = rc_3;
+                            let mut io1_9: *mut TValue = slot as *mut TValue;
+                            let mut io2_9: *const TValue = rc;
                             (*io1_9).value_ = (*io2_9).value_;
                             (*io1_9).tt_ = (*io2_9).tt_;
 
-                            if (*rc_3).tt_ as i32 & (1 as i32) << 6 as i32 != 0 {
-                                if (*(*ra_14).val.value_.gc).marked as i32 & (1 as i32) << 5 as i32
+                            if iscollectable((*rc).tt_) {
+                                if (*(*ra).val.value_.gc).marked as i32 & (1 as i32) << 5 as i32
                                     != 0
-                                    && (*(*rc_3).value_.gc).marked as i32
+                                    && (*(*rc).value_.gc).marked as i32
                                         & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
                                         != 0
                                 {
-                                    luaC_barrierback_(L, (*ra_14).val.value_.gc);
-                                } else {
-                                };
-                            } else {
-                            };
+                                    luaC_barrierback_(L, (*ra).val.value_.gc);
+                                }
+                            }
                         } else {
                             (*ci).u.l.savedpc = pc;
                             (*L).top.p = (*ci).top.p;
-                            luaV_finishset(L, &mut (*ra_14).val, rb_5, rc_3, slot_4);
+                            luaV_finishset(L, &mut (*ra).val, rb, rc, slot);
                             trap = (*ci).u.l.trap;
                         }
                         continue;
                     }
                     OP_SETI => {
-                        let mut ra_15: StkId = base.offset(
-                            (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
-                                as isize,
-                        );
-                        let mut slot_5: *const TValue = 0 as *const TValue;
-                        let mut c_0: i32 = (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
-                            & !(!(0 as Instruction) << 8 as i32) << 0)
-                            as i32;
-                        let mut rc_4: *mut TValue =
-                            if (i & (1 as u32) << 0 + 7 as i32 + 8 as i32) as i32 != 0 {
-                                k.offset(
-                                    (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32 + 8 as i32
-                                        & !(!(0 as Instruction) << 8 as i32) << 0)
-                                        as i32 as isize,
-                                )
-                            } else {
-                                &mut (*base.offset(
-                                    (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32 + 8 as i32
-                                        & !(!(0 as Instruction) << 8 as i32) << 0)
-                                        as i32 as isize,
-                                ))
-                                .val
-                            };
-                        if if !((*ra_15).val.tt_ as i32
+                        let mut ra: StkId = base.add(getarg_a(i) as usize);
+                        let mut slot: *const TValue = 0 as *const TValue;
+                        let mut b = getarg_b(i);
+                        let c = getarg_c(i) as usize;
+                        let mut rc: *mut TValue = if getarg_k(i) {
+                            k.add(c)
+                        } else {
+                            &mut (*base.add(c)).val
+                        };
+                        if if !((*ra).val.tt_ as i32
                             == 5 as i32 | (0) << 4 as i32 | (1 as i32) << 6 as i32)
                         {
-                            slot_5 = 0 as *const TValue;
+                            slot = 0 as *const TValue;
                             0
                         } else {
-                            slot_5 = (if (c_0 as lua_Unsigned)
-                                .wrapping_sub(1 as u32 as lua_Unsigned)
-                                < (*(&mut (*((*ra_15).val.value_.gc as *mut GCUnion)).h
-                                    as *mut Table))
+                            slot = (if (b as lua_Unsigned).wrapping_sub(1 as u32 as lua_Unsigned)
+                                < (*(&mut (*((*ra).val.value_.gc as *mut GCUnion)).h as *mut Table))
                                     .alimit as lua_Unsigned
                             {
-                                &mut *((*(&mut (*((*ra_15).val.value_.gc as *mut GCUnion)).h
+                                &mut *((*(&mut (*((*ra).val.value_.gc as *mut GCUnion)).h
                                     as *mut Table))
                                     .array)
-                                    .offset((c_0 - 1 as i32) as isize)
+                                    .offset((b - 1) as isize)
                                     as *mut TValue as *const TValue
                             } else {
                                 luaH_getint(
-                                    &mut (*((*ra_15).val.value_.gc as *mut GCUnion)).h,
-                                    c_0 as lua_Integer,
+                                    &mut (*((*ra).val.value_.gc as *mut GCUnion)).h,
+                                    b as lua_Integer,
                                 )
                             });
-                            !((*slot_5).tt_ as i32 & 0xf as i32 == 0) as i32
+                            !((*slot).tt_ as i32 & 0xf as i32 == 0) as i32
                         } != 0
                         {
-                            let mut io1_10: *mut TValue = slot_5 as *mut TValue;
-                            let mut io2_10: *const TValue = rc_4;
+                            let mut io1_10: *mut TValue = slot as *mut TValue;
+                            let mut io2_10: *const TValue = rc;
                             (*io1_10).value_ = (*io2_10).value_;
                             (*io1_10).tt_ = (*io2_10).tt_;
-                            if (*rc_4).tt_ as i32 & (1 as i32) << 6 as i32 != 0 {
-                                if (*(*ra_15).val.value_.gc).marked as i32 & (1 as i32) << 5 as i32
+                            if iscollectable((*rc).tt_) {
+                                if (*(*ra).val.value_.gc).marked as i32 & (1 as i32) << 5 as i32
                                     != 0
-                                    && (*(*rc_4).value_.gc).marked as i32
+                                    && (*(*rc).value_.gc).marked as i32
                                         & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
                                         != 0
                                 {
-                                    luaC_barrierback_(L, (*ra_15).val.value_.gc);
-                                } else {
-                                };
-                            } else {
-                            };
+                                    luaC_barrierback_(L, (*ra).val.value_.gc);
+                                }
+                            }
                         } else {
                             let mut key_3: TValue = TValue {
                                 value_: Value {
@@ -1763,11 +1682,11 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 tt_: 0,
                             };
                             let mut io_2: *mut TValue = &mut key_3;
-                            (*io_2).value_.i = c_0 as lua_Integer;
+                            (*io_2).value_.i = b as lua_Integer;
                             (*io_2).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
                             (*ci).u.l.savedpc = pc;
                             (*L).top.p = (*ci).top.p;
-                            luaV_finishset(L, &mut (*ra_15).val, &mut key_3, rc_4, slot_5);
+                            luaV_finishset(L, &mut (*ra).val, &mut key_3, rc, slot);
                             trap = (*ci).u.l.trap;
                         }
                         continue;
@@ -1817,7 +1736,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             let mut io2_11: *const TValue = rc_5;
                             (*io1_11).value_ = (*io2_11).value_;
                             (*io1_11).tt_ = (*io2_11).tt_;
-                            if (*rc_5).tt_ as i32 & (1 as i32) << 6 as i32 != 0 {
+                            if iscollectable((*rc_5).tt_) {
                                 if (*(*ra_16).val.value_.gc).marked as i32 & (1 as i32) << 5 as i32
                                     != 0
                                     && (*(*rc_5).value_.gc).marked as i32
@@ -1825,10 +1744,8 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                         != 0
                                 {
                                     luaC_barrierback_(L, (*ra_16).val.value_.gc);
-                                } else {
-                                };
-                            } else {
-                            };
+                                }
+                            }
                         } else {
                             (*ci).u.l.savedpc = pc;
                             (*L).top.p = (*ci).top.p;

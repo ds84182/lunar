@@ -66,8 +66,15 @@ pub(super) const LUA_VCCL: u8 = makevariant(LUA_TFUNCTION, 2);
 
 pub(super) const LUA_VTABLE: u8 = makevariant(LUA_TTABLE, 0);
 
-// #[inline]
-// pub(super) fn iscollectable()
+#[inline]
+pub(super) fn iscollectable(t: u8) -> bool {
+    (t & BIT_ISCOLLECTABLE) != 0
+}
+
+#[inline]
+pub(super) fn ctb(t: u8) -> u8 {
+    t | BIT_ISCOLLECTABLE
+}
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaO_ceillog2(mut x: u32) -> i32 {

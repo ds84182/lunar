@@ -162,8 +162,8 @@ pub(crate) fn getarg_sc(i: u32) -> i32 {
 }
 
 #[inline]
-pub(crate) fn getarg_k(i: u32) -> u32 {
-    get::<1, POS_k>(i)
+pub(crate) fn getarg_k(i: u32) -> bool {
+    get::<1, POS_k>(i) != 0
 }
 
 #[inline]
