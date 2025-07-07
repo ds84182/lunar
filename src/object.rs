@@ -9,54 +9,66 @@ pub(super) const LUA_TDEADKEY: i8 = LUA_NUMTYPES + 2;
 pub(super) const LUA_TOTALTYPES: i8 = LUA_TPROTO + 2;
 
 pub(super) trait TValueFields: Copy {
-    fn value(self) -> *mut Value;
-    fn tt(self) -> *mut u8;
+    unsafe fn value(self) -> *mut Value;
+    unsafe fn tt(self) -> *mut u8;
 }
 
 impl TValueFields for *mut TValue {
     #[inline]
-    fn value(self) -> *mut Value {
+    unsafe fn value(self) -> *mut Value {
         self.cast()
     }
 
     #[inline]
-    fn tt(self) -> *mut u8 {
+    unsafe fn tt(self) -> *mut u8 {
         unsafe { self.byte_add(offset_of!(TValue, tt_)).cast() }
     }
 }
 
 impl TValueFields for *const TValue {
     #[inline]
-    fn value(self) -> *mut Value {
+    unsafe fn value(self) -> *mut Value {
         self.cast_mut().cast()
     }
 
     #[inline]
-    fn tt(self) -> *mut u8 {
+    unsafe fn tt(self) -> *mut u8 {
         unsafe { self.byte_add(offset_of!(TValue, tt_)).cast_mut().cast() }
+    }
+}
+
+impl TValueFields for StkId {
+    #[inline]
+    unsafe fn value(self) -> *mut Value {
+        (&raw const (*self).val).value()
+    }
+
+    #[inline]
+    unsafe fn tt(self) -> *mut u8 {
+        (&raw const (*self).val).tt()
     }
 }
 
 impl TValueFields for *mut ToBeClosedList {
     #[inline]
-    fn value(self) -> *mut Value {
+    unsafe fn value(self) -> *mut Value {
         self.cast()
     }
 
     #[inline]
-    fn tt(self) -> *mut u8 {
+    unsafe fn tt(self) -> *mut u8 {
         unsafe { self.byte_add(offset_of!(ToBeClosedList, tt_)).cast() }
     }
 }
 
 impl TValueFields for *mut NodeKey {
     #[inline]
-    fn value(self) -> *mut Value {
+    unsafe fn value(self) -> *mut Value {
         self.cast()
     }
 
     #[inline]
-    fn tt(self) -> *mut u8 {
+    unsafe fn tt(self) -> *mut u8 {
         unsafe { self.byte_add(offset_of!(NodeKey, tt_)).cast() }
     }
 }
@@ -206,6 +218,30 @@ pub(super) unsafe fn tt_is_float(v: impl TValueFields) -> bool {
 #[inline]
 pub(super) unsafe fn tt_is_integer(v: impl TValueFields) -> bool {
     checktag(v, LUA_VNUMINT)
+}
+
+#[inline]
+pub(super) unsafe fn setfltvalue(obj: impl TValueFields, x: lua_Number) {
+    (*obj.value()).n = x;
+    *obj.tt() = LUA_VNUMFLT;
+}
+
+#[inline]
+pub(super) unsafe fn chgfltvalue(obj: impl TValueFields, x: lua_Number) {
+    debug_assert!(tt_is_float(obj));
+    (*obj.value()).n = x;
+}
+
+#[inline]
+pub(super) unsafe fn setivalue(obj: impl TValueFields, x: lua_Integer) {
+    (*obj.value()).i = x;
+    *obj.tt() = LUA_VNUMINT;
+}
+
+#[inline]
+pub(super) unsafe fn chgivalue(obj: impl TValueFields, x: lua_Integer) {
+    debug_assert!(tt_is_integer(obj));
+    (*obj.value()).i = x;
 }
 
 pub(super) const LUA_VSHRSTR: u8 = makevariant(LUA_TSTRING, 0);

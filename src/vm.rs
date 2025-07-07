@@ -1228,65 +1228,56 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                 match (i >> 0 & !(!(0 as Instruction) << 7 as i32) << 0) as OpCode as u32 {
                     OP_MOVE => {
                         let mut ra: StkId = base.add(getarg_a(i) as usize);
-                        let mut io1: *mut TValue = &mut (*ra).val;
                         let mut io2: *const TValue = &(*base.add(getarg_b(i) as usize)).val;
-                        setobj(io1, io2);
+                        setobj(ra, io2);
                         continue;
                     }
                     OP_LOADI => {
                         let mut ra: StkId = base.add(getarg_a(i) as usize);
                         let b = getarg_sbx(i) as lua_Integer;
-                        let mut io: *mut TValue = &mut (*ra).val;
-                        (*io).value_.i = b;
-                        (*io).tt_ = LUA_VNUMINT;
+                        setivalue(ra, b);
                         continue;
                     }
                     OP_LOADF => {
                         let mut ra: StkId = base.add(getarg_a(i) as usize);
                         let b = getarg_sbx(i);
-                        let mut io: *mut TValue = &mut (*ra).val;
-                        (*io).value_.n = b as lua_Number;
-                        (*io).tt_ = LUA_VNUMFLT;
+                        setfltvalue(ra, b as lua_Number);
                         continue;
                     }
                     OP_LOADK => {
                         let mut ra: StkId = base.add(getarg_a(i) as usize);
-                        let mut rb: *mut TValue = k.add(getarg_bx(i) as usize);
-                        let mut io1: *mut TValue = &mut (*ra).val;
-                        let mut io2: *const TValue = rb;
-                        setobj(io1, io2);
+                        let mut rb: *const TValue = k.add(getarg_bx(i) as usize);
+                        setobj(ra, rb);
                         continue;
                     }
                     OP_LOADKX => {
                         let mut ra: StkId = base.add(getarg_a(i) as usize);
-                        let mut rb: *mut TValue = k.add(getarg_ax(*pc) as usize);
+                        let mut rb: *const TValue = k.add(getarg_ax(*pc) as usize);
                         pc = pc.add(1);
-                        let mut io1: *mut TValue = &mut (*ra).val;
-                        let mut io2: *const TValue = rb;
-                        setobj(io1, io2);
+                        setobj(ra, rb);
                         continue;
                     }
                     OP_LOADFALSE => {
                         let mut ra: StkId = base.add(getarg_a(i) as usize);
-                        (*ra).val.tt_ = LUA_VFALSE;
+                        tt_set_false(ra);
                         continue;
                     }
                     OP_LFALSESKIP => {
                         let mut ra: StkId = base.add(getarg_a(i) as usize);
-                        (*ra).val.tt_ = LUA_VFALSE;
+                        tt_set_false(ra);
                         pc = pc.add(1);
                         continue;
                     }
                     OP_LOADTRUE => {
                         let mut ra: StkId = base.add(getarg_a(i) as usize);
-                        (*ra).val.tt_ = LUA_VTRUE;
+                        tt_set_true(ra);
                         continue;
                     }
                     OP_LOADNIL => {
                         let mut ra: StkId = base.add(getarg_a(i) as usize);
-                        let mut b: i32 = getarg_b(i) as i32;
+                        let mut b = getarg_b(i);
                         loop {
-                            (*ra).val.tt_ = LUA_VNIL;
+                            set_nil_value(ra);
                             ra = ra.add(1);
                             if b == 0 {
                                 break;
