@@ -1,3 +1,5 @@
+use std::mem::offset_of;
+
 use super::*;
 
 pub(super) const LUA_TUPVAL: i8 = LUA_NUMTYPES;
@@ -5,6 +7,47 @@ pub(super) const LUA_TPROTO: i8 = LUA_NUMTYPES + 1;
 pub(super) const LUA_TDEADKEY: i8 = LUA_NUMTYPES + 2;
 
 pub(super) const LUA_TOTALTYPES: i8 = LUA_TPROTO + 2;
+
+pub(super) trait TValueFields: Copy {
+    fn value(self) -> *mut Value;
+    fn tt(self) -> *mut u8;
+}
+
+impl TValueFields for *mut TValue {
+    #[inline]
+    fn value(self) -> *mut Value {
+        self.cast()
+    }
+
+    #[inline]
+    fn tt(self) -> *mut u8 {
+        unsafe { self.byte_add(offset_of!(TValue, tt_)).cast() }
+    }
+}
+
+impl TValueFields for *mut ToBeClosedList {
+    #[inline]
+    fn value(self) -> *mut Value {
+        self.cast()
+    }
+
+    #[inline]
+    fn tt(self) -> *mut u8 {
+        unsafe { self.byte_add(offset_of!(ToBeClosedList, tt_)).cast() }
+    }
+}
+
+impl TValueFields for *mut NodeKey {
+    #[inline]
+    fn value(self) -> *mut Value {
+        self.cast()
+    }
+
+    #[inline]
+    fn tt(self) -> *mut u8 {
+        unsafe { self.byte_add(offset_of!(NodeKey, tt_)).cast() }
+    }
+}
 
 /*
 ** tags for Tagged Values have the following use of bits:
@@ -28,6 +71,31 @@ pub(super) const fn withvariant(t: u8) -> u8 {
     t & 0x3F
 }
 
+#[inline]
+pub(super) unsafe fn raw_tt(ptr: impl TValueFields) -> u8 {
+    ptr.tt().read()
+}
+
+#[inline]
+pub(super) unsafe fn ttypetag(ptr: impl TValueFields) -> u8 {
+    withvariant(raw_tt(ptr))
+}
+
+#[inline]
+pub(super) unsafe fn ttype(ptr: impl TValueFields) -> u8 {
+    novariant(raw_tt(ptr))
+}
+
+#[inline]
+pub(super) unsafe fn checktag(ptr: impl TValueFields, t: u8) -> bool {
+    raw_tt(ptr) == t
+}
+
+#[inline]
+pub(super) unsafe fn checktype(ptr: impl TValueFields, t: u8) -> bool {
+    ttype(ptr) == t
+}
+
 /// Standard nil
 pub(super) const LUA_VNIL: u8 = makevariant(LUA_TNIL, 0);
 
@@ -37,18 +105,96 @@ pub(super) const LUA_VEMPTY: u8 = makevariant(LUA_TNIL, 1);
 /// Value returned for a key not found in a table (absent key)
 pub(super) const LUA_VABSTKEY: u8 = makevariant(LUA_TNIL, 2);
 
+#[inline]
+pub(super) unsafe fn tt_is_nil(v: impl TValueFields) -> bool {
+    checktype(v, LUA_TNIL as u8)
+}
+
+#[inline]
+pub(super) unsafe fn tt_is_strict_nil(v: impl TValueFields) -> bool {
+    checktag(v, LUA_VNIL)
+}
+
+#[inline]
+pub(super) unsafe fn set_nil_value(v: impl TValueFields) {
+    v.tt().write(LUA_VNIL);
+}
+
+#[inline]
+pub(super) unsafe fn is_absent_key(v: impl TValueFields) -> bool {
+    checktag(v, LUA_VABSTKEY)
+}
+
+#[inline]
+pub(super) unsafe fn set_empty(v: impl TValueFields) {
+    v.tt().write(LUA_VEMPTY);
+}
+
 pub(super) const LUA_VFALSE: u8 = makevariant(LUA_TBOOLEAN, 0);
 pub(super) const LUA_VTRUE: u8 = makevariant(LUA_TBOOLEAN, 1);
 
+#[inline]
+pub(super) unsafe fn tt_is_boolean(v: impl TValueFields) -> bool {
+    checktype(v, LUA_TBOOLEAN as u8)
+}
+
+#[inline]
+pub(super) unsafe fn tt_is_false(v: impl TValueFields) -> bool {
+    checktag(v, LUA_VFALSE)
+}
+
+#[inline]
+pub(super) unsafe fn tt_is_true(v: impl TValueFields) -> bool {
+    checktag(v, LUA_VTRUE)
+}
+
+#[inline]
+pub(super) unsafe fn l_is_false(v: impl TValueFields) -> bool {
+    tt_is_false(v) || tt_is_nil(v)
+}
+
+#[inline]
+pub(super) unsafe fn tt_set_false(v: impl TValueFields) {
+    v.tt().write(LUA_VFALSE)
+}
+
+#[inline]
+pub(super) unsafe fn tt_set_true(v: impl TValueFields) {
+    v.tt().write(LUA_VTRUE)
+}
+
 pub(super) const LUA_VTHREAD: u8 = makevariant(LUA_TTHREAD, 0);
 
-pub(super) const BIT_ISCOLLECTABLE: u8 = 1 << 6;
+#[inline]
+pub(super) unsafe fn tt_is_thread(v: impl TValueFields) -> bool {
+    checktag(v, ctb(LUA_TTHREAD as u8))
+}
 
 pub(super) const LUA_VNUMINT: u8 = makevariant(LUA_TNUMBER, 0);
 pub(super) const LUA_VNUMFLT: u8 = makevariant(LUA_TNUMBER, 1);
 
+#[inline]
+pub(super) unsafe fn tt_is_number(v: impl TValueFields) -> bool {
+    checktype(v, LUA_TNUMBER as u8)
+}
+
+#[inline]
+pub(super) unsafe fn tt_is_float(v: impl TValueFields) -> bool {
+    checktag(v, LUA_VNUMFLT)
+}
+
+#[inline]
+pub(super) unsafe fn tt_is_integer(v: impl TValueFields) -> bool {
+    checktag(v, LUA_VNUMINT)
+}
+
 pub(super) const LUA_VSHRSTR: u8 = makevariant(LUA_TSTRING, 0);
 pub(super) const LUA_VLNGSTR: u8 = makevariant(LUA_TSTRING, 1);
+
+#[inline]
+pub(super) unsafe fn tt_is_string(v: impl TValueFields) -> bool {
+    checktype(v, LUA_TSTRING as u8)
+}
 
 pub(super) const LUA_VLIGHTUSERDATA: u8 = makevariant(LUA_TLIGHTUSERDATA, 0);
 pub(super) const LUA_VUSERDATA: u8 = makevariant(LUA_TUSERDATA, 0);
@@ -65,6 +211,13 @@ pub(super) const LUA_VLCF: u8 = makevariant(LUA_TFUNCTION, 1);
 pub(super) const LUA_VCCL: u8 = makevariant(LUA_TFUNCTION, 2);
 
 pub(super) const LUA_VTABLE: u8 = makevariant(LUA_TTABLE, 0);
+
+#[inline]
+pub(super) unsafe fn tt_is_table(v: impl TValueFields) -> bool {
+    checktag(v, ctb(LUA_VTABLE))
+}
+
+pub(super) const BIT_ISCOLLECTABLE: u8 = 1 << 6;
 
 #[inline]
 pub(super) fn iscollectable(t: u8) -> bool {
