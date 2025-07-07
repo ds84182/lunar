@@ -1240,34 +1240,34 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         let b = getarg_sbx(i) as lua_Integer;
                         let mut io: *mut TValue = &mut (*ra).val;
                         (*io).value_.i = b;
-                        (*io).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
+                        (*io).tt_ = LUA_VNUMINT;
                         continue;
                     }
                     OP_LOADF => {
                         let mut ra: StkId = base.add(getarg_a(i) as usize);
                         let b = getarg_sbx(i);
-                        let mut io_0: *mut TValue = &mut (*ra).val;
-                        (*io_0).value_.n = b as lua_Number;
-                        (*io_0).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
+                        let mut io: *mut TValue = &mut (*ra).val;
+                        (*io).value_.n = b as lua_Number;
+                        (*io).tt_ = LUA_VNUMFLT;
                         continue;
                     }
                     OP_LOADK => {
                         let mut ra: StkId = base.add(getarg_a(i) as usize);
                         let mut rb: *mut TValue = k.add(getarg_bx(i) as usize);
-                        let mut io1_0: *mut TValue = &mut (*ra).val;
-                        let mut io2_0: *const TValue = rb;
-                        (*io1_0).value_ = (*io2_0).value_;
-                        (*io1_0).tt_ = (*io2_0).tt_;
+                        let mut io1: *mut TValue = &mut (*ra).val;
+                        let mut io2: *const TValue = rb;
+                        (*io1).value_ = (*io2).value_;
+                        (*io1).tt_ = (*io2).tt_;
                         continue;
                     }
                     OP_LOADKX => {
                         let mut ra: StkId = base.add(getarg_a(i) as usize);
                         let mut rb: *mut TValue = k.add(getarg_ax(*pc) as usize);
                         pc = pc.add(1);
-                        let mut io1_1: *mut TValue = &mut (*ra).val;
-                        let mut io2_1: *const TValue = rb;
-                        (*io1_1).value_ = (*io2_1).value_;
-                        (*io1_1).tt_ = (*io2_1).tt_;
+                        let mut io1: *mut TValue = &mut (*ra).val;
+                        let mut io2: *const TValue = rb;
+                        (*io1).value_ = (*io2).value_;
+                        (*io1).tt_ = (*io2).tt_;
                         continue;
                     }
                     OP_LOADFALSE => {
@@ -1302,12 +1302,12 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                     OP_GETUPVAL => {
                         let mut ra: StkId = base.add(getarg_a(i) as usize);
                         let mut b = getarg_b(i);
-                        let mut io1_2: *mut TValue = &mut (*ra).val;
+                        let mut io1: *mut TValue = &mut (*ra).val;
                         // TODO: UB if done by ref (Reading past the end of an array)
-                        let mut io2_2: *const TValue =
+                        let mut io2: *const TValue =
                             (**((*cl).upvals).as_mut_ptr().add(b as usize)).v.p;
-                        (*io1_2).value_ = (*io2_2).value_;
-                        (*io1_2).tt_ = (*io2_2).tt_;
+                        (*io1).value_ = (*io2).value_;
+                        (*io1).tt_ = (*io2).tt_;
                         continue;
                     }
                     OP_SETUPVAL => {
@@ -1315,10 +1315,10 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         // TODO: UB if done by ref (Reading past the end of an array)
                         let mut uv: *mut UpVal =
                             *((*cl).upvals).as_mut_ptr().add(getarg_b(i) as usize);
-                        let mut io1_3: *mut TValue = (*uv).v.p;
-                        let mut io2_3: *const TValue = &mut (*ra).val;
-                        (*io1_3).value_ = (*io2_3).value_;
-                        (*io1_3).tt_ = (*io2_3).tt_;
+                        let mut io1: *mut TValue = (*uv).v.p;
+                        let mut io2: *const TValue = &mut (*ra).val;
+                        (*io1).value_ = (*io2).value_;
+                        (*io1).tt_ = (*io2).tt_;
                         if (*ra).val.tt_ as i32 & (1 as i32) << 6 as i32 != 0 {
                             if (*uv).marked as i32 & (1 as i32) << 5 as i32 != 0
                                 && (*(*ra).val.value_.gc).marked as i32
@@ -1358,10 +1358,10 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             !((*slot).tt_ as i32 & 0xf as i32 == 0) as i32
                         } != 0
                         {
-                            let mut io1_4: *mut TValue = &mut (*ra).val;
-                            let mut io2_4: *const TValue = slot;
-                            (*io1_4).value_ = (*io2_4).value_;
-                            (*io1_4).tt_ = (*io2_4).tt_;
+                            let mut io1: *mut TValue = &mut (*ra).val;
+                            let mut io2: *const TValue = slot;
+                            (*io1).value_ = (*io2).value_;
+                            (*io1).tt_ = (*io2).tt_;
                         } else {
                             (*ci).u.l.savedpc = pc;
                             (*L).top.p = (*ci).top.p;
@@ -1413,10 +1413,10 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             !((*slot).tt_ as i32 & 0xf as i32 == 0) as i32
                         } != 0
                         {
-                            let mut io1_5: *mut TValue = &mut (*ra).val;
-                            let mut io2_5: *const TValue = slot;
-                            (*io1_5).value_ = (*io2_5).value_;
-                            (*io1_5).tt_ = (*io2_5).tt_;
+                            let mut io1: *mut TValue = &mut (*ra).val;
+                            let mut io2: *const TValue = slot;
+                            (*io1).value_ = (*io2).value_;
+                            (*io1).tt_ = (*io2).tt_;
                         } else {
                             (*ci).u.l.savedpc = pc;
                             (*L).top.p = (*ci).top.p;
@@ -1464,22 +1464,10 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             !((*slot_1).tt_ as i32 & 0xf as i32 == 0) as i32
                         } != 0
                         {
-                            let mut io1_6: *mut TValue = &mut (*ra_12).val;
-                            let mut io2_6: *const TValue = slot_1;
-                            (*io1_6).value_ = (*io2_6).value_;
-                            (*io1_6).tt_ = (*io2_6).tt_;
-                            if (*io1_6).tt_ as i32 & (1 as i32) << 6 as i32 == 0
-                                || (*io1_6).tt_ as i32 & 0x3f as i32
-                                    == (*(*io1_6).value_.gc).tt as i32
-                                    && (L.is_null()
-                                        || (*(*io1_6).value_.gc).marked as i32
-                                            & ((*(*L).l_G).currentwhite as i32
-                                                ^ ((1 as i32) << 3 as i32
-                                                    | (1 as i32) << 4 as i32))
-                                            == 0)
-                            {
-                            } else {
-                            };
+                            let mut io1: *mut TValue = &mut (*ra_12).val;
+                            let mut io2: *const TValue = slot_1;
+                            (*io1).value_ = (*io2).value_;
+                            (*io1).tt_ = (*io2).tt_;
                         } else {
                             let mut key_0: TValue = TValue {
                                 value_: Value {
@@ -1529,22 +1517,10 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             !((*slot_2).tt_ as i32 & 0xf as i32 == 0) as i32
                         } != 0
                         {
-                            let mut io1_7: *mut TValue = &mut (*ra_13).val;
-                            let mut io2_7: *const TValue = slot_2;
-                            (*io1_7).value_ = (*io2_7).value_;
-                            (*io1_7).tt_ = (*io2_7).tt_;
-                            if (*io1_7).tt_ as i32 & (1 as i32) << 6 as i32 == 0
-                                || (*io1_7).tt_ as i32 & 0x3f as i32
-                                    == (*(*io1_7).value_.gc).tt as i32
-                                    && (L.is_null()
-                                        || (*(*io1_7).value_.gc).marked as i32
-                                            & ((*(*L).l_G).currentwhite as i32
-                                                ^ ((1 as i32) << 3 as i32
-                                                    | (1 as i32) << 4 as i32))
-                                            == 0)
-                            {
-                            } else {
-                            };
+                            let mut io1: *mut TValue = &mut (*ra_13).val;
+                            let mut io2: *const TValue = slot_2;
+                            (*io1).value_ = (*io2).value_;
+                            (*io1).tt_ = (*io2).tt_;
                         } else {
                             (*ci).u.l.savedpc = pc;
                             (*L).top.p = (*ci).top.p;
@@ -1596,22 +1572,11 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             !((*slot_3).tt_ as i32 & 0xf as i32 == 0) as i32
                         } != 0
                         {
-                            let mut io1_8: *mut TValue = slot_3 as *mut TValue;
-                            let mut io2_8: *const TValue = rc_2;
-                            (*io1_8).value_ = (*io2_8).value_;
-                            (*io1_8).tt_ = (*io2_8).tt_;
-                            if (*io1_8).tt_ as i32 & (1 as i32) << 6 as i32 == 0
-                                || (*io1_8).tt_ as i32 & 0x3f as i32
-                                    == (*(*io1_8).value_.gc).tt as i32
-                                    && (L.is_null()
-                                        || (*(*io1_8).value_.gc).marked as i32
-                                            & ((*(*L).l_G).currentwhite as i32
-                                                ^ ((1 as i32) << 3 as i32
-                                                    | (1 as i32) << 4 as i32))
-                                            == 0)
-                            {
-                            } else {
-                            };
+                            let mut io1: *mut TValue = slot_3 as *mut TValue;
+                            let mut io2: *const TValue = rc_2;
+                            (*io1).value_ = (*io2).value_;
+                            (*io1).tt_ = (*io2).tt_;
+
                             if (*rc_2).tt_ as i32 & (1 as i32) << 6 as i32 != 0 {
                                 if (*(*upval_0).value_.gc).marked as i32 & (1 as i32) << 5 as i32
                                     != 0
@@ -1703,18 +1668,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             let mut io2_9: *const TValue = rc_3;
                             (*io1_9).value_ = (*io2_9).value_;
                             (*io1_9).tt_ = (*io2_9).tt_;
-                            if (*io1_9).tt_ as i32 & (1 as i32) << 6 as i32 == 0
-                                || (*io1_9).tt_ as i32 & 0x3f as i32
-                                    == (*(*io1_9).value_.gc).tt as i32
-                                    && (L.is_null()
-                                        || (*(*io1_9).value_.gc).marked as i32
-                                            & ((*(*L).l_G).currentwhite as i32
-                                                ^ ((1 as i32) << 3 as i32
-                                                    | (1 as i32) << 4 as i32))
-                                            == 0)
-                            {
-                            } else {
-                            };
+
                             if (*rc_3).tt_ as i32 & (1 as i32) << 6 as i32 != 0 {
                                 if (*(*ra_14).val.value_.gc).marked as i32 & (1 as i32) << 5 as i32
                                     != 0
@@ -1789,18 +1743,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             let mut io2_10: *const TValue = rc_4;
                             (*io1_10).value_ = (*io2_10).value_;
                             (*io1_10).tt_ = (*io2_10).tt_;
-                            if (*io1_10).tt_ as i32 & (1 as i32) << 6 as i32 == 0
-                                || (*io1_10).tt_ as i32 & 0x3f as i32
-                                    == (*(*io1_10).value_.gc).tt as i32
-                                    && (L.is_null()
-                                        || (*(*io1_10).value_.gc).marked as i32
-                                            & ((*(*L).l_G).currentwhite as i32
-                                                ^ ((1 as i32) << 3 as i32
-                                                    | (1 as i32) << 4 as i32))
-                                            == 0)
-                            {
-                            } else {
-                            };
                             if (*rc_4).tt_ as i32 & (1 as i32) << 6 as i32 != 0 {
                                 if (*(*ra_15).val.value_.gc).marked as i32 & (1 as i32) << 5 as i32
                                     != 0
@@ -1875,18 +1817,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             let mut io2_11: *const TValue = rc_5;
                             (*io1_11).value_ = (*io2_11).value_;
                             (*io1_11).tt_ = (*io2_11).tt_;
-                            if (*io1_11).tt_ as i32 & (1 as i32) << 6 as i32 == 0
-                                || (*io1_11).tt_ as i32 & 0x3f as i32
-                                    == (*(*io1_11).value_.gc).tt as i32
-                                    && (L.is_null()
-                                        || (*(*io1_11).value_.gc).marked as i32
-                                            & ((*(*L).l_G).currentwhite as i32
-                                                ^ ((1 as i32) << 3 as i32
-                                                    | (1 as i32) << 4 as i32))
-                                            == 0)
-                            {
-                            } else {
-                            };
                             if (*rc_5).tt_ as i32 & (1 as i32) << 6 as i32 != 0 {
                                 if (*(*ra_16).val.value_.gc).marked as i32 & (1 as i32) << 5 as i32
                                     != 0
@@ -1938,16 +1868,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         (*io_3).value_.gc = &mut (*(x_ as *mut GCUnion)).gc;
                         (*io_3).tt_ =
                             (5 as i32 | (0) << 4 as i32 | (1 as i32) << 6 as i32) as lu_byte;
-                        if (*io_3).tt_ as i32 & (1 as i32) << 6 as i32 == 0
-                            || (*io_3).tt_ as i32 & 0x3f as i32 == (*(*io_3).value_.gc).tt as i32
-                                && (L.is_null()
-                                    || (*(*io_3).value_.gc).marked as i32
-                                        & ((*(*L).l_G).currentwhite as i32
-                                            ^ ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32))
-                                        == 0)
-                        {
-                        } else {
-                        };
+
                         if b_3 != 0 || c_1 != 0 {
                             luaH_resize(L, t, c_1 as u32, b_3 as u32);
                         }
@@ -1992,17 +1913,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         let mut io2_12: *const TValue = rb_7;
                         (*io1_12).value_ = (*io2_12).value_;
                         (*io1_12).tt_ = (*io2_12).tt_;
-                        if (*io1_12).tt_ as i32 & (1 as i32) << 6 as i32 == 0
-                            || (*io1_12).tt_ as i32 & 0x3f as i32
-                                == (*(*io1_12).value_.gc).tt as i32
-                                && (L.is_null()
-                                    || (*(*io1_12).value_.gc).marked as i32
-                                        & ((*(*L).l_G).currentwhite as i32
-                                            ^ ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32))
-                                        == 0)
-                        {
-                        } else {
-                        };
+
                         if if !((*rb_7).tt_ as i32
                             == 5 as i32 | (0) << 4 as i32 | (1 as i32) << 6 as i32)
                         {
@@ -2018,18 +1929,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             let mut io2_13: *const TValue = slot_7;
                             (*io1_13).value_ = (*io2_13).value_;
                             (*io1_13).tt_ = (*io2_13).tt_;
-                            if (*io1_13).tt_ as i32 & (1 as i32) << 6 as i32 == 0
-                                || (*io1_13).tt_ as i32 & 0x3f as i32
-                                    == (*(*io1_13).value_.gc).tt as i32
-                                    && (L.is_null()
-                                        || (*(*io1_13).value_.gc).marked as i32
-                                            & ((*(*L).l_G).currentwhite as i32
-                                                ^ ((1 as i32) << 3 as i32
-                                                    | (1 as i32) << 4 as i32))
-                                            == 0)
-                            {
-                            } else {
-                            };
                         } else {
                             (*ci).u.l.savedpc = pc;
                             (*L).top.p = (*ci).top.p;
@@ -2056,7 +1955,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         if (*v1).tt_ as i32 == 3 as i32 | (0) << 4 as i32 {
                             let mut iv1: lua_Integer = (*v1).value_.i;
                             pc = pc.offset(1);
-                            pc;
                             let mut io_4: *mut TValue = &mut (*ra_19).val;
                             (*io_4).value_.i = (iv1 as lua_Unsigned)
                                 .wrapping_add(imm as lua_Unsigned)
@@ -2066,7 +1964,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             let mut nb: lua_Number = (*v1).value_.n;
                             let mut fimm: lua_Number = imm as lua_Number;
                             pc = pc.offset(1);
-                            pc;
                             let mut io_5: *mut TValue = &mut (*ra_19).val;
                             (*io_5).value_.n = nb + fimm;
                             (*io_5).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
@@ -2095,7 +1992,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             let mut i1: lua_Integer = (*v1_0).value_.i;
                             let mut i2: lua_Integer = (*v2).value_.i;
                             pc = pc.offset(1);
-                            pc;
                             let mut io_6: *mut TValue = &mut (*ra_20).val;
                             (*io_6).value_.i = (i1 as lua_Unsigned).wrapping_add(i2 as lua_Unsigned)
                                 as lua_Integer;
@@ -2127,7 +2023,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 }) != 0
                             {
                                 pc = pc.offset(1);
-                                pc;
                                 let mut io_7: *mut TValue = &mut (*ra_20).val;
                                 (*io_7).value_.n = n1 + n2;
                                 (*io_7).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
@@ -2157,7 +2052,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             let mut i1_0: lua_Integer = (*v1_1).value_.i;
                             let mut i2_0: lua_Integer = (*v2_0).value_.i;
                             pc = pc.offset(1);
-                            pc;
                             let mut io_8: *mut TValue = &mut (*ra_21).val;
                             (*io_8).value_.i = (i1_0 as lua_Unsigned)
                                 .wrapping_sub(i2_0 as lua_Unsigned)
@@ -2190,7 +2084,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 }) != 0
                             {
                                 pc = pc.offset(1);
-                                pc;
                                 let mut io_9: *mut TValue = &mut (*ra_21).val;
                                 (*io_9).value_.n = n1_0 - n2_0;
                                 (*io_9).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
@@ -2220,7 +2113,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             let mut i1_1: lua_Integer = (*v1_2).value_.i;
                             let mut i2_1: lua_Integer = (*v2_1).value_.i;
                             pc = pc.offset(1);
-                            pc;
                             let mut io_10: *mut TValue = &mut (*ra_22).val;
                             (*io_10).value_.i = ((i1_1 as lua_Unsigned)
                                 .wrapping_mul(i2_1 as lua_Unsigned))
@@ -2253,7 +2145,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 }) != 0
                             {
                                 pc = pc.offset(1);
-                                pc;
                                 let mut io_11: *mut TValue = &mut (*ra_22).val;
                                 (*io_11).value_.n = n1_1 * n2_1;
                                 (*io_11).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
@@ -2285,7 +2176,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             let mut i1_2: lua_Integer = (*v1_3).value_.i;
                             let mut i2_2: lua_Integer = (*v2_2).value_.i;
                             pc = pc.offset(1);
-                            pc;
                             let mut io_12: *mut TValue = &mut (*ra_23).val;
                             (*io_12).value_.i = luaV_mod(L, i1_2, i2_2);
                             (*io_12).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
@@ -2316,7 +2206,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 }) != 0
                             {
                                 pc = pc.offset(1);
-                                pc;
                                 let mut io_13: *mut TValue = &mut (*ra_23).val;
                                 (*io_13).value_.n = luaV_modf(L, n1_2, n2_2);
                                 (*io_13).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
@@ -2366,7 +2255,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             }) != 0
                         {
                             pc = pc.offset(1);
-                            pc;
                             let mut io_14: *mut TValue = &mut (*ra_24).val;
                             (*io_14).value_.n = (if n2_3 == 2 as i32 as lua_Number {
                                 n1_3 * n1_3
@@ -2419,7 +2307,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             }) != 0
                         {
                             pc = pc.offset(1);
-                            pc;
                             let mut io_15: *mut TValue = &mut (*ra_25).val;
                             (*io_15).value_.n = n1_4 / n2_4;
                             (*io_15).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
@@ -2450,7 +2337,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             let mut i1_3: lua_Integer = (*v1_6).value_.i;
                             let mut i2_3: lua_Integer = (*v2_5).value_.i;
                             pc = pc.offset(1);
-                            pc;
                             let mut io_16: *mut TValue = &mut (*ra_26).val;
                             (*io_16).value_.i = luaV_idiv(L, i1_3, i2_3);
                             (*io_16).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
@@ -2481,7 +2367,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 }) != 0
                             {
                                 pc = pc.offset(1);
-                                pc;
                                 let mut io_17: *mut TValue = &mut (*ra_26).val;
                                 (*io_17).value_.n = (n1_5 / n2_5).floor();
                                 (*io_17).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
@@ -2518,7 +2403,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         } != 0
                         {
                             pc = pc.offset(1);
-                            pc;
                             let mut io_18: *mut TValue = &mut (*ra_27).val;
                             (*io_18).value_.i =
                                 (i1_4 as lua_Unsigned & i2_4 as lua_Unsigned) as lua_Integer;
@@ -2555,7 +2439,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         } != 0
                         {
                             pc = pc.offset(1);
-                            pc;
                             let mut io_19: *mut TValue = &mut (*ra_28).val;
                             (*io_19).value_.i =
                                 (i1_5 as lua_Unsigned | i2_5 as lua_Unsigned) as lua_Integer;
@@ -2592,7 +2475,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         } != 0
                         {
                             pc = pc.offset(1);
-                            pc;
                             let mut io_20: *mut TValue = &mut (*ra_29).val;
                             (*io_20).value_.i =
                                 (i1_6 as lua_Unsigned ^ i2_6 as lua_Unsigned) as lua_Integer;
@@ -2627,7 +2509,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         } != 0
                         {
                             pc = pc.offset(1);
-                            pc;
                             let mut io_21: *mut TValue = &mut (*ra_30).val;
                             (*io_21).value_.i = luaV_shiftl(ib, -ic as lua_Integer);
                             (*io_21).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
@@ -2661,7 +2542,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         } != 0
                         {
                             pc = pc.offset(1);
-                            pc;
                             let mut io_22: *mut TValue = &mut (*ra_31).val;
                             (*io_22).value_.i = luaV_shiftl(ic_0 as lua_Integer, ib_0);
                             (*io_22).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
@@ -2691,7 +2571,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             let mut i1_7: lua_Integer = (*v1_10).value_.i;
                             let mut i2_7: lua_Integer = (*v2_9).value_.i;
                             pc = pc.offset(1);
-                            pc;
                             let mut io_23: *mut TValue = &mut (*ra_32).val;
                             (*io_23).value_.i = (i1_7 as lua_Unsigned)
                                 .wrapping_add(i2_7 as lua_Unsigned)
@@ -2724,7 +2603,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 }) != 0
                             {
                                 pc = pc.offset(1);
-                                pc;
                                 let mut io_24: *mut TValue = &mut (*ra_32).val;
                                 (*io_24).value_.n = n1_6 + n2_6;
                                 (*io_24).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
@@ -2755,7 +2633,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             let mut i1_8: lua_Integer = (*v1_11).value_.i;
                             let mut i2_8: lua_Integer = (*v2_10).value_.i;
                             pc = pc.offset(1);
-                            pc;
                             let mut io_25: *mut TValue = &mut (*ra_33).val;
                             (*io_25).value_.i = (i1_8 as lua_Unsigned)
                                 .wrapping_sub(i2_8 as lua_Unsigned)
@@ -2788,7 +2665,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 }) != 0
                             {
                                 pc = pc.offset(1);
-                                pc;
                                 let mut io_26: *mut TValue = &mut (*ra_33).val;
                                 (*io_26).value_.n = n1_7 - n2_7;
                                 (*io_26).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
@@ -2819,7 +2695,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             let mut i1_9: lua_Integer = (*v1_12).value_.i;
                             let mut i2_9: lua_Integer = (*v2_11).value_.i;
                             pc = pc.offset(1);
-                            pc;
                             let mut io_27: *mut TValue = &mut (*ra_34).val;
                             (*io_27).value_.i = ((i1_9 as lua_Unsigned)
                                 .wrapping_mul(i2_9 as lua_Unsigned))
@@ -2852,7 +2727,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 }) != 0
                             {
                                 pc = pc.offset(1);
-                                pc;
                                 let mut io_28: *mut TValue = &mut (*ra_34).val;
                                 (*io_28).value_.n = n1_8 * n2_8;
                                 (*io_28).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
@@ -2885,7 +2759,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             let mut i1_10: lua_Integer = (*v1_13).value_.i;
                             let mut i2_10: lua_Integer = (*v2_12).value_.i;
                             pc = pc.offset(1);
-                            pc;
                             let mut io_29: *mut TValue = &mut (*ra_35).val;
                             (*io_29).value_.i = luaV_mod(L, i1_10, i2_10);
                             (*io_29).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
@@ -2916,7 +2789,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 }) != 0
                             {
                                 pc = pc.offset(1);
-                                pc;
                                 let mut io_30: *mut TValue = &mut (*ra_35).val;
                                 (*io_30).value_.n = luaV_modf(L, n1_9, n2_9);
                                 (*io_30).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
@@ -2967,7 +2839,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             }) != 0
                         {
                             pc = pc.offset(1);
-                            pc;
                             let mut io_31: *mut TValue = &mut (*ra_36).val;
                             (*io_31).value_.n = (if n2_10 == 2 as i32 as lua_Number {
                                 n1_10 * n1_10
@@ -3021,7 +2892,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             }) != 0
                         {
                             pc = pc.offset(1);
-                            pc;
                             let mut io_32: *mut TValue = &mut (*ra_37).val;
                             (*io_32).value_.n = n1_11 / n2_11;
                             (*io_32).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
@@ -3053,7 +2923,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             let mut i1_11: lua_Integer = (*v1_16).value_.i;
                             let mut i2_11: lua_Integer = (*v2_15).value_.i;
                             pc = pc.offset(1);
-                            pc;
                             let mut io_33: *mut TValue = &mut (*ra_38).val;
                             (*io_33).value_.i = luaV_idiv(L, i1_11, i2_11);
                             (*io_33).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
@@ -3084,7 +2953,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 }) != 0
                             {
                                 pc = pc.offset(1);
-                                pc;
                                 let mut io_34: *mut TValue = &mut (*ra_38).val;
                                 (*io_34).value_.n = (n1_12 / n2_12).floor();
                                 (*io_34).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
@@ -3131,7 +2999,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             }) != 0
                         {
                             pc = pc.offset(1);
-                            pc;
                             let mut io_35: *mut TValue = &mut (*ra_39).val;
                             (*io_35).value_.i =
                                 (i1_12 as lua_Unsigned & i2_12 as lua_Unsigned) as lua_Integer;
@@ -3178,7 +3045,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             }) != 0
                         {
                             pc = pc.offset(1);
-                            pc;
                             let mut io_36: *mut TValue = &mut (*ra_40).val;
                             (*io_36).value_.i =
                                 (i1_13 as lua_Unsigned | i2_13 as lua_Unsigned) as lua_Integer;
@@ -3225,7 +3091,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             }) != 0
                         {
                             pc = pc.offset(1);
-                            pc;
                             let mut io_37: *mut TValue = &mut (*ra_41).val;
                             (*io_37).value_.i =
                                 (i1_14 as lua_Unsigned ^ i2_14 as lua_Unsigned) as lua_Integer;
@@ -3272,7 +3137,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             }) != 0
                         {
                             pc = pc.offset(1);
-                            pc;
                             let mut io_38: *mut TValue = &mut (*ra_42).val;
                             (*io_38).value_.i = luaV_shiftl(
                                 i1_15,
@@ -3322,7 +3186,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             }) != 0
                         {
                             pc = pc.offset(1);
-                            pc;
                             let mut io_39: *mut TValue = &mut (*ra_43).val;
                             (*io_39).value_.i = luaV_shiftl(i1_16, i2_16);
                             (*io_39).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
@@ -3605,7 +3468,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 as i32
                         {
                             pc = pc.offset(1);
-                            pc;
                         } else {
                             let mut ni: Instruction = *pc;
                             pc = pc.offset(
@@ -3656,7 +3518,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 as i32
                         {
                             pc = pc.offset(1);
-                            pc;
                         } else {
                             let mut ni_0: Instruction = *pc;
                             pc = pc.offset(
@@ -3707,7 +3568,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 as i32
                         {
                             pc = pc.offset(1);
-                            pc;
                         } else {
                             let mut ni_1: Instruction = *pc;
                             pc = pc.offset(
@@ -3742,7 +3602,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 as i32
                         {
                             pc = pc.offset(1);
-                            pc;
                         } else {
                             let mut ni_2: Instruction = *pc;
                             pc = pc.offset(
@@ -3782,7 +3641,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 as i32
                         {
                             pc = pc.offset(1);
-                            pc;
                         } else {
                             let mut ni_3: Instruction = *pc;
                             pc = pc.offset(
@@ -3830,7 +3688,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 as i32
                         {
                             pc = pc.offset(1);
-                            pc;
                         } else {
                             let mut ni_4: Instruction = *pc;
                             pc = pc.offset(
@@ -3879,7 +3736,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 as i32
                         {
                             pc = pc.offset(1);
-                            pc;
                         } else {
                             let mut ni_5: Instruction = *pc;
                             pc = pc.offset(
@@ -3935,7 +3791,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 as i32
                         {
                             pc = pc.offset(1);
-                            pc;
                         } else {
                             let mut ni_6: Instruction = *pc;
                             pc = pc.offset(
@@ -3991,7 +3846,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 as i32
                         {
                             pc = pc.offset(1);
-                            pc;
                         } else {
                             let mut ni_7: Instruction = *pc;
                             pc = pc.offset(
@@ -4023,7 +3877,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 as i32
                         {
                             pc = pc.offset(1);
-                            pc;
                         } else {
                             let mut ni_8: Instruction = *pc;
                             pc = pc.offset(
@@ -4059,7 +3912,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 as i32
                         {
                             pc = pc.offset(1);
-                            pc;
                         } else {
                             let mut io1_14: *mut TValue = &mut (*ra_64).val;
                             let mut io2_14: *const TValue = rb_18;
@@ -4212,7 +4064,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 (*L).top.p = ((*L).top.p).offset(1);
                                 (*fresh137).val.tt_ = (0 | (0) << 4 as i32) as lu_byte;
                                 nres -= 1;
-                                nres;
                             }
                         }
                         break;
@@ -4261,7 +4112,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                     (*L).top.p = ((*L).top.p).offset(1);
                                     (*fresh138).val.tt_ = (0 | (0) << 4 as i32) as lu_byte;
                                     nres_0 -= 1;
-                                    nres_0;
                                 }
                             }
                         }
