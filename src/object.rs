@@ -25,6 +25,18 @@ impl TValueFields for *mut TValue {
     }
 }
 
+impl TValueFields for *const TValue {
+    #[inline]
+    fn value(self) -> *mut Value {
+        self.cast_mut().cast()
+    }
+
+    #[inline]
+    fn tt(self) -> *mut u8 {
+        unsafe { self.byte_add(offset_of!(TValue, tt_)).cast_mut().cast() }
+    }
+}
+
 impl TValueFields for *mut ToBeClosedList {
     #[inline]
     fn value(self) -> *mut Value {
@@ -47,6 +59,14 @@ impl TValueFields for *mut NodeKey {
     fn tt(self) -> *mut u8 {
         unsafe { self.byte_add(offset_of!(NodeKey, tt_)).cast() }
     }
+}
+
+#[inline]
+pub(super) unsafe fn setobj(dst: impl TValueFields, src: impl TValueFields) {
+    let (o1_v, o1_tt) = (dst.value(), dst.tt());
+    let (o2_v, o2_tt) = (src.value(), src.tt());
+    *o1_v = *o2_v;
+    *o1_tt = *o2_tt;
 }
 
 /*

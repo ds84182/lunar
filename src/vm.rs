@@ -1230,8 +1230,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         let mut ra: StkId = base.add(getarg_a(i) as usize);
                         let mut io1: *mut TValue = &mut (*ra).val;
                         let mut io2: *const TValue = &(*base.add(getarg_b(i) as usize)).val;
-                        (*io1).value_ = (*io2).value_;
-                        (*io1).tt_ = (*io2).tt_;
+                        setobj(io1, io2);
                         continue;
                     }
                     OP_LOADI => {
@@ -1255,8 +1254,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         let mut rb: *mut TValue = k.add(getarg_bx(i) as usize);
                         let mut io1: *mut TValue = &mut (*ra).val;
                         let mut io2: *const TValue = rb;
-                        (*io1).value_ = (*io2).value_;
-                        (*io1).tt_ = (*io2).tt_;
+                        setobj(io1, io2);
                         continue;
                     }
                     OP_LOADKX => {
@@ -1265,8 +1263,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         pc = pc.add(1);
                         let mut io1: *mut TValue = &mut (*ra).val;
                         let mut io2: *const TValue = rb;
-                        (*io1).value_ = (*io2).value_;
-                        (*io1).tt_ = (*io2).tt_;
+                        setobj(io1, io2);
                         continue;
                     }
                     OP_LOADFALSE => {
@@ -1305,8 +1302,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         // TODO: UB if done by ref (Reading past the end of an array)
                         let mut io2: *const TValue =
                             (**((*cl).upvals).as_mut_ptr().add(b as usize)).v.p;
-                        (*io1).value_ = (*io2).value_;
-                        (*io1).tt_ = (*io2).tt_;
+                        setobj(io1, io2);
                         continue;
                     }
                     OP_SETUPVAL => {
@@ -1316,8 +1312,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             *((*cl).upvals).as_mut_ptr().add(getarg_b(i) as usize);
                         let mut io1: *mut TValue = (*uv).v.p;
                         let mut io2: *const TValue = &mut (*ra).val;
-                        (*io1).value_ = (*io2).value_;
-                        (*io1).tt_ = (*io2).tt_;
+                        setobj(io1, io2);
                         if iscollectable(&raw mut (*ra).val) {
                             if (*uv).marked as i32 & (1 as i32) << 5 as i32 != 0
                                 && (*(*ra).val.value_.gc).marked as i32
@@ -1359,8 +1354,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         {
                             let mut io1: *mut TValue = &mut (*ra).val;
                             let mut io2: *const TValue = slot;
-                            (*io1).value_ = (*io2).value_;
-                            (*io1).tt_ = (*io2).tt_;
+                            setobj(io1, io2);
                         } else {
                             (*ci).u.l.savedpc = pc;
                             (*L).top.p = (*ci).top.p;
@@ -1414,8 +1408,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         {
                             let mut io1: *mut TValue = &mut (*ra).val;
                             let mut io2: *const TValue = slot;
-                            (*io1).value_ = (*io2).value_;
-                            (*io1).tt_ = (*io2).tt_;
+                            setobj(io1, io2);
                         } else {
                             (*ci).u.l.savedpc = pc;
                             (*L).top.p = (*ci).top.p;
@@ -1455,8 +1448,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         {
                             let mut io1: *mut TValue = &mut (*ra).val;
                             let mut io2: *const TValue = slot;
-                            (*io1).value_ = (*io2).value_;
-                            (*io1).tt_ = (*io2).tt_;
+                            setobj(io1, io2);
                         } else {
                             let mut key_0: TValue = TValue {
                                 value_: Value {
@@ -1495,8 +1487,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         {
                             let mut io1: *mut TValue = &mut (*ra).val;
                             let mut io2: *const TValue = slot;
-                            (*io1).value_ = (*io2).value_;
-                            (*io1).tt_ = (*io2).tt_;
+                            setobj(io1, io2);
                         } else {
                             (*ci).u.l.savedpc = pc;
                             (*L).top.p = (*ci).top.p;
@@ -1534,8 +1525,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         {
                             let mut io1: *mut TValue = slot as *mut TValue;
                             let mut io2: *const TValue = rc;
-                            (*io1).value_ = (*io2).value_;
-                            (*io1).tt_ = (*io2).tt_;
+                            setobj(io1, io2);
 
                             if iscollectable(rc) {
                                 if (*(*upval).value_.gc).marked as i32 & (1 as i32) << 5 as i32 != 0
