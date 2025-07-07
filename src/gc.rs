@@ -124,10 +124,37 @@ pub(super) unsafe fn luaC_objbarrier(L: *mut lua_State, p: *mut GCObject, o: *mu
     }
 }
 
+/// Barrier that moves collector forward, that is, marks the white object
+/// `v` being pointed bt the black object `o`. In the generational
+/// mode, `v` must also become old, if `o` is old; however, it cannot
+/// be changed directly to OLD, because it may still point to non-old
+/// objects. So, it is marked as OLD0. In the next cycle it will become
+/// OLD1, and in the next it will finally become OLD (regular old). By
+/// then, any object it points to will also be old. If called in the
+/// incremental sweep phase, it clears the black object to white (sweep
+/// it) to avoid other barrier calls for this same object. (That cannot
+/// be done in generational mode, as its sweep does not distinguish
+/// whites from deads.)
 #[inline]
 pub(super) unsafe fn luaC_barrier(L: *mut lua_State, p: *mut impl IsGCObject, v: *mut TValue) {
     if iscollectable(v) {
         luaC_objbarrier(L, gco(p), (*v).value_.gc)
+    }
+}
+
+#[inline]
+pub(super) unsafe fn luaC_objbarrierback(L: *mut lua_State, p: *mut GCObject, o: *mut GCObject) {
+    if is_black(p) && is_white(o) {
+        luaC_barrierback_(L, p)
+    }
+}
+
+/// Barrier that moves collector backwards, that is, mark the black object
+/// pointing to a white object as gray again.
+#[inline]
+pub(super) unsafe fn luaC_barrierback(L: *mut lua_State, p: *mut impl IsGCObject, v: *mut TValue) {
+    if iscollectable(v) {
+        luaC_objbarrierback(L, gco(p), (*v).value_.gc)
     }
 }
 
