@@ -1,5 +1,136 @@
 use crate::*;
 
+// Possible states of the Garbage Collector
+pub(super) const GCSpropagate: u8 = 0;
+pub(super) const GCSenteratomic: u8 = 1;
+pub(super) const GCSatomic: u8 = 2;
+pub(super) const GCSswpallgc: u8 = 3;
+pub(super) const GCSswpfinobj: u8 = 4;
+pub(super) const GCSswptobefnz: u8 = 5;
+pub(super) const GCSswpend: u8 = 6;
+pub(super) const GCScallfin: u8 = 7;
+pub(super) const GCSpause: u8 = 8;
+
+#[inline]
+unsafe fn is_sweep_phase(g: *mut global_State) -> bool {
+    let gcstate = (*g).gcstate;
+    GCSswpallgc <= gcstate && gcstate <= GCSswpend
+}
+
+/// When main invariant (white objects cannot point to black ones) must be kept.
+///
+/// During a collection, the sweep phase may break the invariant, as objects turned
+/// white may point to still-black objects. The invariant is restored when sweep
+/// ends and all objects are white again.
+#[inline]
+unsafe fn keep_invariant(g: *mut global_State) -> bool {
+    (*g).gcstate <= GCSatomic
+}
+
+#[inline]
+fn resetbits(x: &mut u8, m: u8) {
+    *x &= m;
+}
+
+#[inline]
+fn setbits(x: &mut u8, m: u8) {
+    *x |= m;
+}
+
+#[inline]
+fn testbits(x: u8, m: u8) -> bool {
+    (x & m) != 0
+}
+
+#[inline]
+const fn bitmask(b: u32) -> u8 {
+    1 << b
+}
+
+#[inline]
+const fn bit2mask(b1: u32, b2: u32) -> u8 {
+    bitmask(b1) | bitmask(b2)
+}
+
+#[inline]
+fn setbit<const B: u32>(x: &mut u8) {
+    setbits(x, const { bitmask(B) })
+}
+
+#[inline]
+fn resetbit<const B: u32>(x: &mut u8) {
+    resetbits(x, const { bitmask(B) })
+}
+
+#[inline]
+fn testbit<const B: u32>(x: u8) -> bool {
+    testbits(x, const { bitmask(B) })
+}
+
+// Layout for bit use in 'marked' field. First three bits are used for object "age"
+// in generational mode. Last bit is used by tests.
+const WHITE0BIT: u32 = 3;
+const WHITE1BIT: u32 = 4;
+const BLACKBIT: u32 = 5;
+const FINALIZEDBIT: u32 = 6;
+
+const WHITEBITS: u8 = bit2mask(WHITE0BIT, WHITE1BIT);
+
+pub(super) trait IsGCObject {}
+
+impl IsGCObject for GCObject {}
+impl IsGCObject for UpVal {}
+
+#[inline]
+unsafe fn gco(ptr: *const impl IsGCObject) -> *mut GCObject {
+    ptr.cast_mut().cast()
+}
+
+#[inline]
+unsafe fn is_white(x: *mut GCObject) -> bool {
+    testbits((*x).marked, WHITEBITS)
+}
+
+#[inline]
+unsafe fn is_black(x: *mut GCObject) -> bool {
+    testbit::<BLACKBIT>((*x).marked)
+}
+
+#[inline]
+unsafe fn is_grey(x: *mut GCObject) -> bool {
+    testbits((*x).marked, const { WHITEBITS | bitmask(BLACKBIT) })
+}
+
+#[inline]
+unsafe fn to_finalize(x: *mut GCObject) -> bool {
+    testbit::<FINALIZEDBIT>((*x).marked)
+}
+
+// Object age in generational mode
+const G_NEW: u8 = 0;
+const G_SURVIVAL: u8 = 1;
+const G_OLD0: u8 = 2;
+const G_OLD1: u8 = 3;
+const G_OLD: u8 = 4;
+const G_TOUCHED1: u8 = 5;
+const G_TOUCHED2: u8 = 6;
+
+const AGEBITS: u8 = 7;
+
+#[inline]
+pub(super) unsafe fn luaC_objbarrier(L: *mut lua_State, p: *mut GCObject, o: *mut GCObject) {
+    if is_black(p) && is_white(o) {
+        luaC_barrier_(L, p, o)
+    }
+}
+
+#[inline]
+pub(super) unsafe fn luaC_barrier(L: *mut lua_State, p: *mut impl IsGCObject, v: *mut TValue) {
+    if iscollectable(v) {
+        luaC_objbarrier(L, gco(p), (*v).value_.gc)
+    }
+}
+
 unsafe extern "C-unwind" fn getgclist(mut o: *mut GCObject) -> *mut *mut GCObject {
     match (*o).tt {
         LUA_VTABLE => return &mut (*&mut (*(o as *mut GCUnion)).h).gclist,
@@ -49,7 +180,7 @@ pub unsafe extern "C-unwind" fn luaC_barrier_(
     mut v: *mut GCObject,
 ) {
     let mut g: *mut global_State = (*L).l_G;
-    if (*g).gcstate as i32 <= 2 as i32 {
+    if keep_invariant(g) {
         reallymarkobject(g, v);
         if (*o).marked as i32 & 7 as i32 > 1 as i32 {
             (*v).marked = ((*v).marked as i32 & !(7 as i32) | 2 as i32) as lu_byte;

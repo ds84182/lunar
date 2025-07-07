@@ -1313,21 +1313,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         let mut io1: *mut TValue = (*uv).v.p;
                         let mut io2: *const TValue = &mut (*ra).val;
                         setobj(io1, io2);
-                        if iscollectable(&raw mut (*ra).val) {
-                            if (*uv).marked as i32 & (1 as i32) << 5 as i32 != 0
-                                && (*(*ra).val.value_.gc).marked as i32
-                                    & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
-                                    != 0
-                            {
-                                luaC_barrier_(
-                                    L,
-                                    &mut (*(uv as *mut GCUnion)).gc,
-                                    &mut (*((*ra).val.value_.gc as *mut GCUnion)).gc,
-                                );
-                            } else {
-                            };
-                        } else {
-                        };
+                        luaC_barrier(L, uv, &raw mut (*ra).val);
                         continue;
                     }
                     OP_GETTABUP => {
