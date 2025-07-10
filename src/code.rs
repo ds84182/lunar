@@ -1910,6 +1910,12 @@ pub unsafe extern "C-unwind" fn luaK_settablesize(
     *inst.offset(1) =
         (OP_EXTRAARG as i32 as Instruction) << 0 | (extra as Instruction) << 0 + 7 as i32;
 }
+
+/// Emit a SETLIST instruction.
+/// `base` is the register that keeps table;
+/// `nelems` is #table plus those to be stored now;
+/// `tostore` is number of values (in registers `base + 1`,...) to add to
+/// table (or LUA_MULTIRET to add up to stack top).
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaK_setlist(
     mut fs: *mut FuncState,
@@ -1917,39 +1923,38 @@ pub unsafe extern "C-unwind" fn luaK_setlist(
     mut nelems: i32,
     mut tostore: i32,
 ) {
-    if tostore == -(1 as i32) {
+    if tostore == LUA_MULTRET {
         tostore = 0;
     }
-    if nelems <= ((1 as i32) << 8 as i32) - 1 as i32 {
+    if nelems <= MAXARG_C as i32 {
         luaK_codeABCk(fs, OP_SETLIST, base, tostore, nelems, 0);
     } else {
-        let mut extra: i32 = nelems / (((1 as i32) << 8 as i32) - 1 as i32 + 1 as i32);
-        nelems %= ((1 as i32) << 8 as i32) - 1 as i32 + 1 as i32;
-        luaK_codeABCk(fs, OP_SETLIST, base, tostore, nelems, 1 as i32);
+        let mut extra: i32 = nelems / (MAXARG_C as i32 + 1);
+        nelems %= MAXARG_C as i32 + 1;
+        luaK_codeABCk(fs, OP_SETLIST, base, tostore, nelems, 1);
         codeextraarg(fs, extra);
     }
+    // free registers with list values
     (*fs).freereg = (base + 1 as i32) as lu_byte;
 }
+
+/// Return the final target of a jump (skipping jumps to jumps).
 unsafe extern "C-unwind" fn finaltarget(mut code: *mut Instruction, mut i: i32) -> i32 {
     let mut count: i32 = 0;
     count = 0;
     while count < 100 {
         let mut pc: Instruction = *code.offset(i as isize);
-        if (pc >> 0 & !(!(0 as Instruction) << 7 as i32) << 0) as OpCode as u32
-            != OP_JMP as i32 as u32
-        {
+        if get_opcode(pc) != OP_JMP {
             break;
         }
-        i += (pc >> 0 + 7 as i32
-            & !(!(0 as Instruction) << 8 as i32 + 8 as i32 + 1 as i32 + 8 as i32) << 0)
-            as i32
-            - (((1 as i32) << 8 as i32 + 8 as i32 + 1 as i32 + 8 as i32) - 1 as i32 >> 1 as i32)
-            + 1 as i32;
+        i += getarg_sj(pc) + 1;
         count += 1;
-        count;
     }
     return i;
 }
+
+/// Do a final pass over the code of a function, doing small peephole
+/// optimizations and adjustments.
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaK_finish(mut fs: *mut FuncState) {
     let mut i: i32 = 0;
@@ -1958,8 +1963,8 @@ pub unsafe extern "C-unwind" fn luaK_finish(mut fs: *mut FuncState) {
     while i < (*fs).pc {
         let mut pc: *mut Instruction = &mut *((*p).code).offset(i as isize) as *mut Instruction;
         let mut current_block_7: u64;
-        match (*pc >> 0 & !(!(0 as Instruction) << 7 as i32) << 0) as OpCode as u32 {
-            71 | 72 => {
+        match get_opcode(*pc) {
+            OP_RETURN0 | OP_RETURN1 => {
                 if !((*fs).needclose as i32 != 0 || (*p).is_vararg as i32 != 0) {
                     current_block_7 = 12599329904712511516;
                 } else {
@@ -1969,10 +1974,10 @@ pub unsafe extern "C-unwind" fn luaK_finish(mut fs: *mut FuncState) {
                     current_block_7 = 11006700562992250127;
                 }
             }
-            70 | 69 => {
+            OP_RETURN | OP_TAILCALL => {
                 current_block_7 = 11006700562992250127;
             }
-            56 => {
+            OP_JMP => {
                 let mut target: i32 = finaltarget((*p).code, i);
                 fixjump(fs, i, target);
                 current_block_7 = 12599329904712511516;
@@ -2001,6 +2006,5 @@ pub unsafe extern "C-unwind" fn luaK_finish(mut fs: *mut FuncState) {
             _ => {}
         }
         i += 1;
-        i;
     }
 }

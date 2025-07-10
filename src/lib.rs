@@ -70,6 +70,7 @@ pub type __time_t = std::ffi::c_long;
 pub type __sig_atomic_t = i32;
 pub type intptr_t = isize;
 pub type uintptr_t = usize;
+pub const LUA_MULTRET: i32 = -1;
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct lua_State {
