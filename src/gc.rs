@@ -80,6 +80,8 @@ pub(super) trait IsGCObject {}
 
 impl IsGCObject for GCObject {}
 impl IsGCObject for UpVal {}
+impl IsGCObject for Table {}
+impl IsGCObject for TString {}
 
 #[inline]
 unsafe fn gco(ptr: *const impl IsGCObject) -> *mut GCObject {

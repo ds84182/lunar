@@ -745,46 +745,14 @@ unsafe extern "C-unwind" fn luaH_newkey(
             mp = f_0;
         }
     }
+
     let mut n_: *mut Node = mp;
     let mut io_: *const TValue = key;
     (*n_).u.key_val = (*io_).value_;
     (*n_).u.key_tt = (*io_).tt_;
-    if (*io_).tt_ as i32 & (1 as i32) << 6 as i32 == 0
-        || (*io_).tt_ as i32 & 0x3f as i32 == (*(*io_).value_.gc).tt as i32
-            && (L.is_null()
-                || (*(*io_).value_.gc).marked as i32
-                    & ((*(*L).l_G).currentwhite as i32
-                        ^ ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32))
-                    == 0)
-    {
-    } else {
-    };
-    if (*key).tt_ as i32 & (1 as i32) << 6 as i32 != 0 {
-        if (*(&mut (*(t as *mut GCUnion)).gc as *mut GCObject)).marked as i32
-            & (1 as i32) << 5 as i32
-            != 0
-            && (*(*key).value_.gc).marked as i32 & ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32)
-                != 0
-        {
-            luaC_barrierback_(L, &mut (*(t as *mut GCUnion)).gc);
-        } else {
-        };
-    } else {
-    };
-    let mut io1: *mut TValue = &mut (*mp).i_val;
-    let mut io2: *const TValue = value;
-    (*io1).value_ = (*io2).value_;
-    (*io1).tt_ = (*io2).tt_;
-    if (*io1).tt_ as i32 & (1 as i32) << 6 as i32 == 0
-        || (*io1).tt_ as i32 & 0x3f as i32 == (*(*io1).value_.gc).tt as i32
-            && (L.is_null()
-                || (*(*io1).value_.gc).marked as i32
-                    & ((*(*L).l_G).currentwhite as i32
-                        ^ ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32))
-                    == 0)
-    {
-    } else {
-    };
+
+    luaC_barrierback(L, t, key.cast_mut());
+    setobj(&raw mut (*mp).i_val, value);
 }
 
 #[unsafe(no_mangle)]
@@ -847,7 +815,7 @@ pub unsafe extern "C-unwind" fn luaH_getstr(
     mut t: *mut Table,
     mut key: *mut TString,
 ) -> *const TValue {
-    if (*key).tt as i32 == 4 as i32 | (0) << 4 as i32 {
+    if (*key).tt == LUA_VSHRSTR {
         return luaH_getshortstr(t, key);
     } else {
         let mut ko: TValue = TValue {
@@ -865,16 +833,17 @@ pub unsafe extern "C-unwind" fn luaH_getstr(
     };
 }
 
+/// Main search function.
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaH_get(
     mut t: *mut Table,
     mut key: *const TValue,
 ) -> *const TValue {
-    match (*key).tt_ as i32 & 0x3f as i32 {
-        4 => return luaH_getshortstr(t, &mut (*((*key).value_.gc as *mut GCUnion)).ts),
-        3 => return luaH_getint(t, (*key).value_.i),
-        0 => return &raw const absentkey,
-        19 => {
+    match ttypetag(key) {
+        LUA_VSHRSTR => return luaH_getshortstr(t, &mut (*((*key).value_.gc as *mut GCUnion)).ts),
+        LUA_VNUMINT => return luaH_getint(t, (*key).value_.i),
+        LUA_VNIL => return &raw const absentkey,
+        LUA_VNUMFLT => {
             let mut k: lua_Integer = 0;
             if luaV_flttointeger((*key).value_.n, &mut k, F2Ieq) != 0 {
                 return luaH_getint(t, k);
@@ -885,6 +854,10 @@ pub unsafe extern "C-unwind" fn luaH_get(
     return getgeneric(t, key, 0);
 }
 
+/// Finish a raw "set table" operation, where `slot` is where the value
+/// should have been (the result of a previous "get table").
+/// Beware: When using this function you probably need to check as GC
+/// barrier and invalidate the TM cache.
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaH_finishset(
     mut L: *mut lua_State,
@@ -893,26 +866,15 @@ pub unsafe extern "C-unwind" fn luaH_finishset(
     mut slot: *const TValue,
     mut value: *mut TValue,
 ) {
-    if (*slot).tt_ as i32 == 0 | (2 as i32) << 4 as i32 {
+    if is_absent_key(slot) {
         luaH_newkey(L, t, key, value);
     } else {
-        let mut io1: *mut TValue = slot as *mut TValue;
-        let mut io2: *const TValue = value;
-        (*io1).value_ = (*io2).value_;
-        (*io1).tt_ = (*io2).tt_;
-        if (*io1).tt_ as i32 & (1 as i32) << 6 as i32 == 0
-            || (*io1).tt_ as i32 & 0x3f as i32 == (*(*io1).value_.gc).tt as i32
-                && (L.is_null()
-                    || (*(*io1).value_.gc).marked as i32
-                        & ((*(*L).l_G).currentwhite as i32
-                            ^ ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32))
-                        == 0)
-        {
-        } else {
-        };
-    };
+        setobj(slot as *mut TValue, value);
+    }
 }
 
+/// Beware: When using this function you probably need to check as GC
+/// barrier and invalidate the TM cache.
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaH_set(
     mut L: *mut lua_State,
@@ -932,7 +894,7 @@ pub unsafe extern "C-unwind" fn luaH_setint(
     mut value: *mut TValue,
 ) {
     let mut p: *const TValue = luaH_getint(t, key);
-    if (*p).tt_ as i32 == 0 | (2 as i32) << 4 as i32 {
+    if is_absent_key(p) {
         let mut k: TValue = TValue {
             value_: Value {
                 gc: 0 as *mut GCObject,
@@ -940,25 +902,11 @@ pub unsafe extern "C-unwind" fn luaH_setint(
             tt_: 0,
         };
         let mut io: *mut TValue = &mut k;
-        (*io).value_.i = key;
-        (*io).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
+        setivalue(io, key);
         luaH_newkey(L, t, &mut k, value);
     } else {
-        let mut io1: *mut TValue = p as *mut TValue;
-        let mut io2: *const TValue = value;
-        (*io1).value_ = (*io2).value_;
-        (*io1).tt_ = (*io2).tt_;
-        if (*io1).tt_ as i32 & (1 as i32) << 6 as i32 == 0
-            || (*io1).tt_ as i32 & 0x3f as i32 == (*(*io1).value_.gc).tt as i32
-                && (L.is_null()
-                    || (*(*io1).value_.gc).marked as i32
-                        & ((*(*L).l_G).currentwhite as i32
-                            ^ ((1 as i32) << 3 as i32 | (1 as i32) << 4 as i32))
-                        == 0)
-        {
-        } else {
-        };
-    };
+        setobj(p as *mut TValue, value);
+    }
 }
 
 unsafe extern "C-unwind" fn hash_search(mut t: *mut Table, mut j: lua_Unsigned) -> lua_Unsigned {
