@@ -18,7 +18,6 @@ unsafe extern "C" {
 use lunar::*;
 
 use libc::{FILE, fprintf, fflush, fwrite, strlen, strchr, strcmp, getenv, fputs, fgets};
-use ::c2rust_bitfields;
 
 unsafe fn signal(signum: i32, handler: Option<unsafe extern "C" fn(i32) -> ()>) -> Option<unsafe extern "C" fn(i32) -> ()> {
     std::mem::transmute(libc::signal(signum, std::mem::transmute(handler)))
