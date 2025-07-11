@@ -1248,6 +1248,112 @@ pub unsafe extern "C-unwind" fn luaV_finishOp(mut L: *mut lua_State) {
         _ => {}
     };
 }
+
+macro_rules! intop {
+    ($name:ident, $op:tt) => {
+        #[inline]
+        fn $name(a: lua_Integer, b: lua_Integer) -> lua_Integer {
+            ((a as lua_Unsigned) $op (b as lua_Unsigned)) as lua_Integer
+        }
+    };
+}
+
+macro_rules! fltop {
+    ($name:ident, $op:tt) => {
+        #[inline]
+        fn $name(a: lua_Number, b: lua_Number) -> lua_Number {
+            a $op b
+        }
+    };
+}
+
+intop!(l_addi, +);
+intop!(l_subi, -);
+intop!(l_muli, *);
+intop!(l_band, &);
+intop!(l_bor, |);
+intop!(l_bxor, ^);
+
+fltop!(luai_numadd, +);
+fltop!(luai_numsub, -);
+fltop!(luai_nummul, *);
+fltop!(luai_numdiv, /);
+
+#[inline]
+fn luai_numpow(a: lua_Number, b: lua_Number) -> lua_Number {
+    if b == 2.0 { a * a } else { a.powf(b) }
+}
+
+#[inline(always)]
+unsafe fn op_arith(
+    i: u32,
+    base: StkId,
+    pc: *const Instruction,
+    iop: impl Fn(lua_Integer, lua_Integer) -> lua_Integer,
+    fop: impl Fn(lua_Number, lua_Number) -> lua_Number,
+) -> *const Instruction {
+    let mut v1: *mut TValue = &mut (*base.add(getarg_b(i) as usize)).val;
+    let mut v2: *mut TValue = &mut (*base.add(getarg_c(i) as usize)).val;
+    let mut ra: StkId = base.add(getarg_a(i) as usize);
+
+    let a_tt = (*v1).tt_;
+    let b_tt = (*v2).tt_;
+
+    if std::hint::likely(a_tt == b_tt) {
+        if a_tt == LUA_VNUMINT {
+            setivalue(ra, iop((*v1).value_.i, (*v2).value_.i));
+            pc.add(1)
+        } else if a_tt == LUA_VNUMFLT {
+            setfltvalue(ra, fop((*v1).value_.n, (*v2).value_.n));
+            pc.add(1)
+        } else {
+            pc
+        }
+    } else {
+        match (a_tt, b_tt) {
+            (LUA_VNUMINT, LUA_VNUMFLT) => {
+                setfltvalue(ra, fop((*v1).value_.i as lua_Number, (*v2).value_.n));
+                pc.add(1)
+            }
+            (LUA_VNUMFLT, LUA_VNUMINT) => {
+                setfltvalue(ra, fop((*v1).value_.n, (*v2).value_.i as lua_Number));
+                pc.add(1)
+            }
+            _ => pc,
+        }
+    }
+}
+
+#[inline(always)]
+unsafe fn op_arithf(
+    i: u32,
+    base: StkId,
+    pc: *const Instruction,
+    fop: impl Fn(lua_Number, lua_Number) -> lua_Number,
+) -> *const Instruction {
+    let mut v1: *mut TValue = &mut (*base.add(getarg_b(i) as usize)).val;
+    let mut v2: *mut TValue = &mut (*base.add(getarg_c(i) as usize)).val;
+    let mut ra: StkId = base.add(getarg_a(i) as usize);
+
+    let a_tt = (*v1).tt_;
+    let b_tt = (*v2).tt_;
+
+    let a = match a_tt {
+        3 => (*v1).value_.i as lua_Number,
+        0x13 => (*v1).value_.n,
+        _ => return pc,
+    };
+
+    let b = match b_tt {
+        3 => (*v2).value_.i as lua_Number,
+        0x13 => (*v2).value_.n,
+        _ => return pc,
+    };
+
+    setfltvalue(ra, fop(a, b));
+    pc.add(1)
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut CallInfo) {
     let mut i: Instruction = 0;
@@ -2243,156 +2349,15 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         continue;
                     }
                     OP_ADD => {
-                        let mut v1: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut v2: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32 + 8 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut ra: StkId = base.offset(
-                            (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
-                                as isize,
-                        );
-
-                        let a_tt = (*v1).tt_;
-                        let b_tt = (*v2).tt_;
-
-                        pc = if std::hint::likely(a_tt == b_tt) {
-                            if a_tt == LUA_VNUMINT {
-                                setivalue(
-                                    ra,
-                                    ((*v1).value_.i as lua_Unsigned)
-                                        .wrapping_add((*v2).value_.i as lua_Unsigned)
-                                        as lua_Integer,
-                                );
-                                pc.add(1)
-                            } else if a_tt == LUA_VNUMFLT {
-                                setfltvalue(ra, (*v1).value_.n + (*v2).value_.n);
-                                pc.add(1)
-                            } else {
-                                pc
-                            }
-                        } else {
-                            match (a_tt, b_tt) {
-                                (LUA_VNUMINT, LUA_VNUMFLT) => {
-                                    setfltvalue(ra, (*v1).value_.i as lua_Number + (*v2).value_.n);
-                                    pc.add(1)
-                                }
-                                (LUA_VNUMFLT, LUA_VNUMINT) => {
-                                    setfltvalue(ra, (*v1).value_.n + (*v2).value_.i as lua_Number);
-                                    pc.add(1)
-                                }
-                                _ => pc,
-                            }
-                        };
+                        pc = op_arith(i, base, pc, l_addi, luai_numadd);
                         continue;
                     }
                     OP_SUB => {
-                        let mut v1: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut v2: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32 + 8 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut ra: StkId = base.offset(
-                            (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
-                                as isize,
-                        );
-
-                        let a_tt = (*v1).tt_;
-                        let b_tt = (*v2).tt_;
-
-                        pc = if std::hint::likely(a_tt == b_tt) {
-                            if a_tt == LUA_VNUMINT {
-                                setivalue(
-                                    ra,
-                                    ((*v1).value_.i as lua_Unsigned)
-                                        .wrapping_sub((*v2).value_.i as lua_Unsigned)
-                                        as lua_Integer,
-                                );
-                                pc.add(1)
-                            } else if a_tt == LUA_VNUMFLT {
-                                setfltvalue(ra, (*v1).value_.n - (*v2).value_.n);
-                                pc.add(1)
-                            } else {
-                                pc
-                            }
-                        } else {
-                            match (a_tt, b_tt) {
-                                (LUA_VNUMINT, LUA_VNUMFLT) => {
-                                    setfltvalue(ra, (*v1).value_.i as lua_Number - (*v2).value_.n);
-                                    pc.add(1)
-                                }
-                                (LUA_VNUMFLT, LUA_VNUMINT) => {
-                                    setfltvalue(ra, (*v1).value_.n - (*v2).value_.i as lua_Number);
-                                    pc.add(1)
-                                }
-                                _ => pc,
-                            }
-                        };
+                        pc = op_arith(i, base, pc, l_subi, luai_numsub);
                         continue;
                     }
                     OP_MUL => {
-                        let mut v1: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut v2: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32 + 8 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut ra: StkId = base.offset(
-                            (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
-                                as isize,
-                        );
-
-                        let a_tt = (*v1).tt_;
-                        let b_tt = (*v2).tt_;
-
-                        pc = if std::hint::likely(a_tt == b_tt) {
-                            if a_tt == LUA_VNUMINT {
-                                setivalue(
-                                    ra,
-                                    ((*v1).value_.i as lua_Unsigned)
-                                        .wrapping_mul((*v2).value_.i as lua_Unsigned)
-                                        as lua_Integer,
-                                );
-                                pc.add(1)
-                            } else if a_tt == LUA_VNUMFLT {
-                                setfltvalue(ra, (*v1).value_.n * (*v2).value_.n);
-                                pc.add(1)
-                            } else {
-                                pc
-                            }
-                        } else {
-                            match (a_tt, b_tt) {
-                                (LUA_VNUMINT, LUA_VNUMFLT) => {
-                                    setfltvalue(ra, (*v1).value_.i as lua_Number * (*v2).value_.n);
-                                    pc.add(1)
-                                }
-                                (LUA_VNUMFLT, LUA_VNUMINT) => {
-                                    setfltvalue(ra, (*v1).value_.n * (*v2).value_.i as lua_Number);
-                                    pc.add(1)
-                                }
-                                _ => pc,
-                            }
-                        };
+                        pc = op_arith(i, base, pc, l_muli, luai_nummul);
                         continue;
                     }
                     OP_MOD => {
@@ -2458,105 +2423,11 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         continue;
                     }
                     OP_POW => {
-                        let mut ra_36: StkId = base.offset(
-                            (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
-                                as isize,
-                        );
-                        let mut v1_14: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut v2_13: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32 + 8 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut n1_10: lua_Number = 0.;
-                        let mut n2_10: lua_Number = 0.;
-                        if (if (*v1_14).tt_ as i32 == 3 as i32 | (1 as i32) << 4 as i32 {
-                            n1_10 = (*v1_14).value_.n;
-                            1 as i32
-                        } else {
-                            (if (*v1_14).tt_ as i32 == 3 as i32 | (0) << 4 as i32 {
-                                n1_10 = (*v1_14).value_.i as lua_Number;
-                                1 as i32
-                            } else {
-                                0
-                            })
-                        }) != 0
-                            && (if (*v2_13).tt_ as i32 == 3 as i32 | (1 as i32) << 4 as i32 {
-                                n2_10 = (*v2_13).value_.n;
-                                1 as i32
-                            } else {
-                                (if (*v2_13).tt_ as i32 == 3 as i32 | (0) << 4 as i32 {
-                                    n2_10 = (*v2_13).value_.i as lua_Number;
-                                    1 as i32
-                                } else {
-                                    0
-                                })
-                            }) != 0
-                        {
-                            pc = pc.offset(1);
-                            let mut io_31: *mut TValue = &mut (*ra_36).val;
-                            (*io_31).value_.n = (if n2_10 == 2 as i32 as lua_Number {
-                                n1_10 * n1_10
-                            } else {
-                                n1_10.powf(n2_10)
-                            });
-                            (*io_31).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
-                        }
+                        pc = op_arithf(i, base, pc, luai_numpow);
                         continue;
                     }
                     OP_DIV => {
-                        let mut ra_37: StkId = base.offset(
-                            (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
-                                as isize,
-                        );
-                        let mut v1_15: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut v2_14: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32 + 8 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut n1_11: lua_Number = 0.;
-                        let mut n2_11: lua_Number = 0.;
-                        if (if (*v1_15).tt_ as i32 == 3 as i32 | (1 as i32) << 4 as i32 {
-                            n1_11 = (*v1_15).value_.n;
-                            1 as i32
-                        } else {
-                            (if (*v1_15).tt_ as i32 == 3 as i32 | (0) << 4 as i32 {
-                                n1_11 = (*v1_15).value_.i as lua_Number;
-                                1 as i32
-                            } else {
-                                0
-                            })
-                        }) != 0
-                            && (if (*v2_14).tt_ as i32 == 3 as i32 | (1 as i32) << 4 as i32 {
-                                n2_11 = (*v2_14).value_.n;
-                                1 as i32
-                            } else {
-                                (if (*v2_14).tt_ as i32 == 3 as i32 | (0) << 4 as i32 {
-                                    n2_11 = (*v2_14).value_.i as lua_Number;
-                                    1 as i32
-                                } else {
-                                    0
-                                })
-                            }) != 0
-                        {
-                            pc = pc.offset(1);
-                            let mut io_32: *mut TValue = &mut (*ra_37).val;
-                            (*io_32).value_.n = n1_11 / n2_11;
-                            (*io_32).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
-                        }
+                        pc = op_arithf(i, base, pc, luai_numdiv);
                         continue;
                     }
                     OP_IDIV => {
