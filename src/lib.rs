@@ -9,6 +9,7 @@
     unsafe_op_in_unsafe_fn
 )]
 #![feature(c_variadic, extern_types)]
+#![feature(likely_unlikely)]
 
 mod code;
 mod gc;
