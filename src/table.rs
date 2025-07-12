@@ -703,7 +703,7 @@ unsafe extern "C-unwind" fn luaH_newkey(
     } else if (*key).tt_ as i32 == 3 as i32 | (1 as i32) << 4 as i32 {
         let mut f: lua_Number = (*key).value_.n;
         let mut k: lua_Integer = 0;
-        if luaV_flttointeger(f, &mut k, F2Ieq) != 0 {
+        if luaV_flttointeger::<F2Ieq>(f, &mut k) != 0 {
             let mut io: *mut TValue = &mut aux;
             (*io).value_.i = k;
             (*io).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
@@ -845,7 +845,7 @@ pub unsafe extern "C-unwind" fn luaH_get(
         LUA_VNIL => return &raw const absentkey,
         LUA_VNUMFLT => {
             let mut k: lua_Integer = 0;
-            if luaV_flttointeger((*key).value_.n, &mut k, F2Ieq) != 0 {
+            if luaV_flttointeger::<F2Ieq>((*key).value_.n, &mut k) != 0 {
                 return luaH_getint(t, k);
             }
         }

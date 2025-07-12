@@ -3786,7 +3786,7 @@ pub unsafe extern "C-unwind" fn luaG_tointerror(
     mut p2: *const TValue,
 ) -> ! {
     let mut temp: lua_Integer = 0;
-    if luaV_tointegerns(p1, &mut temp, F2Ieq) == 0 {
+    if luaV_tointegerns::<F2Ieq>(p1, &mut temp) == 0 {
         p2 = p1;
     }
     luaG_runerror(
@@ -5773,7 +5773,7 @@ pub unsafe extern "C-unwind" fn lua_tointegerx(
         res = (*o).value_.i;
         1 as i32
     } else {
-        luaV_tointeger(o, &mut res, F2Ieq)
+        luaV_tointeger::<F2Ieq>(o, &mut res)
     };
     if !pisnum.is_null() {
         *pisnum = isnum;

@@ -451,7 +451,7 @@ pub unsafe extern "C-unwind" fn luaO_rawarith(
                 i1 = (*p1).value_.i;
                 1 as i32
             } else {
-                luaV_tointegerns(p1, &mut i1, F2Ieq)
+                luaV_tointegerns::<F2Ieq>(p1, &mut i1)
             }) != 0
                 && (if (((*p2).tt_ as i32 == 3 as i32 | (0) << 4 as i32) as i32 != 0) as i32
                     as std::ffi::c_long
@@ -460,7 +460,7 @@ pub unsafe extern "C-unwind" fn luaO_rawarith(
                     i2 = (*p2).value_.i;
                     1 as i32
                 } else {
-                    luaV_tointegerns(p2, &mut i2, F2Ieq)
+                    luaV_tointegerns::<F2Ieq>(p2, &mut i2)
                 }) != 0
             {
                 let mut io: *mut TValue = res;

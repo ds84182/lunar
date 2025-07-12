@@ -663,7 +663,7 @@ unsafe extern "C-unwind" fn luaK_numberK(mut fs: *mut FuncState, mut r: lua_Numb
     let mut io: *mut TValue = &mut o;
     (*io).value_.n = r;
     (*io).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
-    if luaV_flttointeger(r, &mut ik, F2Ieq) == 0 {
+    if luaV_flttointeger::<F2Ieq>(r, &mut ik) == 0 {
         return addk(fs, &mut o, &mut o);
     } else {
         let nbm: i32 = 53 as i32;
@@ -754,7 +754,7 @@ pub unsafe extern "C-unwind" fn luaK_int(mut fs: *mut FuncState, mut reg: i32, m
 }
 unsafe extern "C-unwind" fn luaK_float(mut fs: *mut FuncState, mut reg: i32, mut f: lua_Number) {
     let mut fi: lua_Integer = 0;
-    if luaV_flttointeger(f, &mut fi, F2Ieq) != 0 && fitsBx(fi) != 0 {
+    if luaV_flttointeger::<F2Ieq>(f, &mut fi) != 0 && fitsBx(fi) != 0 {
         codeAsBx(fs, OP_LOADF, reg, fi as i32);
     } else {
         luaK_codek(fs, reg, luaK_numberK(fs, f));
@@ -1315,7 +1315,7 @@ unsafe extern "C-unwind" fn isSCnumber(
     if (*e).k as u32 == VKINT as i32 as u32 {
         i = (*e).u.ival;
     } else if (*e).k as u32 == VKFLT as i32 as u32
-        && luaV_flttointeger((*e).u.nval, &mut i, F2Ieq) != 0
+        && luaV_flttointeger::<F2Ieq>((*e).u.nval, &mut i) != 0
     {
         *isfloat = 1 as i32;
     } else {
@@ -1367,8 +1367,8 @@ unsafe extern "C-unwind" fn validop(mut op: i32, mut v1: *mut TValue, mut v2: *m
     match op {
         7 | 8 | 9 | 10 | 11 | 13 => {
             let mut i: lua_Integer = 0;
-            return (luaV_tointegerns(v1, &mut i, F2Ieq) != 0
-                && luaV_tointegerns(v2, &mut i, F2Ieq) != 0) as i32;
+            return (luaV_tointegerns::<F2Ieq>(v1, &mut i) != 0
+                && luaV_tointegerns::<F2Ieq>(v2, &mut i) != 0) as i32;
         }
         5 | 6 | 3 => {
             return ((if (*v2).tt_ as i32 == 3 as i32 | (0) << 4 as i32 {

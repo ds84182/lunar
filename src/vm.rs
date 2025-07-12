@@ -93,17 +93,17 @@ pub unsafe extern "C-unwind" fn luaV_tonumber_(
         return 0;
     };
 }
-#[unsafe(no_mangle)]
-pub unsafe extern "C-unwind" fn luaV_flttointeger(
+
+#[inline]
+pub unsafe fn luaV_flttointeger<const MODE: F2Imod>(
     mut n: lua_Number,
     mut p: *mut lua_Integer,
-    mut mode: F2Imod,
 ) -> i32 {
     let mut f: lua_Number = n.floor();
     if n != f {
-        if mode as u32 == F2Ieq as i32 as u32 {
+        if MODE == F2Ieq {
             return 0;
-        } else if mode as u32 == F2Iceil as i32 as u32 {
+        } else if MODE == F2Iceil {
             f += 1 as i32 as lua_Number;
         }
     }
@@ -117,14 +117,14 @@ pub unsafe extern "C-unwind" fn luaV_flttointeger(
             1 as i32 != 0
         }) as i32;
 }
-#[unsafe(no_mangle)]
-pub unsafe extern "C-unwind" fn luaV_tointegerns(
+
+#[inline]
+pub unsafe fn luaV_tointegerns<const MODE: F2Imod>(
     mut obj: *const TValue,
     mut p: *mut lua_Integer,
-    mut mode: F2Imod,
 ) -> i32 {
     if (*obj).tt_ as i32 == 3 as i32 | (1 as i32) << 4 as i32 {
-        return luaV_flttointeger((*obj).value_.n, p, mode);
+        return luaV_flttointeger::<MODE>((*obj).value_.n, p);
     } else if (*obj).tt_ as i32 == 3 as i32 | (0) << 4 as i32 {
         *p = (*obj).value_.i;
         return 1 as i32;
@@ -132,11 +132,11 @@ pub unsafe extern "C-unwind" fn luaV_tointegerns(
         return 0;
     };
 }
-#[unsafe(no_mangle)]
-pub unsafe extern "C-unwind" fn luaV_tointeger(
+
+#[inline]
+pub unsafe fn luaV_tointeger<const MODE: F2Imod>(
     mut obj: *const TValue,
     mut p: *mut lua_Integer,
-    mut mode: F2Imod,
 ) -> i32 {
     let mut v: TValue = TValue {
         value_: Value {
@@ -147,8 +147,9 @@ pub unsafe extern "C-unwind" fn luaV_tointeger(
     if l_strton(obj, &mut v) != 0 {
         obj = &mut v;
     }
-    return luaV_tointegerns(obj, p, mode);
+    return luaV_tointegerns::<MODE>(obj, p);
 }
+
 unsafe extern "C-unwind" fn forlimit(
     mut L: *mut lua_State,
     mut init: lua_Integer,
@@ -156,16 +157,13 @@ unsafe extern "C-unwind" fn forlimit(
     mut p: *mut lua_Integer,
     mut step: lua_Integer,
 ) -> i32 {
-    if luaV_tointeger(
-        lim,
-        p,
-        (if step < 0 as lua_Integer {
-            F2Iceil as i32
-        } else {
-            F2Ifloor as i32
-        }) as F2Imod,
-    ) == 0
-    {
+    let res = if step < 0 {
+        luaV_tointeger::<F2Iceil>(lim, p)
+    } else {
+        luaV_tointeger::<F2Ifloor>(lim, p)
+    };
+
+    if res == 0 {
         let mut flim: lua_Number = 0.;
         if if (*lim).tt_ as i32 == 3 as i32 | (1 as i32) << 4 as i32 {
             flim = (*lim).value_.n;
@@ -527,7 +525,7 @@ unsafe extern "C-unwind" fn LTintfloat(mut i: lua_Integer, mut f: lua_Number) ->
         return ((i as lua_Number) < f) as i32;
     } else {
         let mut fi: lua_Integer = 0;
-        if luaV_flttointeger(f, &mut fi, F2Iceil) != 0 {
+        if luaV_flttointeger::<F2Iceil>(f, &mut fi) != 0 {
             return (i < fi) as i32;
         } else {
             return (f > 0 as lua_Number) as i32;
@@ -542,7 +540,7 @@ unsafe extern "C-unwind" fn LEintfloat(mut i: lua_Integer, mut f: lua_Number) ->
         return (i as lua_Number <= f) as i32;
     } else {
         let mut fi: lua_Integer = 0;
-        if luaV_flttointeger(f, &mut fi, F2Ifloor) != 0 {
+        if luaV_flttointeger::<F2Ifloor>(f, &mut fi) != 0 {
             return (i <= fi) as i32;
         } else {
             return (f > 0 as lua_Number) as i32;
@@ -557,7 +555,7 @@ unsafe extern "C-unwind" fn LTfloatint(mut f: lua_Number, mut i: lua_Integer) ->
         return (f < i as lua_Number) as i32;
     } else {
         let mut fi: lua_Integer = 0;
-        if luaV_flttointeger(f, &mut fi, F2Ifloor) != 0 {
+        if luaV_flttointeger::<F2Ifloor>(f, &mut fi) != 0 {
             return (fi < i) as i32;
         } else {
             return (f < 0 as lua_Number) as i32;
@@ -572,7 +570,7 @@ unsafe extern "C-unwind" fn LEfloatint(mut f: lua_Number, mut i: lua_Integer) ->
         return (f <= i as lua_Number) as i32;
     } else {
         let mut fi: lua_Integer = 0;
-        if luaV_flttointeger(f, &mut fi, F2Iceil) != 0 {
+        if luaV_flttointeger::<F2Iceil>(f, &mut fi) != 0 {
             return (fi <= i) as i32;
         } else {
             return (f < 0 as lua_Number) as i32;
@@ -682,8 +680,8 @@ pub unsafe extern "C-unwind" fn luaV_equalobj(
         } else {
             let mut i1: lua_Integer = 0;
             let mut i2: lua_Integer = 0;
-            return (luaV_tointegerns(t1, &mut i1, F2Ieq) != 0
-                && luaV_tointegerns(t2, &mut i2, F2Ieq) != 0
+            return (luaV_tointegerns::<F2Ieq>(t1, &mut i1) != 0
+                && luaV_tointegerns::<F2Ieq>(t2, &mut i2) != 0
                 && i1 == i2) as i32;
         }
     }
@@ -1311,14 +1309,14 @@ unsafe fn op_arithf(
     let b_tt = (*v2).tt_;
 
     let a = match a_tt {
-        3 => (*v1).value_.i as lua_Number,
-        0x13 => (*v1).value_.n,
+        LUA_VNUMINT => (*v1).value_.i as lua_Number,
+        LUA_VNUMFLT => (*v1).value_.n,
         _ => return pc,
     };
 
     let b = match b_tt {
-        3 => (*v2).value_.i as lua_Number,
-        0x13 => (*v2).value_.n,
+        LUA_VNUMINT => (*v2).value_.i as lua_Number,
+        LUA_VNUMFLT => (*v2).value_.n,
         _ => return pc,
     };
 
@@ -2171,7 +2169,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             i1_4 = (*v1_7).value_.i;
                             1 as i32
                         } else {
-                            luaV_tointegerns(v1_7, &mut i1_4, F2Ieq)
+                            luaV_tointegerns::<F2Ieq>(v1_7, &mut i1_4)
                         } != 0
                         {
                             pc = pc.offset(1);
@@ -2207,7 +2205,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             i1_5 = (*v1_8).value_.i;
                             1 as i32
                         } else {
-                            luaV_tointegerns(v1_8, &mut i1_5, F2Ieq)
+                            luaV_tointegerns::<F2Ieq>(v1_8, &mut i1_5)
                         } != 0
                         {
                             pc = pc.offset(1);
@@ -2243,7 +2241,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             i1_6 = (*v1_9).value_.i;
                             1 as i32
                         } else {
-                            luaV_tointegerns(v1_9, &mut i1_6, F2Ieq)
+                            luaV_tointegerns::<F2Ieq>(v1_9, &mut i1_6)
                         } != 0
                         {
                             pc = pc.offset(1);
@@ -2277,7 +2275,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             ib = (*rb_8).value_.i;
                             1 as i32
                         } else {
-                            luaV_tointegerns(rb_8, &mut ib, F2Ieq)
+                            luaV_tointegerns::<F2Ieq>(rb_8, &mut ib)
                         } != 0
                         {
                             pc = pc.offset(1);
@@ -2310,7 +2308,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             ib_0 = (*rb_9).value_.i;
                             1 as i32
                         } else {
-                            luaV_tointegerns(rb_9, &mut ib_0, F2Ieq)
+                            luaV_tointegerns::<F2Ieq>(rb_9, &mut ib_0)
                         } != 0
                         {
                             pc = pc.offset(1);
@@ -2490,7 +2488,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             i1_12 = (*v1_17).value_.i;
                             1 as i32
                         } else {
-                            luaV_tointegerns(v1_17, &mut i1_12, F2Ieq)
+                            luaV_tointegerns::<F2Ieq>(v1_17, &mut i1_12)
                         }) != 0
                             && (if (((*v2_16).tt_ as i32 == 3 as i32 | (0) << 4 as i32) as i32 != 0)
                                 as i32 as std::ffi::c_long
@@ -2499,7 +2497,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 i2_12 = (*v2_16).value_.i;
                                 1 as i32
                             } else {
-                                luaV_tointegerns(v2_16, &mut i2_12, F2Ieq)
+                                luaV_tointegerns::<F2Ieq>(v2_16, &mut i2_12)
                             }) != 0
                         {
                             pc = pc.offset(1);
@@ -2536,7 +2534,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             i1_13 = (*v1_18).value_.i;
                             1 as i32
                         } else {
-                            luaV_tointegerns(v1_18, &mut i1_13, F2Ieq)
+                            luaV_tointegerns::<F2Ieq>(v1_18, &mut i1_13)
                         }) != 0
                             && (if (((*v2_17).tt_ as i32 == 3 as i32 | (0) << 4 as i32) as i32 != 0)
                                 as i32 as std::ffi::c_long
@@ -2545,7 +2543,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 i2_13 = (*v2_17).value_.i;
                                 1 as i32
                             } else {
-                                luaV_tointegerns(v2_17, &mut i2_13, F2Ieq)
+                                luaV_tointegerns::<F2Ieq>(v2_17, &mut i2_13)
                             }) != 0
                         {
                             pc = pc.offset(1);
@@ -2582,7 +2580,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             i1_14 = (*v1_19).value_.i;
                             1 as i32
                         } else {
-                            luaV_tointegerns(v1_19, &mut i1_14, F2Ieq)
+                            luaV_tointegerns::<F2Ieq>(v1_19, &mut i1_14)
                         }) != 0
                             && (if (((*v2_18).tt_ as i32 == 3 as i32 | (0) << 4 as i32) as i32 != 0)
                                 as i32 as std::ffi::c_long
@@ -2591,7 +2589,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 i2_14 = (*v2_18).value_.i;
                                 1 as i32
                             } else {
-                                luaV_tointegerns(v2_18, &mut i2_14, F2Ieq)
+                                luaV_tointegerns::<F2Ieq>(v2_18, &mut i2_14)
                             }) != 0
                         {
                             pc = pc.offset(1);
@@ -2628,7 +2626,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             i1_15 = (*v1_20).value_.i;
                             1 as i32
                         } else {
-                            luaV_tointegerns(v1_20, &mut i1_15, F2Ieq)
+                            luaV_tointegerns::<F2Ieq>(v1_20, &mut i1_15)
                         }) != 0
                             && (if (((*v2_19).tt_ as i32 == 3 as i32 | (0) << 4 as i32) as i32 != 0)
                                 as i32 as std::ffi::c_long
@@ -2637,7 +2635,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 i2_15 = (*v2_19).value_.i;
                                 1 as i32
                             } else {
-                                luaV_tointegerns(v2_19, &mut i2_15, F2Ieq)
+                                luaV_tointegerns::<F2Ieq>(v2_19, &mut i2_15)
                             }) != 0
                         {
                             pc = pc.offset(1);
@@ -2677,7 +2675,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             i1_16 = (*v1_21).value_.i;
                             1 as i32
                         } else {
-                            luaV_tointegerns(v1_21, &mut i1_16, F2Ieq)
+                            luaV_tointegerns::<F2Ieq>(v1_21, &mut i1_16)
                         }) != 0
                             && (if (((*v2_20).tt_ as i32 == 3 as i32 | (0) << 4 as i32) as i32 != 0)
                                 as i32 as std::ffi::c_long
@@ -2686,7 +2684,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                 i2_16 = (*v2_20).value_.i;
                                 1 as i32
                             } else {
-                                luaV_tointegerns(v2_20, &mut i2_16, F2Ieq)
+                                luaV_tointegerns::<F2Ieq>(v2_20, &mut i2_16)
                             }) != 0
                         {
                             pc = pc.offset(1);
@@ -2840,7 +2838,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             ib_2 = (*rb_12).value_.i;
                             1 as i32
                         } else {
-                            luaV_tointegerns(rb_12, &mut ib_2, F2Ieq)
+                            luaV_tointegerns::<F2Ieq>(rb_12, &mut ib_2)
                         } != 0
                         {
                             let mut io_42: *mut TValue = &mut (*ra_48).val;
