@@ -1221,7 +1221,7 @@ pub unsafe extern "C-unwind" fn luaV_finishOp(mut L: *mut lua_State) {
 
 macro_rules! intop {
     ($name:ident, $op:tt) => {
-        #[inline]
+        #[inline(always)]
         fn $name(a: lua_Integer, b: lua_Integer) -> lua_Integer {
             ((a as lua_Unsigned) $op (b as lua_Unsigned)) as lua_Integer
         }
@@ -1230,7 +1230,7 @@ macro_rules! intop {
 
 macro_rules! fltop {
     ($name:ident, $op:tt) => {
-        #[inline]
+        #[inline(always)]
         fn $name(a: lua_Number, b: lua_Number) -> lua_Number {
             a $op b
         }
@@ -1322,6 +1322,63 @@ unsafe fn op_arithf(
 
     setfltvalue(ra, fop(a, b));
     pc.add(1)
+}
+
+#[inline(always)]
+unsafe fn op_bitwise(
+    i: u32,
+    base: StkId,
+    pc: *const Instruction,
+    op: impl Fn(lua_Integer, lua_Integer) -> lua_Integer,
+) -> *const Instruction {
+    let mut ra: StkId = base.add(getarg_a(i) as usize);
+    let mut v1: *mut TValue = &mut (*base.add(getarg_b(i) as usize)).val;
+    let mut v2: *mut TValue = &mut (*base.add(getarg_c(i) as usize)).val;
+
+    let a_tt = (*v1).tt_;
+    let b_tt = (*v2).tt_;
+
+    if std::hint::likely(a_tt == LUA_VNUMINT && b_tt == LUA_VNUMINT) {
+        let a = (*v1).value_.i;
+        let b = (*v2).value_.i;
+        setivalue(ra, op(a, b));
+        return pc.add(1);
+    }
+
+    op_bitwise_slow(ra, v1, v2, pc, op)
+}
+
+#[inline(always)]
+unsafe fn op_bitwise_slow(
+    ra: StkId,
+    v1: *mut TValue,
+    v2: *mut TValue,
+    pc: *const Instruction,
+    op: impl Fn(lua_Integer, lua_Integer) -> lua_Integer,
+) -> *const Instruction {
+    let mut i1: lua_Integer = 0;
+    let mut i2: lua_Integer = 0;
+
+    if (if (*v1).tt_ == LUA_VNUMINT {
+        i1 = (*v1).value_.i;
+        1 as i32
+    } else {
+        luaV_tointegerns::<F2Ieq>(v1, &mut i1)
+    }) != 0
+        && (if (*v2).tt_ == LUA_VNUMINT {
+            i2 = (*v2).value_.i;
+            1 as i32
+        } else {
+            luaV_tointegerns::<F2Ieq>(v2, &mut i2)
+        }) != 0
+    {
+        let mut io_37: *mut TValue = &mut (*ra).val;
+        (*io_37).value_.i = op(i1, i2);
+        (*io_37).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
+        pc.add(1)
+    } else {
+        pc
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -2463,141 +2520,15 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         continue;
                     }
                     OP_BAND => {
-                        let mut ra_39: StkId = base.offset(
-                            (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
-                                as isize,
-                        );
-                        let mut v1_17: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut v2_16: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32 + 8 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut i1_12: lua_Integer = 0;
-                        let mut i2_12: lua_Integer = 0;
-                        if (if (((*v1_17).tt_ as i32 == 3 as i32 | (0) << 4 as i32) as i32 != 0)
-                            as i32 as std::ffi::c_long
-                            != 0
-                        {
-                            i1_12 = (*v1_17).value_.i;
-                            1 as i32
-                        } else {
-                            luaV_tointegerns::<F2Ieq>(v1_17, &mut i1_12)
-                        }) != 0
-                            && (if (((*v2_16).tt_ as i32 == 3 as i32 | (0) << 4 as i32) as i32 != 0)
-                                as i32 as std::ffi::c_long
-                                != 0
-                            {
-                                i2_12 = (*v2_16).value_.i;
-                                1 as i32
-                            } else {
-                                luaV_tointegerns::<F2Ieq>(v2_16, &mut i2_12)
-                            }) != 0
-                        {
-                            pc = pc.offset(1);
-                            let mut io_35: *mut TValue = &mut (*ra_39).val;
-                            (*io_35).value_.i =
-                                (i1_12 as lua_Unsigned & i2_12 as lua_Unsigned) as lua_Integer;
-                            (*io_35).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
-                        }
+                        pc = op_bitwise(i, base, pc, l_band);
                         continue;
                     }
                     OP_BOR => {
-                        let mut ra_40: StkId = base.offset(
-                            (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
-                                as isize,
-                        );
-                        let mut v1_18: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut v2_17: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32 + 8 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut i1_13: lua_Integer = 0;
-                        let mut i2_13: lua_Integer = 0;
-                        if (if (((*v1_18).tt_ as i32 == 3 as i32 | (0) << 4 as i32) as i32 != 0)
-                            as i32 as std::ffi::c_long
-                            != 0
-                        {
-                            i1_13 = (*v1_18).value_.i;
-                            1 as i32
-                        } else {
-                            luaV_tointegerns::<F2Ieq>(v1_18, &mut i1_13)
-                        }) != 0
-                            && (if (((*v2_17).tt_ as i32 == 3 as i32 | (0) << 4 as i32) as i32 != 0)
-                                as i32 as std::ffi::c_long
-                                != 0
-                            {
-                                i2_13 = (*v2_17).value_.i;
-                                1 as i32
-                            } else {
-                                luaV_tointegerns::<F2Ieq>(v2_17, &mut i2_13)
-                            }) != 0
-                        {
-                            pc = pc.offset(1);
-                            let mut io_36: *mut TValue = &mut (*ra_40).val;
-                            (*io_36).value_.i =
-                                (i1_13 as lua_Unsigned | i2_13 as lua_Unsigned) as lua_Integer;
-                            (*io_36).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
-                        }
+                        pc = op_bitwise(i, base, pc, l_bor);
                         continue;
                     }
                     OP_BXOR => {
-                        let mut ra_41: StkId = base.offset(
-                            (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
-                                as isize,
-                        );
-                        let mut v1_19: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut v2_18: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32 + 8 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut i1_14: lua_Integer = 0;
-                        let mut i2_14: lua_Integer = 0;
-                        if (if (((*v1_19).tt_ as i32 == 3 as i32 | (0) << 4 as i32) as i32 != 0)
-                            as i32 as std::ffi::c_long
-                            != 0
-                        {
-                            i1_14 = (*v1_19).value_.i;
-                            1 as i32
-                        } else {
-                            luaV_tointegerns::<F2Ieq>(v1_19, &mut i1_14)
-                        }) != 0
-                            && (if (((*v2_18).tt_ as i32 == 3 as i32 | (0) << 4 as i32) as i32 != 0)
-                                as i32 as std::ffi::c_long
-                                != 0
-                            {
-                                i2_14 = (*v2_18).value_.i;
-                                1 as i32
-                            } else {
-                                luaV_tointegerns::<F2Ieq>(v2_18, &mut i2_14)
-                            }) != 0
-                        {
-                            pc = pc.offset(1);
-                            let mut io_37: *mut TValue = &mut (*ra_41).val;
-                            (*io_37).value_.i =
-                                (i1_14 as lua_Unsigned ^ i2_14 as lua_Unsigned) as lua_Integer;
-                            (*io_37).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
-                        }
+                        pc = op_bitwise(i, base, pc, l_bxor);
                         continue;
                     }
                     OP_SHR => {
