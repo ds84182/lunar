@@ -1295,6 +1295,47 @@ unsafe fn op_arith(
 }
 
 #[inline(always)]
+unsafe fn op_arith_k(
+    i: u32,
+    base: StkId,
+    k: *mut TValue,
+    pc: *const Instruction,
+    iop: impl Fn(lua_Integer, lua_Integer) -> lua_Integer,
+    fop: impl Fn(lua_Number, lua_Number) -> lua_Number,
+) -> *const Instruction {
+    let mut v1: *mut TValue = &mut (*base.add(getarg_b(i) as usize)).val;
+    let mut v2: *mut TValue = k.add(getarg_c(i) as usize);
+    let mut ra: StkId = base.add(getarg_a(i) as usize);
+
+    let a_tt = (*v1).tt_;
+    let b_tt = (*v2).tt_;
+
+    if std::hint::likely(a_tt == b_tt) {
+        if a_tt == LUA_VNUMINT {
+            setivalue(ra, iop((*v1).value_.i, (*v2).value_.i));
+            pc.add(1)
+        } else if a_tt == LUA_VNUMFLT {
+            setfltvalue(ra, fop((*v1).value_.n, (*v2).value_.n));
+            pc.add(1)
+        } else {
+            pc
+        }
+    } else {
+        match (a_tt, b_tt) {
+            (LUA_VNUMINT, LUA_VNUMFLT) => {
+                setfltvalue(ra, fop((*v1).value_.i as lua_Number, (*v2).value_.n));
+                pc.add(1)
+            }
+            (LUA_VNUMFLT, LUA_VNUMINT) => {
+                setfltvalue(ra, fop((*v1).value_.n, (*v2).value_.i as lua_Number));
+                pc.add(1)
+            }
+            _ => pc,
+        }
+    }
+}
+
+#[inline(always)]
 unsafe fn op_arithf(
     i: u32,
     base: StkId,
@@ -1798,185 +1839,15 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         continue;
                     }
                     OP_ADDK => {
-                        let mut v1_0: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut v2: *mut TValue = k.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32 + 8 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        );
-                        let mut ra_20: StkId = base.offset(
-                            (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
-                                as isize,
-                        );
-                        if (*v1_0).tt_ as i32 == 3 as i32 | (0) << 4 as i32
-                            && (*v2).tt_ as i32 == 3 as i32 | (0) << 4 as i32
-                        {
-                            let mut i1: lua_Integer = (*v1_0).value_.i;
-                            let mut i2: lua_Integer = (*v2).value_.i;
-                            pc = pc.offset(1);
-                            let mut io_6: *mut TValue = &mut (*ra_20).val;
-                            (*io_6).value_.i = (i1 as lua_Unsigned).wrapping_add(i2 as lua_Unsigned)
-                                as lua_Integer;
-                            (*io_6).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
-                        } else {
-                            let mut n1: lua_Number = 0.;
-                            let mut n2: lua_Number = 0.;
-                            if (if (*v1_0).tt_ as i32 == 3 as i32 | (1 as i32) << 4 as i32 {
-                                n1 = (*v1_0).value_.n;
-                                1 as i32
-                            } else {
-                                (if (*v1_0).tt_ as i32 == 3 as i32 | (0) << 4 as i32 {
-                                    n1 = (*v1_0).value_.i as lua_Number;
-                                    1 as i32
-                                } else {
-                                    0
-                                })
-                            }) != 0
-                                && (if (*v2).tt_ as i32 == 3 as i32 | (1 as i32) << 4 as i32 {
-                                    n2 = (*v2).value_.n;
-                                    1 as i32
-                                } else {
-                                    (if (*v2).tt_ as i32 == 3 as i32 | (0) << 4 as i32 {
-                                        n2 = (*v2).value_.i as lua_Number;
-                                        1 as i32
-                                    } else {
-                                        0
-                                    })
-                                }) != 0
-                            {
-                                pc = pc.offset(1);
-                                let mut io_7: *mut TValue = &mut (*ra_20).val;
-                                (*io_7).value_.n = n1 + n2;
-                                (*io_7).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
-                            }
-                        }
+                        pc = op_arith_k(i, base, k, pc, l_addi, luai_numadd);
                         continue;
                     }
                     OP_SUBK => {
-                        let mut v1_1: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut v2_0: *mut TValue = k.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32 + 8 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        );
-                        let mut ra_21: StkId = base.offset(
-                            (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
-                                as isize,
-                        );
-                        if (*v1_1).tt_ as i32 == 3 as i32 | (0) << 4 as i32
-                            && (*v2_0).tt_ as i32 == 3 as i32 | (0) << 4 as i32
-                        {
-                            let mut i1_0: lua_Integer = (*v1_1).value_.i;
-                            let mut i2_0: lua_Integer = (*v2_0).value_.i;
-                            pc = pc.offset(1);
-                            let mut io_8: *mut TValue = &mut (*ra_21).val;
-                            (*io_8).value_.i = (i1_0 as lua_Unsigned)
-                                .wrapping_sub(i2_0 as lua_Unsigned)
-                                as lua_Integer;
-                            (*io_8).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
-                        } else {
-                            let mut n1_0: lua_Number = 0.;
-                            let mut n2_0: lua_Number = 0.;
-                            if (if (*v1_1).tt_ as i32 == 3 as i32 | (1 as i32) << 4 as i32 {
-                                n1_0 = (*v1_1).value_.n;
-                                1 as i32
-                            } else {
-                                (if (*v1_1).tt_ as i32 == 3 as i32 | (0) << 4 as i32 {
-                                    n1_0 = (*v1_1).value_.i as lua_Number;
-                                    1 as i32
-                                } else {
-                                    0
-                                })
-                            }) != 0
-                                && (if (*v2_0).tt_ as i32 == 3 as i32 | (1 as i32) << 4 as i32 {
-                                    n2_0 = (*v2_0).value_.n;
-                                    1 as i32
-                                } else {
-                                    (if (*v2_0).tt_ as i32 == 3 as i32 | (0) << 4 as i32 {
-                                        n2_0 = (*v2_0).value_.i as lua_Number;
-                                        1 as i32
-                                    } else {
-                                        0
-                                    })
-                                }) != 0
-                            {
-                                pc = pc.offset(1);
-                                let mut io_9: *mut TValue = &mut (*ra_21).val;
-                                (*io_9).value_.n = n1_0 - n2_0;
-                                (*io_9).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
-                            }
-                        }
+                        pc = op_arith_k(i, base, k, pc, l_subi, luai_numsub);
                         continue;
                     }
                     OP_MULK => {
-                        let mut v1_2: *mut TValue = &mut (*base.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        ))
-                        .val;
-                        let mut v2_1: *mut TValue = k.offset(
-                            (i >> 0 + 7 as i32 + 8 as i32 + 1 as i32 + 8 as i32
-                                & !(!(0 as Instruction) << 8 as i32) << 0)
-                                as i32 as isize,
-                        );
-                        let mut ra_22: StkId = base.offset(
-                            (i >> 0 + 7 as i32 & !(!(0 as Instruction) << 8 as i32) << 0) as i32
-                                as isize,
-                        );
-                        if (*v1_2).tt_ as i32 == 3 as i32 | (0) << 4 as i32
-                            && (*v2_1).tt_ as i32 == 3 as i32 | (0) << 4 as i32
-                        {
-                            let mut i1_1: lua_Integer = (*v1_2).value_.i;
-                            let mut i2_1: lua_Integer = (*v2_1).value_.i;
-                            pc = pc.offset(1);
-                            let mut io_10: *mut TValue = &mut (*ra_22).val;
-                            (*io_10).value_.i = ((i1_1 as lua_Unsigned)
-                                .wrapping_mul(i2_1 as lua_Unsigned))
-                                as lua_Integer;
-                            (*io_10).tt_ = (3 as i32 | (0) << 4 as i32) as lu_byte;
-                        } else {
-                            let mut n1_1: lua_Number = 0.;
-                            let mut n2_1: lua_Number = 0.;
-                            if (if (*v1_2).tt_ as i32 == 3 as i32 | (1 as i32) << 4 as i32 {
-                                n1_1 = (*v1_2).value_.n;
-                                1 as i32
-                            } else {
-                                (if (*v1_2).tt_ as i32 == 3 as i32 | (0) << 4 as i32 {
-                                    n1_1 = (*v1_2).value_.i as lua_Number;
-                                    1 as i32
-                                } else {
-                                    0
-                                })
-                            }) != 0
-                                && (if (*v2_1).tt_ as i32 == 3 as i32 | (1 as i32) << 4 as i32 {
-                                    n2_1 = (*v2_1).value_.n;
-                                    1 as i32
-                                } else {
-                                    (if (*v2_1).tt_ as i32 == 3 as i32 | (0) << 4 as i32 {
-                                        n2_1 = (*v2_1).value_.i as lua_Number;
-                                        1 as i32
-                                    } else {
-                                        0
-                                    })
-                                }) != 0
-                            {
-                                pc = pc.offset(1);
-                                let mut io_11: *mut TValue = &mut (*ra_22).val;
-                                (*io_11).value_.n = n1_1 * n2_1;
-                                (*io_11).tt_ = (3 as i32 | (1 as i32) << 4 as i32) as lu_byte;
-                            }
-                        }
+                        pc = op_arith_k(i, base, k, pc, l_muli, luai_nummul);
                         continue;
                     }
                     OP_MODK => {
