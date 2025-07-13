@@ -823,6 +823,7 @@ unsafe extern "C-unwind" fn close_func(mut ls: *mut LexState) {
         (*fs).nups as i32,
         size_of::<Upvaldesc>() as usize as i32,
     ) as *mut Upvaldesc;
+    luaK_build_loop_counters(L, f);
     (*ls).fs = (*fs).prev;
     if (*(*L).l_G).GCdebt > 0 as l_mem {
         luaC_step(L);

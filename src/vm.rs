@@ -1422,6 +1422,17 @@ unsafe fn op_bitwise_slow(
     }
 }
 
+#[inline(always)]
+unsafe fn luaV_record_loop(proto: *mut Proto, pc: *const Instruction) {
+    let pc = pc.offset_from_unsigned((*proto).code) as u32;
+    let loop_counters = ptr::slice_from_raw_parts_mut((*proto).loop_cnts, (*proto).size_loop_cnts as usize);
+    if let Some(loop_counters) = loop_counters.as_mut() {
+        if let Ok(idx) = loop_counters.binary_search_by_key(&pc, |lc| lc.pc) {
+            loop_counters.get_unchecked_mut(idx).count += 1;
+        }
+    }
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut CallInfo) {
     let mut i: Instruction = 0;
@@ -2737,16 +2748,11 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         continue;
                     }
                     OP_JMP => {
-                        pc = pc.offset(
-                            ((i >> 0 + 7 as i32
-                                & !(!(0 as Instruction)
-                                    << 8 as i32 + 8 as i32 + 1 as i32 + 8 as i32)
-                                    << 0) as i32
-                                - (((1 as i32) << 8 as i32 + 8 as i32 + 1 as i32 + 8 as i32)
-                                    - 1 as i32
-                                    >> 1 as i32)
-                                + 0) as isize,
-                        );
+                        let offset = getarg_sj(i) as isize;
+                        pc = pc.offset(offset);
+                        if offset.is_negative() {
+                            luaV_record_loop((*cl).p, pc);
+                        }
                         trap = (*ci).u.l.trap;
                         continue;
                     }
@@ -3448,6 +3454,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                             << 0) as i32
                                         as isize),
                                 );
+                                luaV_record_loop((*cl).p, pc);
                             }
                         } else if floatforloop(ra_71) != 0 {
                             pc = pc.offset(
@@ -3455,6 +3462,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                     & !(!(0 as Instruction) << 8 as i32 + 8 as i32 + 1 as i32) << 0)
                                     as i32 as isize),
                             );
+                            luaV_record_loop((*cl).p, pc);
                         }
                         trap = (*ci).u.l.trap;
                         continue;
@@ -3688,6 +3696,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             & !(!(0 as Instruction) << 8 as i32 + 8 as i32 + 1 as i32) << 0)
                             as i32 as isize),
                     );
+                    luaV_record_loop((*cl).p, pc);
                 }
             }
             if (*ci).callstatus as i32 & (1 as i32) << 2 as i32 != 0 {

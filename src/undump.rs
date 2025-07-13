@@ -400,6 +400,8 @@ unsafe extern "C-unwind" fn loadFunction(
     loadUpvalues(S, f);
     loadProtos(S, f);
     loadDebug(S, f);
+
+    luaK_build_loop_counters((*S).L, f);
 }
 unsafe extern "C-unwind" fn checkliteral(
     mut S: *mut LoadState,

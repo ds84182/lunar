@@ -20,6 +20,7 @@ mod opcodes;
 mod parser;
 mod table;
 mod undump;
+mod utils;
 mod vm;
 mod zio;
 
@@ -440,6 +441,11 @@ pub struct Proto {
     pub locvars: *mut LocVar,
     pub source: *mut TString,
     pub gclist: *mut GCObject,
+    /// Counters for the target of each backwards jump.
+    ///
+    /// Used to detect hot loops.
+    pub loop_cnts: *mut LoopCounter,
+    pub size_loop_cnts: u32,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -462,6 +468,11 @@ pub struct Upvaldesc {
     pub instack: lu_byte,
     pub idx: lu_byte,
     pub kind: lu_byte,
+}
+#[repr(C)]
+pub struct LoopCounter {
+    pub pc: u32,
+    pub count: u32,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -4377,6 +4388,16 @@ pub unsafe extern "C-unwind" fn luaF_freeproto(mut L: *mut lua_State, mut f: *mu
         (*f).upvalues as *mut c_void,
         ((*f).sizeupvalues as usize).wrapping_mul(size_of::<Upvaldesc>() as usize),
     );
+    if let Some(ptr) = NonNull::new(ptr::slice_from_raw_parts_mut(
+        (*f).loop_cnts,
+        (*f).size_loop_cnts as usize,
+    )) {
+        // for lc in ptr.as_ref() {
+        //     eprintln!("Loop Count {}: {}", lc.pc, lc.count);
+        // }
+
+        (&*(*L).l_G).dealloc(ptr);
+    }
     luaM_free_(L, f as *mut c_void, size_of::<Proto>() as usize);
 }
 #[unsafe(no_mangle)]

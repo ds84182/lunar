@@ -2008,3 +2008,59 @@ pub unsafe extern "C-unwind" fn luaK_finish(mut fs: *mut FuncState) {
         i += 1;
     }
 }
+
+pub unsafe fn luaK_build_loop_counters(L: *mut lua_State, proto: *mut Proto) {
+    // Iterate through instructions backwards, finding targets of backwards jumps.
+    // First do an initial count of all backwards jumps (including for loops).
+
+    let code = std::slice::from_raw_parts((*proto).code, (*proto).sizecode as usize);
+
+    let Some(mut loop_points) = (&(*(*L).l_G)).alloc_slice::<bool>((*proto).sizecode as usize) else {
+        luaD_throw(L, 4);
+    };
+
+    let loop_points = loop_points.as_mut();
+
+    loop_points.fill(false);
+
+    for (pc, i) in code.iter().copied().enumerate().rev() {
+        match get_opcode(i) {
+            OP_JMP => {
+                // TODO: Check for backwards jump
+                let target = getarg_sj(i) + 1;
+
+                if target.is_negative() {
+                    let target_pc = (pc as u32).wrapping_add_signed(target);
+
+                    *loop_points.get_unchecked_mut(target_pc as usize) = true;
+                }
+            }
+            OP_FORLOOP | OP_TFORLOOP => {
+                let target = getarg_bx(i) - 1;
+                let target_pc = (pc as u32).wrapping_sub(target);
+                *loop_points.get_unchecked_mut(target_pc as usize) = true;
+            }
+            _ => continue,
+        }
+    }
+
+    let loop_count = loop_points.iter().filter(|is_loop| **is_loop).count();
+
+    let Some(loop_counters) = (&(*(*L).l_G)).alloc_slice::<LoopCounter>(loop_count) else {
+        (&(*(*L).l_G)).dealloc(NonNull::from(loop_points));
+
+        luaD_throw(L, 4);
+    };
+
+    let mut loop_counter = loop_counters.as_ptr().cast::<LoopCounter>();
+
+    loop_points.iter().enumerate().filter(|(_, is_loop)| **is_loop).for_each(|(pc, _)| {
+        loop_counter.write(LoopCounter { pc: pc as u32, count: 0 });
+        loop_counter = loop_counter.add(1);
+    });
+
+    (&(*(*L).l_G)).dealloc(NonNull::from(loop_points));
+
+    (*proto).loop_cnts = loop_counters.as_ptr().cast();
+    (*proto).size_loop_cnts = loop_count as u32;
+}
