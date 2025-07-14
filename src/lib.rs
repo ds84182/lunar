@@ -444,7 +444,9 @@ pub struct Proto {
     /// Counters for the target of each backwards jump.
     ///
     /// Used to detect hot loops.
+    #[cfg(feature = "jit")]
     pub loop_cnts: *mut LoopCounter,
+    #[cfg(feature = "jit")]
     pub size_loop_cnts: u32,
 }
 #[derive(Copy, Clone)]
@@ -469,6 +471,7 @@ pub struct Upvaldesc {
     pub idx: lu_byte,
     pub kind: lu_byte,
 }
+#[cfg(feature = "jit")]
 #[repr(C)]
 pub struct LoopCounter {
     pub pc: u32,

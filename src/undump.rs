@@ -401,6 +401,7 @@ unsafe extern "C-unwind" fn loadFunction(
     loadProtos(S, f);
     loadDebug(S, f);
 
+    #[cfg(feature = "jit")]
     luaK_build_loop_counters((*S).L, f);
 }
 unsafe extern "C-unwind" fn checkliteral(

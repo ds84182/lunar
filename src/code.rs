@@ -2009,6 +2009,7 @@ pub unsafe extern "C-unwind" fn luaK_finish(mut fs: *mut FuncState) {
     }
 }
 
+#[cfg(feature = "jit")]
 pub unsafe fn luaK_build_loop_counters(L: *mut lua_State, proto: *mut Proto) {
     // Iterate through instructions backwards, finding targets of backwards jumps.
     // First do an initial count of all backwards jumps (including for loops).
