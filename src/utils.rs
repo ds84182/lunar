@@ -1,5 +1,6 @@
 use std::{
     alloc::Layout,
+    mem::MaybeUninit,
     ptr::{self, NonNull},
 };
 
@@ -13,7 +14,130 @@ impl<T: Copy> LuaDrop for T {
     fn drop_with_state(&mut self, _state: &global_State) {}
 }
 
-impl global_State {
+pub(super) struct LVec32<T> {
+    ptr: NonNull<T>,
+    len: u32,
+    cap: u32,
+}
+
+impl<T> LVec32<T> {
+    pub(super) fn new() -> Self {
+        Self {
+            ptr: NonNull::dangling(),
+            len: 0,
+            cap: 0,
+        }
+    }
+
+    fn grow(&mut self, g: GlobalState, additional: u32) -> Result<(), ()> {
+        let required_cap = self.len.checked_add(additional).ok_or(())?;
+        let cap = std::cmp::max(self.cap * 2, required_cap);
+
+        let ptr = unsafe {
+            g.realloc_slice(
+                NonNull::new_unchecked(ptr::slice_from_raw_parts_mut(
+                    self.ptr.as_ptr(),
+                    self.cap as usize,
+                ) as *mut [MaybeUninit<T>]),
+                cap as usize,
+            )
+            .ok_or(())?
+        };
+
+        self.ptr = ptr.cast();
+        self.cap = cap;
+
+        Ok(())
+    }
+
+    pub(super) fn push(&mut self, g: GlobalState, item: T) -> Result<(), T> {
+        if self.len >= self.cap {
+            if self.grow(g, 1).is_err() {
+                return Err(item);
+            }
+        }
+        unsafe { self.ptr.add(self.len as usize).write(item) };
+        self.len += 1;
+        Ok(())
+    }
+
+    pub(super) fn pop(&mut self) -> Option<T> {
+        if self.len > 0 {
+            self.len -= 1;
+            let ptr = unsafe { self.ptr.add(self.len as usize) };
+            Some(unsafe { ptr.read() })
+        } else {
+            None
+        }
+    }
+
+    pub(super) fn clear(&mut self) {
+        // TODO: Drop
+        self.len = 0;
+    }
+}
+
+impl<T> std::ops::Deref for LVec32<T> {
+    type Target = [T];
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { std::slice::from_raw_parts(self.ptr.as_ptr(), self.len as usize) }
+    }
+}
+
+impl<T> std::ops::DerefMut for LVec32<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { std::slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len as usize) }
+    }
+}
+
+pub(crate) struct AllocGuard<T: ?Sized> {
+    g: GlobalState,
+    ptr: NonNull<T>,
+}
+
+impl<T: ?Sized> Drop for AllocGuard<T> {
+    fn drop(&mut self) {
+        unsafe { self.g.dealloc(self.ptr) };
+    }
+}
+
+impl<T: ?Sized> AllocGuard<T> {
+    pub(crate) fn alloc(g: GlobalState) -> Option<AllocGuard<T>>
+    where
+        T: Sized,
+    {
+        Some(AllocGuard { g, ptr: g.alloc()? })
+    }
+
+    pub(crate) fn as_ptr(&self) -> NonNull<T> {
+        self.ptr
+    }
+
+    pub(crate) fn into_ptr(self) -> NonNull<T> {
+        let ptr = self.ptr;
+        std::mem::forget(self);
+        ptr
+    }
+}
+
+impl<T> AllocGuard<[T]> {
+    pub(crate) fn alloc_slice(g: GlobalState, len: usize) -> Option<AllocGuard<[T]>> {
+        Some(AllocGuard {
+            g,
+            ptr: g.alloc_slice(len)?,
+        })
+    }
+}
+
+#[derive(Copy, Clone)]
+pub(crate) struct GlobalState(pub(crate) NonNull<global_State>);
+
+impl GlobalState {
+    pub(crate) unsafe fn new_unchecked(g: *const global_State) -> Self {
+        GlobalState(NonNull::new_unchecked(g.cast_mut()))
+    }
+
     pub(crate) fn alloc<T>(&self) -> Option<NonNull<T>> {
         let _ = const {
             assert!(
@@ -26,8 +150,8 @@ impl global_State {
             return Some(NonNull::dangling());
         }
 
-        let alloc = unsafe { self.frealloc.unwrap_unchecked() };
-        let ptr = unsafe { alloc(self.ud, ptr::null_mut(), 0, size_of::<T>()) };
+        let alloc = unsafe { (*self.0.as_ptr()).frealloc.unwrap_unchecked() };
+        let ptr = unsafe { alloc((*self.0.as_ptr()).ud, ptr::null_mut(), 0, size_of::<T>()) };
 
         NonNull::new(ptr.cast())
     }
@@ -53,9 +177,9 @@ impl global_State {
             });
         }
 
-        let alloc = unsafe { self.frealloc.unwrap_unchecked() };
+        let alloc = unsafe { (*self.0.as_ptr()).frealloc.unwrap_unchecked() };
         let ptr: *mut std::ffi::c_void =
-            unsafe { alloc(self.ud, ptr::null_mut(), 0, size as usize) };
+            unsafe { alloc((*self.0.as_ptr()).ud, ptr::null_mut(), 0, size as usize) };
 
         NonNull::new(ptr::slice_from_raw_parts_mut(ptr.cast(), len))
     }
@@ -91,9 +215,15 @@ impl global_State {
             });
         }
 
-        let alloc = unsafe { self.frealloc.unwrap_unchecked() };
-        let ptr: *mut std::ffi::c_void =
-            unsafe { alloc(self.ud, ptr.as_ptr().cast(), old_size.size(), size as usize) };
+        let alloc = unsafe { (*self.0.as_ptr()).frealloc.unwrap_unchecked() };
+        let ptr: *mut std::ffi::c_void = unsafe {
+            alloc(
+                (*self.0.as_ptr()).ud,
+                ptr.as_ptr().cast(),
+                old_size.size(),
+                size as usize,
+            )
+        };
 
         if size == 0 {
             return Some(unsafe {
@@ -114,7 +244,14 @@ impl global_State {
             return;
         }
 
-        let alloc = unsafe { self.frealloc.unwrap_unchecked() };
-        unsafe { alloc(self.ud, ptr.as_ptr().cast(), layout.size() as usize, 0) };
+        let alloc = unsafe { (*self.0.as_ptr()).frealloc.unwrap_unchecked() };
+        unsafe {
+            alloc(
+                (*self.0.as_ptr()).ud,
+                ptr.as_ptr().cast(),
+                layout.size() as usize,
+                0,
+            )
+        };
     }
 }

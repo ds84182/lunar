@@ -2016,11 +2016,13 @@ pub unsafe fn luaK_build_loop_counters(L: *mut lua_State, proto: *mut Proto) {
 
     let code = std::slice::from_raw_parts((*proto).code, (*proto).sizecode as usize);
 
-    let Some(mut loop_points) = (&(*(*L).l_G)).alloc_slice::<bool>((*proto).sizecode as usize) else {
+    let g = utils::GlobalState::new_unchecked((*L).l_G);
+
+    let Some(mut loop_points_guard) = utils::AllocGuard::<[bool]>::alloc_slice(g, (*proto).sizecode as usize) else {
         luaD_throw(L, 4);
     };
 
-    let loop_points = loop_points.as_mut();
+    let loop_points = loop_points_guard.as_ptr().as_mut();
 
     loop_points.fill(false);
 
@@ -2047,9 +2049,8 @@ pub unsafe fn luaK_build_loop_counters(L: *mut lua_State, proto: *mut Proto) {
 
     let loop_count = loop_points.iter().filter(|is_loop| **is_loop).count();
 
-    let Some(loop_counters) = (&(*(*L).l_G)).alloc_slice::<LoopCounter>(loop_count) else {
-        (&(*(*L).l_G)).dealloc(NonNull::from(loop_points));
-
+    let Some(loop_counters) = g.alloc_slice::<LoopCounter>(loop_count) else {
+        drop(loop_points_guard);
         luaD_throw(L, 4);
     };
 
@@ -2059,8 +2060,6 @@ pub unsafe fn luaK_build_loop_counters(L: *mut lua_State, proto: *mut Proto) {
         loop_counter.write(LoopCounter { pc: pc as u32, count: 0 });
         loop_counter = loop_counter.add(1);
     });
-
-    (&(*(*L).l_G)).dealloc(NonNull::from(loop_points));
 
     (*proto).loop_cnts = loop_counters.as_ptr().cast();
     (*proto).size_loop_cnts = loop_count as u32;

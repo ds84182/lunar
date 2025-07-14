@@ -8,7 +8,7 @@
     unused_mut,
     unsafe_op_in_unsafe_fn
 )]
-#![feature(c_variadic, extern_types)]
+#![feature(c_variadic, arbitrary_self_types)]
 #![feature(likely_unlikely)]
 
 mod code;
@@ -4399,7 +4399,7 @@ pub unsafe extern "C-unwind" fn luaF_freeproto(mut L: *mut lua_State, mut f: *mu
         //     eprintln!("Loop Count {}: {}", lc.pc, lc.count);
         // }
 
-        (&*(*L).l_G).dealloc(ptr);
+        utils::GlobalState::new_unchecked((*L).l_G).dealloc(ptr);
     }
     luaM_free_(L, f as *mut c_void, size_of::<Proto>() as usize);
 }
