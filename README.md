@@ -20,4 +20,4 @@ Not in order.
 - [ ] Tracing JIT? (behind a feature flag)
 - [ ] ???
 - [ ] Syntax Extensions? Static Typing?
-- [ ] Prolog-esque Backtracing (behind a feature flag)
+- [ ] Prolog-esque Backtracing? (behind a feature flag)
