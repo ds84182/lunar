@@ -301,11 +301,18 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
             tt: Value,
         }
 
+        #[derive(Copy, Clone)]
+        struct CgReg {
+            value: CgTValue,
+            writeback: bool,
+            known_tt: u8,
+        }
+
         struct TraceContext {
             L: *mut lua_State,
             g: GlobalState,
             arg_base: Value,
-            regs: DropGuard<LVec32<Option<CgTValue>>>,
+            regs: DropGuard<LVec32<Option<CgReg>>>,
         }
 
         impl TraceContext {
@@ -316,7 +323,11 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                     }
                 }
 
-                self.regs[r as usize] = Some(value);
+                self.regs[r as usize] = Some(CgReg {
+                    value,
+                    writeback: true,
+                    known_tt: 255,
+                });
             }
 
             fn get_reg(&mut self, r: u32, bcx: &mut FunctionBuilder<'_>) -> CgTValue {
@@ -328,23 +339,28 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
 
                 let src = &mut self.regs[r as usize];
 
-                *src.get_or_insert_with(|| {
+                src.get_or_insert_with(|| {
                     let offset = (r * size_of::<StackValue>() as u32) as i32;
-                    CgTValue {
-                        value: bcx.ins().load(
-                            PTR_TYPE,
-                            MemFlags::trusted().with_can_move(),
-                            self.arg_base,
-                            offset,
-                        ),
-                        tt: bcx.ins().load(
-                            types::I8,
-                            MemFlags::trusted().with_can_move(),
-                            self.arg_base,
-                            offset + (size_of::<crate::Value>() as i32),
-                        ),
+                    CgReg {
+                        value: CgTValue {
+                            value: bcx.ins().load(
+                                PTR_TYPE,
+                                MemFlags::trusted().with_can_move(),
+                                self.arg_base,
+                                offset,
+                            ),
+                            tt: bcx.ins().load(
+                                types::I8,
+                                MemFlags::trusted().with_can_move(),
+                                self.arg_base,
+                                offset + (size_of::<crate::Value>() as i32),
+                            ),
+                        },
+                        writeback: false,
+                        known_tt: 255,
                     }
                 })
+                .value
             }
         }
 
@@ -352,7 +368,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
             L,
             g,
             arg_base,
-            regs: DropGuard::new(g, LVec32::<Option<CgTValue>>::new()),
+            regs: DropGuard::new(g, LVec32::new()),
         };
 
         // Replay trace into block
@@ -619,22 +635,24 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
         }
 
         // Flush all modified TValues
-        for (i, value) in cx.regs.iter().enumerate() {
-            let Some(value) = value else { continue };
+        for (i, reg) in cx.regs.iter().enumerate() {
+            let Some(reg) = reg else { continue };
 
-            let offset = (i as u32 * size_of::<StackValue>() as u32) as i32;
-            bcx.ins().store(
-                MemFlags::trusted().with_can_move(),
-                value.value,
-                cx.arg_base,
-                offset,
-            );
-            bcx.ins().store(
-                MemFlags::trusted().with_can_move(),
-                value.tt,
-                cx.arg_base,
-                offset + (size_of::<crate::Value>() as i32),
-            );
+            if reg.writeback {
+                let offset = (i as u32 * size_of::<StackValue>() as u32) as i32;
+                bcx.ins().store(
+                    MemFlags::trusted().with_can_move(),
+                    reg.value.value,
+                    cx.arg_base,
+                    offset,
+                );
+                bcx.ins().store(
+                    MemFlags::trusted().with_can_move(),
+                    reg.value.tt,
+                    cx.arg_base,
+                    offset + (size_of::<crate::Value>() as i32),
+                );
+            }
         }
 
         // Return 0 (for successful execution)
