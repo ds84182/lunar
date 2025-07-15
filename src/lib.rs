@@ -476,6 +476,7 @@ pub struct Upvaldesc {
 pub struct LoopCounter {
     pub pc: u32,
     pub count: u32,
+    trace: Option<NonNull<vm::trace::Trace>>,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]

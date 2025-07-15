@@ -4,20 +4,45 @@ use std::{
     ptr::{self, NonNull},
 };
 
-use crate::global_State;
+use crate::{global_State, ldo::luaD_throw, lua_State};
 
-trait LuaDrop {
-    fn drop_with_state(&mut self, state: &global_State);
+pub(super) trait LuaDrop {
+    fn drop_with_state(&mut self, g: GlobalState);
 }
 
 impl<T: Copy> LuaDrop for T {
-    fn drop_with_state(&mut self, _state: &global_State) {}
+    fn drop_with_state(&mut self, _: GlobalState) {}
+}
+
+pub(super) struct AllocError;
+
+impl AllocError {
+    pub(super) unsafe fn throw(self, L: *mut lua_State) -> ! {
+        unsafe { luaD_throw(L, 4) }
+    }
 }
 
 pub(super) struct LVec32<T> {
     ptr: NonNull<T>,
     len: u32,
     cap: u32,
+}
+
+impl<T: LuaDrop> LuaDrop for LVec32<T> {
+    fn drop_with_state(&mut self, g: GlobalState) {
+        unsafe {
+            for i in 0..self.len {
+                self.ptr.add(i as usize).as_mut().drop_with_state(g);
+                ptr::drop_in_place(self.ptr.add(i as usize).as_ptr());
+            }
+
+            g.dealloc(NonNull::new_unchecked(ptr::slice_from_raw_parts_mut(
+                self.ptr.as_ptr(),
+                self.cap as usize,
+            )
+                as *mut [MaybeUninit<T>]));
+        }
+    }
 }
 
 impl<T> LVec32<T> {
@@ -29,8 +54,8 @@ impl<T> LVec32<T> {
         }
     }
 
-    fn grow(&mut self, g: GlobalState, additional: u32) -> Result<(), ()> {
-        let required_cap = self.len.checked_add(additional).ok_or(())?;
+    fn grow(&mut self, g: GlobalState, additional: u32) -> Result<(), AllocError> {
+        let required_cap = self.len.checked_add(additional).ok_or(AllocError)?;
         let cap = std::cmp::max(self.cap * 2, required_cap);
 
         let ptr = unsafe {
@@ -41,7 +66,7 @@ impl<T> LVec32<T> {
                 ) as *mut [MaybeUninit<T>]),
                 cap as usize,
             )
-            .ok_or(())?
+            .ok_or(AllocError)?
         };
 
         self.ptr = ptr.cast();
@@ -50,10 +75,10 @@ impl<T> LVec32<T> {
         Ok(())
     }
 
-    pub(super) fn push(&mut self, g: GlobalState, item: T) -> Result<(), T> {
+    pub(super) fn push(&mut self, g: GlobalState, item: T) -> Result<(), (AllocError, T)> {
         if self.len >= self.cap {
-            if self.grow(g, 1).is_err() {
-                return Err(item);
+            if let Err(err) = self.grow(g, 1) {
+                return Err((err, item));
             }
         }
         unsafe { self.ptr.add(self.len as usize).write(item) };
@@ -75,6 +100,39 @@ impl<T> LVec32<T> {
         // TODO: Drop
         self.len = 0;
     }
+
+    pub(super) fn resize(
+        &mut self,
+        g: GlobalState,
+        new_len: u32,
+        value: T,
+    ) -> Result<(), AllocError>
+    where
+        T: Clone,
+    {
+        if new_len == self.len {
+            return Ok(());
+        }
+
+        if new_len < self.len {
+            // Truncate
+            while self.len > new_len {
+                self.pop();
+            }
+        } else {
+            // Grow
+            if new_len > self.cap {
+                self.grow(g, new_len - self.cap)?;
+            }
+
+            while self.len < new_len - 1 {
+                self.push(g, value.clone()).map_err(|(err, _)| err)?;
+            }
+            self.push(g, value).map_err(|(err, _)| err)?;
+        }
+
+        Ok(())
+    }
 }
 
 impl<T> std::ops::Deref for LVec32<T> {
@@ -88,6 +146,37 @@ impl<T> std::ops::Deref for LVec32<T> {
 impl<T> std::ops::DerefMut for LVec32<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { std::slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len as usize) }
+    }
+}
+
+pub(crate) struct DropGuard<T: LuaDrop> {
+    g: GlobalState,
+    value: T,
+}
+
+impl<T: LuaDrop> Drop for DropGuard<T> {
+    fn drop(&mut self) {
+        self.value.drop_with_state(self.g);
+    }
+}
+
+impl<T: LuaDrop> DropGuard<T> {
+    pub(crate) fn new(g: GlobalState, value: T) -> Self {
+        DropGuard { g, value }
+    }
+}
+
+impl<T: LuaDrop> std::ops::Deref for DropGuard<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl<T: LuaDrop> std::ops::DerefMut for DropGuard<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.value
     }
 }
 
@@ -219,7 +308,7 @@ impl GlobalState {
         let ptr: *mut std::ffi::c_void = unsafe {
             alloc(
                 (*self.0.as_ptr()).ud,
-                ptr.as_ptr().cast(),
+                if old_size.size() == 0 { ptr::null_mut() } else { ptr.as_ptr().cast() },
                 old_size.size(),
                 size as usize,
             )

@@ -2057,7 +2057,7 @@ pub unsafe fn luaK_build_loop_counters(L: *mut lua_State, proto: *mut Proto) {
     let mut loop_counter = loop_counters.as_ptr().cast::<LoopCounter>();
 
     loop_points.iter().enumerate().filter(|(_, is_loop)| **is_loop).for_each(|(pc, _)| {
-        loop_counter.write(LoopCounter { pc: pc as u32, count: 0 });
+        loop_counter.write(LoopCounter { pc: pc as u32, count: 0, trace: None });
         loop_counter = loop_counter.add(1);
     });
 

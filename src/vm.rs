@@ -1,5 +1,8 @@
 use crate::*;
 
+#[cfg(feature = "jit")]
+pub(crate) mod trace;
+
 /// Fast track for 'gettable': if 't' is a table and 't[k]' is present,
 /// return 1 with 'slot' pointing to 't[k]' (position of final result).
 /// Otherwise, return 0 (meaning it will have to check metamethod)
@@ -1424,14 +1427,26 @@ unsafe fn op_bitwise_slow(
 
 #[cfg(feature = "jit")]
 #[inline(always)]
-unsafe fn luaV_record_loop(proto: *mut Proto, pc: *const Instruction) {
+unsafe fn luaV_record_loop(
+    proto: *mut Proto,
+    pc: *const Instruction,
+    tr: &mut trace::TraceRecorder,
+) -> Option<NonNull<trace::Trace>> {
     let pc = pc.offset_from_unsigned((*proto).code) as u32;
-    let loop_counters = ptr::slice_from_raw_parts_mut((*proto).loop_cnts, (*proto).size_loop_cnts as usize);
+    let loop_counters =
+        ptr::slice_from_raw_parts_mut((*proto).loop_cnts, (*proto).size_loop_cnts as usize);
     if let Some(loop_counters) = loop_counters.as_mut() {
         if let Ok(idx) = loop_counters.binary_search_by_key(&pc, |lc| lc.pc) {
-            loop_counters.get_unchecked_mut(idx).count += 1;
+            let lc = loop_counters.get_unchecked_mut(idx);
+            lc.count += 1;
+            if !tr.recording && lc.count > 1000 && lc.trace.is_none() {
+                tr.begin_recording(&mut lc.trace);
+            }
+            // TODO: Could stitch trace here
+            return lc.trace;
         }
     }
+    None
 }
 
 #[unsafe(no_mangle)]
@@ -1447,6 +1462,10 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
     let mut base: StkId = 0 as *mut StackValue;
     let mut pc: *const Instruction = 0 as *const Instruction;
     let mut trap: i32 = 0;
+    #[cfg(feature = "jit")]
+    let mut trace_recorder = trace::TraceRecorder::new();
+    #[cfg(feature = "jit")]
+    let mut next_trace: Option<NonNull<trace::Trace>> = None;
     '_startfunc: loop {
         trap = (*L).hookmask;
         '_returning: loop {
@@ -1463,6 +1482,23 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                     trap = luaG_traceexec(L, pc);
                     base = ((*ci).func.p).offset(1);
                 }
+
+                #[cfg(feature = "jit")]
+                if trace_recorder.recording {
+                    let ok = trace_recorder.record_start(L, pc, ci, NonNull::new_unchecked(cl));
+                    if !ok {
+                        trace_recorder
+                            .end_recording(L)
+                            .expect("Trace compile failed");
+                    }
+                } else {
+                    if let Some(trace) = next_trace.take() {
+                        let entrypoint = (*(trace.as_ptr())).entrypoint;
+                        entrypoint(base, L, ci, cl); // TODO: Check result for bail
+                        pc = (*(trace.as_ptr())).last_pc;
+                    }
+                }
+
                 i = *pc;
                 pc = pc.offset(1);
                 match (i >> 0 & !(!(0 as Instruction) << 7 as i32) << 0) as OpCode as u32 {
@@ -2753,7 +2789,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         pc = pc.offset(offset);
                         #[cfg(feature = "jit")]
                         if offset.is_negative() {
-                            luaV_record_loop((*cl).p, pc);
+                            next_trace = luaV_record_loop((*cl).p, pc, &mut trace_recorder);
                         }
                         trap = (*ci).u.l.trap;
                         continue;
@@ -3457,7 +3493,9 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                         as isize),
                                 );
                                 #[cfg(feature = "jit")]
-                                luaV_record_loop((*cl).p, pc);
+                                {
+                                    next_trace = luaV_record_loop((*cl).p, pc, &mut trace_recorder)
+                                };
                             }
                         } else if floatforloop(ra_71) != 0 {
                             pc = pc.offset(
@@ -3466,7 +3504,9 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                     as i32 as isize),
                             );
                             #[cfg(feature = "jit")]
-                            luaV_record_loop((*cl).p, pc);
+                            {
+                                next_trace = luaV_record_loop((*cl).p, pc, &mut trace_recorder)
+                            };
                         }
                         trap = (*ci).u.l.trap;
                         continue;
@@ -3701,7 +3741,9 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                             as i32 as isize),
                     );
                     #[cfg(feature = "jit")]
-                    luaV_record_loop((*cl).p, pc);
+                    {
+                        next_trace = luaV_record_loop((*cl).p, pc, &mut trace_recorder);
+                    }
                 }
             }
             if (*ci).callstatus as i32 & (1 as i32) << 2 as i32 != 0 {
