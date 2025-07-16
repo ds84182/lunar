@@ -1,11 +1,15 @@
-use std::ptr::{self, NonNull};
+use std::{
+    mem::offset_of,
+    ptr::{self, NonNull},
+};
 
 use crate::{
-    CallInfo, Instruction, LClosure, LUA_VFALSE, LUA_VNIL, LUA_VNUMFLT, LUA_VNUMINT, LUA_VTRUE,
-    StackValue, StkId, TValue,
+    CallInfo, Instruction, LClosure, LUA_VFALSE, LUA_VNIL, LUA_VNUMFLT, LUA_VNUMINT, LUA_VTABLE,
+    LUA_VTRUE, StackValue, StkId, TValue, Table,
     ldo::luaD_throw,
     lua_Integer, lua_Number, lua_State,
     opcodes::*,
+    table::{luaH_get, luaH_getint},
     ttypetag,
     utils::{DropGuard, GlobalState, LVec32},
 };
@@ -106,6 +110,16 @@ impl TraceRecorder {
             | OP_BXOR | OP_SHL | OP_SHR => {
                 traced.arg_tt[0] = unsafe { ttypetag(stack.add(getarg_b(i) as usize)) };
                 traced.arg_tt[1] = unsafe { ttypetag(stack.add(getarg_c(i) as usize)) };
+            }
+
+            // TODO: Check for metatable?
+            OP_GETTABLE if unsafe { ttypetag(stack.add(getarg_b(i) as usize)) == LUA_VTABLE } => {
+                traced.arg_tt[0] = LUA_VTABLE;
+                traced.arg_tt[1] = unsafe { ttypetag(stack.add(getarg_c(i) as usize)) };
+            }
+
+            OP_GETI if unsafe { ttypetag(stack.add(getarg_b(i) as usize)) == LUA_VTABLE } => {
+                traced.arg_tt[0] = LUA_VTABLE;
             }
 
             // OP_GETUPVAL => {
@@ -240,7 +254,7 @@ impl Trace {
 pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Trace {
     let g = GlobalState::new_unchecked((*L).l_G);
 
-    use cranelift::codegen::ir::UserFuncName;
+    use cranelift::codegen::ir::{BlockArg, UserFuncName};
     use cranelift::jit::{JITBuilder, JITModule};
     use cranelift::prelude::*;
     use cranelift_module::{Module, default_libcall_names};
@@ -283,6 +297,71 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
 
     const TT: Type = types::I8;
 
+    struct ExtFunc {
+        name: &'static str,
+        sig: Signature,
+        addr: i64,
+    }
+
+    enum ExtFuncRef<'a> {
+        Uninit(&'a ExtFunc),
+        Init {
+            sig: codegen::ir::SigRef,
+            addr: Value,
+        },
+    }
+
+    impl ExtFuncRef<'_> {
+        fn call(&mut self, bcx: &mut FunctionBuilder<'_>, args: &[Value]) -> codegen::ir::Inst {
+            let (sig, addr) = match self {
+                ExtFuncRef::Uninit(func) => {
+                    let (sig, addr) = (
+                        bcx.import_signature(func.sig.clone()),
+                        bcx.ins().iconst(PTR_TYPE, func.addr),
+                    );
+                    *self = ExtFuncRef::Init { sig, addr };
+                    (sig, addr)
+                }
+                ExtFuncRef::Init { sig, addr } => (*sig, *addr),
+            };
+
+            bcx.ins().call_indirect(sig, addr, args)
+        }
+    }
+
+    // External Functions:
+    // luaH_get(*mut Table, *const TValue) -> *mut TValue (non-null)
+    let ext_luaH_get = {
+        let mut sig = module.make_signature();
+        sig.params.push(AbiParam::new(PTR_TYPE));
+        sig.params.push(AbiParam::new(PTR_TYPE));
+        sig.returns.push(AbiParam::new(PTR_TYPE));
+        ExtFunc {
+            name: "luaH_get",
+            sig,
+            addr: unsafe {
+                std::mem::transmute::<unsafe extern "C-unwind" fn(_, _) -> _, usize>(luaH_get)
+                    as i64
+            },
+        }
+    };
+
+    // luaH_getint(*mut Table, lua_Integer) -> *mut TValue (non-null)
+    let ext_luaH_getint = {
+        let mut sig = module.make_signature();
+        sig.params.push(AbiParam::new(PTR_TYPE));
+        sig.params.push(AbiParam::new(LUA_INT));
+        sig.returns.push(AbiParam::new(PTR_TYPE));
+        ExtFunc {
+            name: "luaH_getint",
+            sig,
+            addr: unsafe {
+                std::mem::transmute::<unsafe extern "C-unwind" fn(_, _) -> _, usize>(luaH_getint)
+                    as i64
+            },
+        }
+    };
+
     let mut bail = DropGuard::new(g, LVec32::new());
 
     // TODO: 32-bit support
@@ -304,6 +383,9 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
     ctx.func.name = UserFuncName::user(0, trace_fn.as_u32());
 
     {
+        let mut ext_luaH_get = ExtFuncRef::Uninit(&ext_luaH_get);
+        let mut ext_luaH_getint = ExtFuncRef::Uninit(&ext_luaH_getint);
+
         let mut bcx = FunctionBuilder::new(&mut ctx.func, &mut func_ctx);
         let mut block = bcx.create_block();
 
@@ -430,6 +512,11 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                 -(self.bail.len() as i64)
             }
 
+            fn reg_offset(&self, r: u32) -> i32 {
+                // NOTE: This would change based on the current inlined function, once inlining is implemented.
+                (r as u32 * size_of::<StackValue>() as u32) as i32
+            }
+
             /// Flushes all modified TValues to the backing registers.
             fn writeback_regs(&self, bcx: &mut FunctionBuilder<'_>) {
                 for (i, reg) in self.regs.iter().enumerate() {
@@ -450,6 +537,29 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                             offset + (size_of::<crate::Value>() as i32),
                         );
                     }
+                }
+            }
+
+            /// Writeback a single register to memory, if it needs writeback.
+            fn writeback_reg(&self, bcx: &mut FunctionBuilder<'_>, r: u32) {
+                let Some(Some(reg)) = self.regs.get(r as usize) else {
+                    return;
+                };
+
+                if reg.writeback {
+                    let offset = self.reg_offset(r);
+                    bcx.ins().store(
+                        MemFlags::trusted().with_can_move(),
+                        reg.value.value,
+                        self.arg_base,
+                        offset,
+                    );
+                    bcx.ins().store(
+                        MemFlags::trusted().with_can_move(),
+                        reg.value.tt,
+                        self.arg_base,
+                        offset + (size_of::<crate::Value>() as i32),
+                    );
                 }
             }
 
@@ -574,6 +684,70 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                     LUA_VNUMINT,
                     bcx,
                 );
+            }
+
+            /// Get a value ptr from the table via integer key.
+            ///
+            /// `slot_check_block` must accept a single ptr as a block argument.
+            ///
+            /// Must switch to another block after this call.
+            fn table_getint(
+                &mut self,
+                bcx: &mut FunctionBuilder<'_>,
+                ext_luaH_getint: &mut ExtFuncRef<'_>,
+                slot_check_block: Block,
+                table: Value,
+                key: Value,
+            ) {
+                let fastget_block = bcx.create_block();
+                let getint_block = bcx.create_block();
+
+                // luaV_fastgeti fast path first:
+                let alimit = bcx.ins().load(
+                    types::I32,
+                    MemFlags::trusted(),
+                    table,
+                    offset_of!(Table, alimit) as i32,
+                );
+                let alimit = bcx.ins().uextend(LUA_INT, alimit);
+
+                let key_index = bcx.ins().iadd_imm(key, -1);
+
+                let cond = bcx.ins().icmp(IntCC::UnsignedLessThan, key_index, alimit);
+
+                bcx.ins().brif(cond, fastget_block, [], getint_block, []);
+
+                {
+                    bcx.switch_to_block(fastget_block);
+
+                    let key_offset = bcx.ins().imul_imm(key_index, size_of::<TValue>() as i64);
+
+                    let array = bcx.ins().load(
+                        PTR_TYPE,
+                        MemFlags::trusted(),
+                        table,
+                        offset_of!(Table, array) as i32,
+                    );
+                    let fastget_value_ptr = bcx.ins().iadd(array, key_offset);
+
+                    bcx.ins()
+                        .jump(slot_check_block, &[BlockArg::Value(fastget_value_ptr)]);
+                }
+
+                {
+                    bcx.switch_to_block(getint_block);
+
+                    // self.writeback_reg(&mut bcx, c);
+                    // let reg_offset = self.reg_offset(c);
+
+                    // let reg = bcx.ins().iadd_imm(cx.arg_base, reg_offset as i64);
+
+                    let call_inst = ext_luaH_getint.call(bcx, &[table, key]);
+                    let getint_value_ptr = bcx.inst_results(call_inst)[0];
+
+                    bcx.ins()
+                        .jump(slot_check_block, &[BlockArg::Value(getint_value_ptr)]);
+                }
             }
         }
 
@@ -869,6 +1043,167 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
 
                     cx.set_reg_typed(a, value, result_tt, &mut bcx);
                 }
+                // Tables
+                OP_GETI => {
+                    let table = cx.get_reg(b, &mut bcx);
+
+                    if cx.reg_static_type(b) == 255 {
+                        // Register type not known statically, insert type guard.
+                        block = cx.type_guard(&mut bcx, table.tt, ctb(LUA_VTABLE), &mut bail);
+                        cx.set_reg_static_type(b, ctb(LUA_VTABLE));
+                    }
+
+                    let key = bcx.ins().iconst(LUA_INT, c as i64);
+
+                    let slot_check_block = bcx.create_block();
+                    let bail_block = bcx.create_block();
+                    bcx.set_cold_block(bail_block);
+                    let continue_block = bcx.create_block();
+
+                    // Phi coming from `fastget_block` and `getint_block`
+                    bcx.append_block_param(slot_check_block, PTR_TYPE);
+
+                    cx.table_getint(
+                        &mut bcx,
+                        &mut ext_luaH_getint,
+                        slot_check_block,
+                        table.value,
+                        key,
+                    );
+
+                    let value_ptr;
+                    let tt;
+
+                    {
+                        bcx.switch_to_block(slot_check_block);
+
+                        value_ptr = bcx.block_params(slot_check_block)[0];
+
+                        tt = bcx.ins().load(
+                            types::I8,
+                            MemFlags::trusted(),
+                            value_ptr,
+                            size_of::<crate::Value>() as i32,
+                        );
+
+                        let tt_no_variant = bcx.ins().band_imm(tt, 0x0F);
+
+                        let cond = bcx.ins().icmp_imm(IntCC::Equal, tt_no_variant, 0);
+
+                        bcx.ins().brif(cond, bail_block, [], continue_block, []);
+                    }
+
+                    {
+                        bcx.switch_to_block(bail_block);
+
+                        cx.writeback_regs(&mut bcx);
+
+                        let bail_id = cx.bail_id(&mut bail);
+                        let bail_id = bcx.ins().iconst(PTR_TYPE, bail_id);
+                        bcx.ins().return_(&[bail_id]);
+                    }
+
+                    bcx.switch_to_block(continue_block);
+                    block = continue_block;
+
+                    let value = bcx.ins().load(PTR_TYPE, MemFlags::trusted(), value_ptr, 0);
+
+                    cx.set_reg(a, CgTValue { value, tt });
+                }
+                OP_GETTABLE => {
+                    let [_, tt_c] = ti.arg_tt;
+
+                    let table = cx.get_reg(b, &mut bcx);
+
+                    if cx.reg_static_type(b) == 255 {
+                        // Register type not known statically, insert type guard.
+                        block = cx.type_guard(&mut bcx, table.tt, ctb(LUA_VTABLE), &mut bail);
+                        cx.set_reg_static_type(b, ctb(LUA_VTABLE));
+                    }
+
+                    let key = cx.get_reg(c, &mut bcx);
+
+                    if cx.reg_static_type(c) == 255 {
+                        // Register type not known statically, insert type guard.
+                        block = cx.type_guard(&mut bcx, key.tt, tt_c, &mut bail);
+                        cx.set_reg_static_type(c, tt_c);
+                    }
+
+                    match tt_c {
+                        LUA_VNUMINT => {
+                            // local slot
+                            // if key-1 < table.alimit then
+                            //   slot = table.array[key]
+                            // else
+                            //   slot = luaH_getint(table, key)
+                            // end
+                            // local tt = slot.tt
+                            // if tt == nil then
+                            //   bail
+                            // end
+                            // load slot.value
+                            // TODO: Don't load the whole slot immediately?
+
+                            let slot_check_block = bcx.create_block();
+                            let bail_block = bcx.create_block();
+                            bcx.set_cold_block(bail_block);
+                            let continue_block = bcx.create_block();
+
+                            // Phi coming from `fastget_block` and `getint_block`
+                            bcx.append_block_param(slot_check_block, PTR_TYPE);
+
+                            cx.table_getint(
+                                &mut bcx,
+                                &mut ext_luaH_getint,
+                                slot_check_block,
+                                table.value,
+                                key.value,
+                            );
+
+                            let value_ptr;
+                            let tt;
+
+                            {
+                                bcx.switch_to_block(slot_check_block);
+
+                                value_ptr = bcx.block_params(slot_check_block)[0];
+
+                                tt = bcx.ins().load(
+                                    types::I8,
+                                    MemFlags::trusted(),
+                                    value_ptr,
+                                    size_of::<crate::Value>() as i32,
+                                );
+
+                                let tt_no_variant = bcx.ins().band_imm(tt, 0x0F);
+
+                                let cond = bcx.ins().icmp_imm(IntCC::Equal, tt_no_variant, 0);
+
+                                bcx.ins().brif(cond, bail_block, [], continue_block, []);
+                            }
+
+                            {
+                                bcx.switch_to_block(bail_block);
+
+                                cx.writeback_regs(&mut bcx);
+
+                                let bail_id = cx.bail_id(&mut bail);
+                                let bail_id = bcx.ins().iconst(PTR_TYPE, bail_id);
+                                bcx.ins().return_(&[bail_id]);
+                            }
+
+                            bcx.switch_to_block(continue_block);
+                            block = continue_block;
+
+                            let value = bcx.ins().load(PTR_TYPE, MemFlags::trusted(), value_ptr, 0);
+
+                            cx.set_reg(a, CgTValue { value, tt });
+                        }
+                        // TODO: Branch between table int get fast path and luaH_get
+                        _ => todo!(),
+                    }
+                }
+
                 op => todo!("{op}"),
             }
         }
