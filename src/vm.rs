@@ -1494,8 +1494,12 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                 } else {
                     if let Some(trace) = next_trace.take() {
                         let entrypoint = (*(trace.as_ptr())).entrypoint;
-                        entrypoint(base, L, ci, cl); // TODO: Check result for bail
-                        pc = (*(trace.as_ptr())).last_pc;
+                        let result = entrypoint(base, L, ci, cl); // TODO: Check result for bail
+                        if result < 0 {
+                            pc = trace.as_ref().bail(result);
+                        } else {
+                            pc = (*(trace.as_ptr())).last_pc;
+                        }
                     }
                 }
 

@@ -1,6 +1,6 @@
 use std::{
     alloc::Layout,
-    mem::MaybeUninit,
+    mem::{ManuallyDrop, MaybeUninit},
     ptr::{self, NonNull},
 };
 
@@ -14,6 +14,7 @@ impl<T: Copy> LuaDrop for T {
     fn drop_with_state(&mut self, _: GlobalState) {}
 }
 
+#[derive(Debug)]
 pub(super) struct AllocError;
 
 impl AllocError {
@@ -133,6 +134,35 @@ impl<T> LVec32<T> {
 
         Ok(())
     }
+
+    pub(super) fn into_boxed_slice(self, g: GlobalState) -> Result<AllocGuard<[T]>, AllocError> {
+        // Shrink if needed
+        let ptr = if self.len < self.cap {
+            unsafe {
+                g.realloc_slice(
+                    NonNull::new_unchecked(ptr::slice_from_raw_parts_mut(
+                        self.ptr.as_ptr(),
+                        self.cap as usize,
+                    ) as *mut [MaybeUninit<T>]),
+                    self.len as usize,
+                )
+                .ok_or(AllocError)?
+            }
+        } else {
+            unsafe {
+                NonNull::new_unchecked(ptr::slice_from_raw_parts_mut(
+                    self.ptr.as_ptr(),
+                    self.len as usize,
+                ) as *mut [MaybeUninit<T>])
+            }
+        };
+
+        std::mem::forget(self);
+        Ok(AllocGuard {
+            g,
+            ptr: unsafe { NonNull::new_unchecked(ptr.as_ptr() as *mut [T]) },
+        })
+    }
 }
 
 impl<T> std::ops::Deref for LVec32<T> {
@@ -163,6 +193,11 @@ impl<T: LuaDrop> Drop for DropGuard<T> {
 impl<T: LuaDrop> DropGuard<T> {
     pub(crate) fn new(g: GlobalState, value: T) -> Self {
         DropGuard { g, value }
+    }
+
+    pub(crate) fn into_inner(self) -> T {
+        let mut this = ManuallyDrop::new(self);
+        unsafe { ptr::read(&this.value) }
     }
 }
 
@@ -308,7 +343,11 @@ impl GlobalState {
         let ptr: *mut std::ffi::c_void = unsafe {
             alloc(
                 (*self.0.as_ptr()).ud,
-                if old_size.size() == 0 { ptr::null_mut() } else { ptr.as_ptr().cast() },
+                if old_size.size() == 0 {
+                    ptr::null_mut()
+                } else {
+                    ptr.as_ptr().cast()
+                },
                 old_size.size(),
                 size as usize,
             )
