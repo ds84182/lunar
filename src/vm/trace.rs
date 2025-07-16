@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     CallInfo, Instruction, LClosure, LUA_VFALSE, LUA_VNIL, LUA_VNUMFLT, LUA_VNUMINT, LUA_VTABLE,
-    LUA_VTRUE, StackValue, StkId, TValue, Table,
+    LUA_VTRUE, StackValue, StkId, TValue, Table, ctb,
     ldo::luaD_throw,
     lua_Integer, lua_Number, lua_State,
     opcodes::*,
@@ -305,26 +305,21 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
 
     enum ExtFuncRef<'a> {
         Uninit(&'a ExtFunc),
-        Init {
-            sig: codegen::ir::SigRef,
-            addr: Value,
-        },
+        Init { sig: codegen::ir::SigRef, addr: i64 },
     }
 
     impl ExtFuncRef<'_> {
         fn call(&mut self, bcx: &mut FunctionBuilder<'_>, args: &[Value]) -> codegen::ir::Inst {
             let (sig, addr) = match self {
                 ExtFuncRef::Uninit(func) => {
-                    let (sig, addr) = (
-                        bcx.import_signature(func.sig.clone()),
-                        bcx.ins().iconst(PTR_TYPE, func.addr),
-                    );
+                    let (sig, addr) = (bcx.import_signature(func.sig.clone()), func.addr);
                     *self = ExtFuncRef::Init { sig, addr };
                     (sig, addr)
                 }
                 ExtFuncRef::Init { sig, addr } => (*sig, *addr),
             };
 
+            let addr = bcx.ins().iconst(PTR_TYPE, addr);
             bcx.ins().call_indirect(sig, addr, args)
         }
     }
@@ -362,6 +357,25 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
         }
     };
 
+    // powf(lua_Number, lua_Number) -> lua_Number
+    let ext_powf = {
+        unsafe extern "C" fn powf(a: lua_Number, b: lua_Number) -> lua_Number {
+            a.powf(b)
+        }
+
+        let mut sig = module.make_signature();
+        sig.params.push(AbiParam::new(LUA_NUM));
+        sig.params.push(AbiParam::new(LUA_NUM));
+        sig.returns.push(AbiParam::new(LUA_NUM));
+        ExtFunc {
+            name: "powf",
+            sig,
+            addr: unsafe {
+                std::mem::transmute::<unsafe extern "C" fn(_, _) -> _, usize>(powf) as i64
+            },
+        }
+    };
+
     let mut bail = DropGuard::new(g, LVec32::new());
 
     // TODO: 32-bit support
@@ -385,6 +399,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
     {
         let mut ext_luaH_get = ExtFuncRef::Uninit(&ext_luaH_get);
         let mut ext_luaH_getint = ExtFuncRef::Uninit(&ext_luaH_getint);
+        let mut ext_powf = ExtFuncRef::Uninit(&ext_powf);
 
         let mut bcx = FunctionBuilder::new(&mut ctx.func, &mut func_ctx);
         let mut block = bcx.create_block();
@@ -591,6 +606,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                 continue_block
             }
 
+            /// Int or float arithmetic between a register and a constant.
             fn arith_k<'f>(
                 &mut self,
                 bcx: &mut FunctionBuilder<'f>,
@@ -647,6 +663,123 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                 };
 
                 self.set_reg_typed(a, value, result_tt, bcx);
+            }
+
+            /// Int or float arithmetic between two registers.
+            fn arith<'f>(
+                &mut self,
+                bcx: &mut FunctionBuilder<'f>,
+                bail: &mut Option<TraceBail>,
+                block: &mut Block,
+                a: u32,
+                b: u32,
+                b_tt: u8,
+                c: u32,
+                c_tt: u8,
+                int_op: impl FnOnce(&mut FunctionBuilder<'f>, Value, Value) -> Value,
+                flt_op: impl FnOnce(&mut FunctionBuilder<'f>, Value, Value) -> Value,
+            ) {
+                let lhs = self.get_reg(b, bcx);
+
+                if self.reg_static_type(b) == 255 {
+                    // Register type not known statically, insert type guard.
+                    *block = self.type_guard(bcx, lhs.tt, b_tt, bail);
+                    self.set_reg_static_type(b, b_tt);
+                }
+
+                let lhs = match b_tt {
+                    LUA_VNUMINT => lhs,
+                    LUA_VNUMFLT => CgTValue {
+                        value: bcx.ins().bitcast(LUA_NUM, MemFlags::new(), lhs.value),
+                        tt: lhs.tt,
+                    },
+                    _ => unreachable!(),
+                };
+
+                let rhs = self.get_reg(c, bcx);
+
+                if self.reg_static_type(c) == 255 {
+                    // Register type not known statically, insert type guard.
+                    *block = self.type_guard(bcx, rhs.tt, c_tt, bail);
+                    self.set_reg_static_type(c, c_tt);
+                }
+
+                let rhs = match c_tt {
+                    LUA_VNUMINT => rhs,
+                    LUA_VNUMFLT => CgTValue {
+                        value: bcx.ins().bitcast(LUA_NUM, MemFlags::new(), rhs.value),
+                        tt: rhs.tt,
+                    },
+                    _ => unreachable!(),
+                };
+
+                let (value, result_tt) = match (b_tt, c_tt) {
+                    (LUA_VNUMINT, LUA_VNUMINT) => (int_op(bcx, lhs.value, rhs.value), LUA_VNUMINT),
+                    (LUA_VNUMINT, LUA_VNUMFLT) => {
+                        let x = bcx.ins().fcvt_from_sint(LUA_NUM, lhs.value);
+                        let y = rhs.value;
+                        (flt_op(bcx, x, y), LUA_VNUMFLT)
+                    }
+                    (LUA_VNUMFLT, LUA_VNUMINT) => {
+                        let x = lhs.value;
+                        let y = bcx.ins().fcvt_from_sint(LUA_NUM, rhs.value);
+                        (flt_op(bcx, x, y), LUA_VNUMFLT)
+                    }
+                    (LUA_VNUMFLT, LUA_VNUMFLT) => {
+                        let x = lhs.value;
+                        let y = rhs.value;
+                        (flt_op(bcx, x, y), LUA_VNUMFLT)
+                    }
+                    _ => todo!(),
+                };
+
+                self.set_reg_typed(a, value, result_tt, bcx);
+            }
+
+            /// Float-only arithmetic between two registers.
+            fn arith_f<'f>(
+                &mut self,
+                bcx: &mut FunctionBuilder<'f>,
+                bail: &mut Option<TraceBail>,
+                block: &mut Block,
+                a: u32,
+                b: u32,
+                b_tt: u8,
+                c: u32,
+                c_tt: u8,
+                flt_op: impl FnOnce(&mut FunctionBuilder<'f>, Value, Value) -> Value,
+            ) {
+                let lhs = self.get_reg(b, bcx);
+
+                if self.reg_static_type(b) == 255 {
+                    // Register type not known statically, insert type guard.
+                    *block = self.type_guard(bcx, lhs.tt, b_tt, bail);
+                    self.set_reg_static_type(b, b_tt);
+                }
+
+                let lhs = match b_tt {
+                    LUA_VNUMINT => bcx.ins().fcvt_from_sint(LUA_NUM, lhs.value),
+                    LUA_VNUMFLT => bcx.ins().bitcast(LUA_NUM, MemFlags::new(), lhs.value),
+                    _ => unreachable!(),
+                };
+
+                let rhs = self.get_reg(c, bcx);
+
+                if self.reg_static_type(c) == 255 {
+                    // Register type not known statically, insert type guard.
+                    *block = self.type_guard(bcx, rhs.tt, c_tt, bail);
+                    self.set_reg_static_type(c, c_tt);
+                }
+
+                let rhs = match c_tt {
+                    LUA_VNUMINT => bcx.ins().fcvt_from_sint(LUA_NUM, rhs.value),
+                    LUA_VNUMFLT => bcx.ins().bitcast(LUA_NUM, MemFlags::new(), rhs.value),
+                    _ => unreachable!(),
+                };
+
+                let value = flt_op(bcx, lhs, rhs);
+
+                self.set_reg_typed(a, value, LUA_VNUMFLT, bcx);
             }
 
             fn bitwise_k<'f>(
@@ -920,7 +1053,36 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                     );
                 }
                 // TODO: OP_MODK
-                // TODO: OP_POWK
+                OP_POWK => {
+                    let [tt, _] = ti.arg_tt;
+
+                    let lhs = cx.get_reg(b, &mut bcx);
+
+                    if cx.reg_static_type(b) == 255 {
+                        // Register type not known statically, insert type guard.
+                        block = cx.type_guard(&mut bcx, lhs.tt, tt, &mut bail);
+                        cx.set_reg_static_type(b, tt);
+                    }
+
+                    let lhs = match tt {
+                        LUA_VNUMINT => bcx.ins().fcvt_from_sint(LUA_NUM, lhs.value),
+                        LUA_VNUMFLT => bcx.ins().bitcast(LUA_NUM, MemFlags::new(), lhs.value),
+                        _ => unreachable!(),
+                    };
+
+                    let kst = unsafe { ksts.add(c as usize) };
+
+                    let rhs = bcx.ins().f64const(if (*kst).tt_ == LUA_VNUMINT {
+                        (*kst).value_.i as lua_Number
+                    } else {
+                        (*kst).value_.n
+                    });
+
+                    let call = ext_powf.call(&mut bcx, &[lhs, rhs]);
+                    let value = bcx.inst_results(call)[0];
+
+                    cx.set_reg_typed(a, value, LUA_VNUMFLT, &mut bcx);
+                }
                 // TODO: OP_DIVK
                 // TODO: OP_IDIVK
                 OP_BANDK => {
@@ -999,6 +1161,71 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                         },
                         LUA_VNUMINT,
                         &mut bcx,
+                    );
+                }
+                OP_ADD => {
+                    let [b_tt, c_tt] = ti.arg_tt;
+
+                    cx.arith(
+                        &mut bcx,
+                        &mut bail,
+                        &mut block,
+                        a,
+                        b,
+                        b_tt,
+                        c,
+                        c_tt,
+                        |bcx, x, y| bcx.ins().iadd(x, y),
+                        |bcx, x, y| bcx.ins().fadd(x, y),
+                    );
+                }
+                OP_SUB => {
+                    let [b_tt, c_tt] = ti.arg_tt;
+
+                    cx.arith(
+                        &mut bcx,
+                        &mut bail,
+                        &mut block,
+                        a,
+                        b,
+                        b_tt,
+                        c,
+                        c_tt,
+                        |bcx, x, y| bcx.ins().isub(x, y),
+                        |bcx, x, y| bcx.ins().fsub(x, y),
+                    );
+                }
+                OP_MUL => {
+                    let [b_tt, c_tt] = ti.arg_tt;
+
+                    cx.arith(
+                        &mut bcx,
+                        &mut bail,
+                        &mut block,
+                        a,
+                        b,
+                        b_tt,
+                        c,
+                        c_tt,
+                        |bcx, x, y| bcx.ins().imul(x, y),
+                        |bcx, x, y| bcx.ins().fmul(x, y),
+                    );
+                }
+                // TODO: OP_MOD
+                // TODO: OP_POW
+                OP_DIV => {
+                    let [b_tt, c_tt] = ti.arg_tt;
+
+                    cx.arith_f(
+                        &mut bcx,
+                        &mut bail,
+                        &mut block,
+                        a,
+                        b,
+                        b_tt,
+                        c,
+                        c_tt,
+                        |bcx, x, y| bcx.ins().fdiv(x, y),
                     );
                 }
                 OP_BXOR => {
