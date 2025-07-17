@@ -1,5 +1,6 @@
 use std::{
     mem::offset_of,
+    ops::Range,
     ptr::{self, NonNull},
 };
 
@@ -12,7 +13,7 @@ use crate::{
     opcodes::*,
     table::{luaH_get, luaH_getint},
     ttypetag,
-    utils::{DropGuard, GlobalState, LVec32},
+    utils::{AllocError, DropGuard, GlobalState, LVec32, LuaDrop},
 };
 
 struct TracedInstr {
@@ -24,24 +25,182 @@ struct TracedInstr {
     // TODO: For conditional instructions, record whether the branch was taken or not.
 }
 
+impl LuaDrop for TracedInstr {
+    fn drop_with_state(&mut self, _: GlobalState) {}
+}
+
+struct BitSet {
+    bits: LVec32<u32>,
+}
+
+impl LuaDrop for BitSet {
+    fn drop_with_state(&mut self, g: GlobalState) {
+        self.bits.drop_with_state(g);
+    }
+}
+
+impl BitSet {
+    fn new() -> Self {
+        Self {
+            bits: LVec32::new(),
+        }
+    }
+
+    fn contains(&self, i: u32) -> bool {
+        let idx = i / 32;
+        let bit = 1 << (i & 31);
+        (self.bits.get(idx as usize).copied().unwrap_or(0) & bit) != 0
+    }
+
+    fn set(&mut self, g: GlobalState, i: u32, v: bool) -> Result<(), AllocError> {
+        let idx = i / 32;
+        let bit = 1 << (i & 31);
+
+        if self.bits.len() <= idx as usize {
+            if !v {
+                return Ok(());
+            }
+            self.bits.resize(g, idx + 1, 0)?;
+        }
+
+        let Some(bits) = self.bits.get_mut(idx as usize) else {
+            return Ok(());
+        };
+
+        if v {
+            *bits |= bit;
+        } else {
+            *bits &= !bit;
+        }
+
+        Ok(())
+    }
+
+    fn clear(&mut self) {
+        self.bits.clear();
+    }
+
+    fn iter(&self) -> impl Iterator<Item = u32> {
+        self.bits
+            .iter()
+            .copied()
+            .enumerate()
+            .flat_map(|(i, x)| {
+                if x != 0 {
+                    Some(((i * 32) as u32, x))
+                } else {
+                    None
+                }
+            })
+            .map(|(base, bits)| {
+                (0..32).flat_map(move |i| ((bits & (1 << i)) != 0).then_some(base + i))
+            })
+            .flatten()
+    }
+}
+
+struct BlockData {
+    /// Previous block in allocated list of blocks.
+    prev: Option<NonNull<BlockData>>,
+    /// Dense ID for this basic block.
+    id: u32,
+    /// Registers used from other basic blocks (use before def).
+    uses: BitSet,
+    /// Registers written by this basic block.
+    defs: BitSet,
+    /// Successors of this basic block.
+    succ: Option<(NonNull<BlockData>, Option<NonNull<BlockData>>)>,
+    /// Range of traced instructions representing this basic block.
+    range: Range<u32>,
+}
+
+impl LuaDrop for BlockData {
+    fn drop_with_state(&mut self, g: GlobalState) {
+        loop {
+            let Self {
+                prev,
+                id: _,
+                uses,
+                defs,
+                succ: _,
+                range: _,
+            } = self;
+            uses.drop_with_state(g);
+            defs.drop_with_state(g);
+
+            if let Some(prev) = prev {
+                let prev = *prev;
+                unsafe {
+                    *self = prev.read();
+                    g.dealloc(prev);
+                }
+                continue;
+            }
+
+            break;
+        }
+    }
+}
+
+// TODO: Loop retracing.
+// When we trace the next iteration of the loop, cross reference the instructions in the buffer
+// with current execution. During which we update arg_tt (polymorphic inline caching...).
+// When diverging, create two new basic blocks: One splits the current block, and the other diverges.
+// Skip creating the divergent basic block if the block is already present (instead retrace it).
+// TODO: If a jump to the middle of a block occurs, we need to split the block.
+// Maintain a btree on the start of blocks in the trace buffer so we can find a block for the jump.
+// TODO: Because of basic block splitting we need a separate pass (after recording) for use & defs.
+
 pub(crate) struct TraceRecorder {
     pub(super) recording: bool,
+    looping: bool,
     /// Buffer of recorded instructions.
     inst_buffer: LVec32<TracedInstr>,
     // Start buffer position -> closure.
     // Searched via binary search.
     // closure_span: NonNull<[(u32, *const LClosure)]>,
     closure: Option<NonNull<LClosure>>,
+    // entry_block: Option<NonNull<BlockData>>,
+    // current_block: Option<NonNull<BlockData>>,
+    // last_alloc_block: Option<NonNull<BlockData>>,
+    // // *const Instruction (light ud) -> *mut BlockData (light ud)
+    // block_table: NonNull<Table>,
+    /// Registers used from other basic blocks (use before def).
+    uses: BitSet,
+    /// Registers written by this basic block.
+    defs: BitSet,
     last_pc: *const Instruction,
     trace_out: *mut Option<NonNull<Trace>>,
+}
+
+impl LuaDrop for TraceRecorder {
+    fn drop_with_state(&mut self, g: GlobalState) {
+        let Self {
+            recording: _,
+            looping: _,
+            inst_buffer,
+            closure: _,
+            uses,
+            defs,
+            last_pc: _,
+            trace_out: _,
+        } = self;
+
+        inst_buffer.drop_with_state(g);
+        uses.drop_with_state(g);
+        defs.drop_with_state(g);
+    }
 }
 
 impl TraceRecorder {
     pub(crate) fn new() -> Self {
         Self {
             recording: false,
+            looping: false,
             inst_buffer: LVec32::new(),
             closure: None,
+            uses: BitSet::new(),
+            defs: BitSet::new(),
             last_pc: ptr::null(),
             trace_out: ptr::null_mut(),
         }
@@ -49,6 +208,12 @@ impl TraceRecorder {
 
     pub(crate) fn begin_recording(&mut self, trace_out: *mut Option<NonNull<Trace>>) {
         self.recording = true;
+        self.looping = false;
+        self.uses.clear();
+        self.defs.clear();
+        self.inst_buffer.clear();
+        self.last_pc = ptr::null();
+        self.closure = None;
         self.trace_out = trace_out;
     }
 
@@ -59,11 +224,18 @@ impl TraceRecorder {
 
         self.recording = false;
 
+        if self.inst_buffer.is_empty() {
+            return None;
+        }
+
+        eprint!("uses: [");
+        for r in self.uses.iter() {
+            eprint!(" {r},")
+        }
+        eprintln!(" ]");
+
         let trace = compile_trace(L, &self);
 
-        self.inst_buffer.clear();
-        self.last_pc = ptr::null();
-        self.closure = None;
         let trace_ptr = GlobalState::new_unchecked((*L).l_G).alloc();
         if let Some(ptr) = trace_ptr {
             ptr.write(trace);
@@ -84,9 +256,22 @@ impl TraceRecorder {
             return false;
         }
 
+        let g = GlobalState::new_unchecked((*L).l_G);
+
+        // TODO: Loop unrolling
+
+        if self.looping {
+            return false;
+        }
+
         // TODO: Associate closure with instructions via spans
         self.closure = Some(cl);
         self.last_pc = pc;
+
+        if self.inst_buffer.first().is_some_and(|f| f.pc == pc) {
+            // Reached first instruction again. Bail.
+            self.looping = true;
+        }
 
         let stack = unsafe { (*ci).func.p.add(1) };
 
@@ -97,13 +282,27 @@ impl TraceRecorder {
         match get_opcode(i) {
             // No need to record trace arguments for constant load instructions.
             OP_LOADI | OP_LOADF | OP_LOADK | OP_LOADKX | OP_LOADFALSE | OP_LFALSESKIP
-            | OP_LOADTRUE | OP_LOADNIL => {}
+            | OP_LOADTRUE | OP_LOADNIL => {
+                if let Err(err) = self.defs.set(g, getarg_a(i), true) {
+                    err.throw(L);
+                }
+            }
 
             // Unary-ish. Single register argument. Constants are inferred later (if any).
             OP_MOVE | OP_ADDI | OP_ADDK | OP_SUBK | OP_MULK | OP_MODK | OP_POWK | OP_DIVK
             | OP_IDIVK | OP_BANDK | OP_BORK | OP_BXORK | OP_SHRI | OP_SHLI | OP_UNM | OP_BNOT
             | OP_NOT => {
                 traced.arg_tt[0] = unsafe { ttypetag(stack.add(getarg_b(i) as usize)) };
+
+                if let Err(err) = self.defs.set(g, getarg_a(i), true) {
+                    err.throw(L);
+                }
+
+                if !self.defs.contains(getarg_b(i)) {
+                    if let Err(err) = self.uses.set(g, getarg_b(i), true) {
+                        err.throw(L);
+                    }
+                }
             }
 
             // Binary.
@@ -111,16 +310,58 @@ impl TraceRecorder {
             | OP_BXOR | OP_SHL | OP_SHR => {
                 traced.arg_tt[0] = unsafe { ttypetag(stack.add(getarg_b(i) as usize)) };
                 traced.arg_tt[1] = unsafe { ttypetag(stack.add(getarg_c(i) as usize)) };
+
+                if let Err(err) = self.defs.set(g, getarg_a(i), true) {
+                    err.throw(L);
+                }
+
+                if !self.defs.contains(getarg_b(i)) {
+                    if let Err(err) = self.uses.set(g, getarg_b(i), true) {
+                        err.throw(L);
+                    }
+                }
+
+                if !self.defs.contains(getarg_c(i)) {
+                    if let Err(err) = self.uses.set(g, getarg_c(i), true) {
+                        err.throw(L);
+                    }
+                }
             }
 
             // TODO: Check for metatable?
             OP_GETTABLE if unsafe { ttypetag(stack.add(getarg_b(i) as usize)) == LUA_VTABLE } => {
                 traced.arg_tt[0] = LUA_VTABLE;
                 traced.arg_tt[1] = unsafe { ttypetag(stack.add(getarg_c(i) as usize)) };
+
+                if let Err(err) = self.defs.set(g, getarg_a(i), true) {
+                    err.throw(L);
+                }
+
+                if !self.defs.contains(getarg_b(i)) {
+                    if let Err(err) = self.uses.set(g, getarg_b(i), true) {
+                        err.throw(L);
+                    }
+                }
+
+                if !self.defs.contains(getarg_c(i)) {
+                    if let Err(err) = self.uses.set(g, getarg_c(i), true) {
+                        err.throw(L);
+                    }
+                }
             }
 
             OP_GETI if unsafe { ttypetag(stack.add(getarg_b(i) as usize)) == LUA_VTABLE } => {
                 traced.arg_tt[0] = LUA_VTABLE;
+
+                if let Err(err) = self.defs.set(g, getarg_a(i), true) {
+                    err.throw(L);
+                }
+
+                if !self.defs.contains(getarg_b(i)) {
+                    if let Err(err) = self.uses.set(g, getarg_b(i), true) {
+                        err.throw(L);
+                    }
+                }
             }
 
             OP_SETI if unsafe { ttypetag(stack.add(getarg_a(i) as usize)) == LUA_VTABLE } => {
@@ -132,6 +373,103 @@ impl TraceRecorder {
                     // TODO: This is not really used, as the collectable bit check is small
                     unsafe { ttypetag(stack.add(getarg_c(i) as usize)) }
                 };
+
+                if !self.defs.contains(getarg_a(i)) {
+                    if let Err(err) = self.uses.set(g, getarg_a(i), true) {
+                        err.throw(L);
+                    }
+                }
+
+                if !getarg_k(i) {
+                    if !self.defs.contains(getarg_c(i)) {
+                        if let Err(err) = self.uses.set(g, getarg_c(i), true) {
+                            err.throw(L);
+                        }
+                    }
+                }
+            }
+
+            // Only trace integer for loops
+            OP_FORLOOP
+                if unsafe { ttypetag(stack.add(getarg_a(i) as usize)) == LUA_VNUMINT }
+                    && unsafe { ttypetag(stack.add(getarg_a(i) as usize + 2)) == LUA_VNUMINT } =>
+            {
+                traced.arg_tt[0] = LUA_VNUMINT;
+                traced.arg_tt[1] = LUA_VNUMINT;
+
+                let idx = getarg_a(i);
+                let count = idx + 1;
+                let step = idx + 2;
+                let out_idx = idx + 3;
+
+                if !self.defs.contains(idx) {
+                    if let Err(err) = self.uses.set(g, idx, true) {
+                        err.throw(L);
+                    }
+                    if let Err(err) = self.defs.set(g, idx, true) {
+                        err.throw(L);
+                    }
+                }
+
+                if !self.defs.contains(count) {
+                    if let Err(err) = self.uses.set(g, count, true) {
+                        err.throw(L);
+                    }
+                    if let Err(err) = self.defs.set(g, count, true) {
+                        err.throw(L);
+                    }
+                }
+
+                if !self.defs.contains(step) {
+                    if let Err(err) = self.uses.set(g, step, true) {
+                        err.throw(L);
+                    }
+                }
+
+                if let Err(err) = self.defs.set(g, out_idx, true) {
+                    err.throw(L);
+                }
+
+                self.looping = true;
+                self.last_pc = self.last_pc.offset((-(getarg_bx(i) as isize)) + 1);
+            }
+
+            OP_FORPREP => {
+                traced.arg_tt[0] = LUA_VNUMINT;
+                traced.arg_tt[1] = LUA_VNUMINT;
+
+                let idx = getarg_a(i);
+                let limit = idx + 1;
+                let step = idx + 2;
+                let out_idx = idx + 3;
+
+                if !self.defs.contains(idx) {
+                    if let Err(err) = self.uses.set(g, idx, true) {
+                        err.throw(L);
+                    }
+                    if let Err(err) = self.defs.set(g, idx, true) {
+                        err.throw(L);
+                    }
+                }
+
+                if !self.defs.contains(limit) {
+                    if let Err(err) = self.uses.set(g, limit, true) {
+                        err.throw(L);
+                    }
+                    if let Err(err) = self.defs.set(g, limit, true) {
+                        err.throw(L);
+                    }
+                }
+
+                if !self.defs.contains(step) {
+                    if let Err(err) = self.uses.set(g, step, true) {
+                        err.throw(L);
+                    }
+                }
+
+                if let Err(err) = self.defs.set(g, out_idx, true) {
+                    err.throw(L);
+                }
             }
 
             // OP_GETUPVAL => {
@@ -530,6 +868,31 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                 .value
             }
 
+            fn get_reg_type_guarded(
+                &mut self,
+                r: u32,
+                tt: u8,
+                bcx: &mut FunctionBuilder<'_>,
+                block: &mut Block,
+                bail: &mut Option<TraceBail>,
+            ) -> CgTValue {
+                let mut value = self.get_reg(r, bcx);
+
+                if self.reg_static_type(r) != tt {
+                    // Register type not known statically, insert type guard.
+                    *block = self.type_guard(bcx, value.tt, tt, bail);
+                    self.set_reg_static_type(r, tt);
+
+                    value.tt = bcx.ins().iconst(TT, tt as i64);
+
+                    if let Some(Some(reg)) = self.regs.get_mut(r as usize) {
+                        reg.value.tt = value.tt;
+                    }
+                }
+
+                value
+            }
+
             fn set_reg_static_type(&mut self, r: u32, tt: u8) {
                 let Some(Some(reg)) = self.regs.get_mut(r as usize) else {
                     return;
@@ -607,6 +970,13 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                 }
             }
 
+            fn emit_bail(&self, bcx: &mut FunctionBuilder<'_>, bail_id: i64) {
+                self.writeback_regs(bcx);
+
+                let bail_id = bcx.ins().iconst(PTR_TYPE, bail_id);
+                bcx.ins().return_(&[bail_id]);
+            }
+
             /// Creates a type guard, which bails out to the interpreter on type mismatch.
             fn type_guard(
                 &mut self,
@@ -624,12 +994,8 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                 bcx.ins().brif(cond, continue_block, [], bail_block, []);
 
                 bcx.switch_to_block(bail_block);
-
-                self.writeback_regs(bcx);
-
                 let bail_id = self.bail_id(bail);
-                let bail_id = bcx.ins().iconst(PTR_TYPE, bail_id);
-                bcx.ins().return_(&[bail_id]);
+                self.emit_bail(bcx, bail_id);
 
                 bcx.switch_to_block(continue_block);
                 continue_block
@@ -1002,7 +1368,6 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                 OP_ADDI => {
                     let [tt, _] = ti.arg_tt;
 
-                    // TODO: Check type and bail
                     let lhs = cx.get_reg(b, &mut bcx);
 
                     if cx.reg_static_type(b) == 255 {
@@ -1564,6 +1929,166 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                     }
 
                     // Otherwise don't emit barrierback when the type is known to be non-collectable
+                }
+
+                OP_FORLOOP => {
+                    // float loops NYI and should not be traced
+                    assert_eq!(ti.arg_tt[0], LUA_VNUMINT);
+
+                    // All registers above are dead. No need to writeback.
+                    for i in (a + 4)..cx.regs.len() as u32 {
+                        if let Some(reg) = &mut cx.regs[i as usize] {
+                            reg.writeback = false;
+                        }
+                    }
+
+                    let count = cx.get_reg(a + 1, &mut bcx);
+
+                    let cond = bcx.ins().icmp_imm(IntCC::NotEqual, count.value, 0);
+
+                    let bail_block = bcx.create_block();
+                    let continue_block = bcx.create_block();
+
+                    bcx.ins().brif(cond, continue_block, [], bail_block, []);
+
+                    {
+                        bcx.switch_to_block(bail_block);
+
+                        cx.writeback_regs(&mut bcx);
+
+                        let bail_id = cx.bail_id(&mut bail);
+                        let bail_id = bcx.ins().iconst(PTR_TYPE, bail_id);
+                        bcx.ins().return_(&[bail_id]);
+                    }
+
+                    bcx.switch_to_block(continue_block);
+                    block = continue_block;
+
+                    cx.set_reg_typed(
+                        a + 1,
+                        bcx.ins().iadd_imm(count.value, -1),
+                        LUA_VNUMINT,
+                        &mut bcx,
+                    );
+
+                    let idx = cx.get_reg(a, &mut bcx);
+                    let step = cx.get_reg(a + 2, &mut bcx);
+
+                    let next_idx = bcx.ins().iadd(idx.value, step.value);
+
+                    cx.set_reg_typed(a, next_idx, LUA_VNUMINT, &mut bcx);
+                    cx.set_reg_typed(a + 3, next_idx, LUA_VNUMINT, &mut bcx);
+                }
+
+                OP_FORPREP => {
+                    // Only integer loops supported.
+                    assert_eq!(ti.arg_tt, [LUA_VNUMINT, LUA_VNUMINT]);
+
+                    // TODO: This creates FOUR bail blocks, but we only need one.
+
+                    let init =
+                        cx.get_reg_type_guarded(a, LUA_VNUMINT, &mut bcx, &mut block, &mut bail);
+                    let limit = cx.get_reg_type_guarded(
+                        a + 1,
+                        LUA_VNUMINT,
+                        &mut bcx,
+                        &mut block,
+                        &mut bail,
+                    );
+                    let step = cx.get_reg_type_guarded(
+                        a + 2,
+                        LUA_VNUMINT,
+                        &mut bcx,
+                        &mut block,
+                        &mut bail,
+                    );
+
+                    let bail_block = bcx.create_block();
+                    bcx.set_cold_block(bail_block);
+
+                    {
+                        bcx.switch_to_block(bail_block);
+                        let bail_id = cx.bail_id(&mut bail);
+                        cx.emit_bail(&mut bcx, bail_id);
+                        bcx.switch_to_block(block);
+                    }
+
+                    let step_zero_cond = bcx.ins().icmp_imm(IntCC::Equal, step.value, 0);
+
+                    let continue_block = bcx.create_block();
+                    bcx.ins()
+                        .brif(step_zero_cond, bail_block, [], continue_block, []);
+                    block = continue_block;
+                    bcx.switch_to_block(block);
+
+                    // Assumes for limit is an integer. Otherwise the logic is complex.
+
+                    // Bail if the loop must be skipped.
+                    // TODO: Invert this bail if the loop was NOT traced.
+                    // Unconditional bail if the trace terminates here.
+
+                    let skip_loop_gt_cond =
+                        bcx.ins()
+                            .icmp(IntCC::SignedGreaterThan, init.value, limit.value);
+                    let skip_loop_lt_cond =
+                        bcx.ins()
+                            .icmp(IntCC::SignedLessThan, init.value, limit.value);
+
+                    let is_step_positive =
+                        bcx.ins().icmp_imm(IntCC::SignedGreaterThan, step.value, 0);
+
+                    let skip_loop_cond =
+                        bcx.ins()
+                            .select(is_step_positive, skip_loop_gt_cond, skip_loop_lt_cond);
+
+                    let continue_block = bcx.create_block();
+                    bcx.ins()
+                        .brif(skip_loop_cond, bail_block, [], continue_block, []);
+                    block = continue_block;
+                    bcx.switch_to_block(block);
+
+                    // Compute count
+                    let count = {
+                        let pos_count_block = bcx.create_block();
+                        let neg_count_block = bcx.create_block();
+                        let continue_block = bcx.create_block();
+                        bcx.append_block_param(continue_block, LUA_INT);
+
+                        bcx.ins()
+                            .brif(is_step_positive, pos_count_block, [], neg_count_block, []);
+
+                        {
+                            bcx.switch_to_block(pos_count_block);
+                            let pos_count = bcx.ins().isub(limit.value, init.value);
+                            // TODO: Constant propagation to avoid division when step == 1 (which is common)
+                            let pos_count = bcx.ins().udiv(pos_count, step.value);
+                            bcx.ins()
+                                .jump(continue_block, [&BlockArg::Value(pos_count)]);
+                        }
+
+                        {
+                            bcx.switch_to_block(neg_count_block);
+                            let neg_count = bcx.ins().isub(init.value, limit.value);
+                            let neg_step = {
+                                let step = bcx.ins().iadd_imm(step.value, 1);
+                                let step = bcx.ins().ineg(step);
+                                bcx.ins().iadd_imm(step, 1)
+                            };
+                            // TODO: Constant propagation to avoid division when step == 1 (which is common)
+                            let neg_count = bcx.ins().udiv(neg_count, neg_step);
+                            bcx.ins()
+                                .jump(continue_block, [&BlockArg::Value(neg_count)]);
+                        }
+
+                        block = continue_block;
+                        bcx.switch_to_block(block);
+                        bcx.block_params(block)[0]
+                    };
+
+                    cx.set_reg_typed(a + 3, init.value, LUA_VNUMINT, &mut bcx);
+
+                    // Overwrite limit with count
+                    cx.set_reg_typed(a + 1, count, LUA_VNUMINT, &mut bcx);
                 }
 
                 op => todo!("{op}"),

@@ -1490,18 +1490,18 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                 if trace_recorder.recording {
                     let ok = trace_recorder.record_start(L, pc, ci, NonNull::new_unchecked(cl));
                     if !ok {
-                        trace_recorder
-                            .end_recording(L)
-                            .expect("Trace compile failed");
+                        trace_recorder.end_recording(L);
                     }
                 } else {
-                    if let Some(trace) = next_trace.take() {
+                    while let Some(trace) = next_trace.take() {
                         let entrypoint = (*(trace.as_ptr())).entrypoint;
                         let result = entrypoint(base, L, ci, cl);
                         if result < 0 {
                             pc = trace.as_ref().bail(result);
                         } else {
                             pc = (*(trace.as_ptr())).last_pc;
+
+                            next_trace = luaV_record_loop((*cl).p, pc, &mut trace_recorder)
                         }
                     }
                 }
