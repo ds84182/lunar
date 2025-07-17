@@ -1426,7 +1426,6 @@ unsafe fn op_bitwise_slow(
 }
 
 #[cfg(feature = "jit")]
-#[inline(always)]
 unsafe fn luaV_record_loop(
     proto: *mut Proto,
     pc: *const Instruction,
@@ -1439,7 +1438,7 @@ unsafe fn luaV_record_loop(
         if let Ok(idx) = loop_counters.binary_search_by_key(&pc, |lc| lc.pc) {
             let lc = loop_counters.get_unchecked_mut(idx);
             lc.count += 1;
-            if !tr.recording && lc.count > 1000 && lc.trace.is_none() {
+            if !tr.recording && lc.count > 56 && lc.trace.is_none() {
                 tr.begin_recording(&mut lc.trace);
             }
             // TODO: Could stitch trace here
@@ -1476,6 +1475,10 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                 trap = luaG_tracecall(L);
             }
             base = ((*ci).func.p).offset(1);
+            #[cfg(feature = "jit")]
+            {
+                next_trace = luaV_record_loop((*cl).p, pc, &mut trace_recorder);
+            }
             loop {
                 i = 0;
                 if (trap != 0) as i32 as std::ffi::c_long != 0 {
@@ -1494,7 +1497,7 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                 } else {
                     if let Some(trace) = next_trace.take() {
                         let entrypoint = (*(trace.as_ptr())).entrypoint;
-                        let result = entrypoint(base, L, ci, cl); // TODO: Check result for bail
+                        let result = entrypoint(base, L, ci, cl);
                         if result < 0 {
                             pc = trace.as_ref().bail(result);
                         } else {
@@ -3496,10 +3499,6 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                             << 0) as i32
                                         as isize),
                                 );
-                                #[cfg(feature = "jit")]
-                                {
-                                    next_trace = luaV_record_loop((*cl).p, pc, &mut trace_recorder)
-                                };
                             }
                         } else if floatforloop(ra_71) != 0 {
                             pc = pc.offset(
@@ -3507,11 +3506,11 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                     & !(!(0 as Instruction) << 8 as i32 + 8 as i32 + 1 as i32) << 0)
                                     as i32 as isize),
                             );
-                            #[cfg(feature = "jit")]
-                            {
-                                next_trace = luaV_record_loop((*cl).p, pc, &mut trace_recorder)
-                            };
                         }
+                        #[cfg(feature = "jit")]
+                        {
+                            next_trace = luaV_record_loop((*cl).p, pc, &mut trace_recorder)
+                        };
                         trap = (*ci).u.l.trap;
                         continue;
                     }
@@ -3530,6 +3529,10 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                                     + 1 as i32) as isize,
                             );
                         }
+                        #[cfg(feature = "jit")]
+                        {
+                            next_trace = luaV_record_loop((*cl).p, pc, &mut trace_recorder)
+                        };
                         continue;
                     }
                     OP_TFORPREP => {

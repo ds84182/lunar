@@ -2025,6 +2025,7 @@ pub unsafe fn luaK_build_loop_counters(L: *mut lua_State, proto: *mut Proto) {
     let loop_points = loop_points_guard.as_ptr().as_mut();
 
     loop_points.fill(false);
+    loop_points[0] = true; // Hot entry
 
     for (pc, i) in code.iter().copied().enumerate().rev() {
         match get_opcode(i) {
@@ -2038,10 +2039,17 @@ pub unsafe fn luaK_build_loop_counters(L: *mut lua_State, proto: *mut Proto) {
                     *loop_points.get_unchecked_mut(target_pc as usize) = true;
                 }
             }
+            OP_CALL => {
+                // Trace after call
+                *loop_points.get_unchecked_mut(pc + 1) = true;
+            }
             OP_FORLOOP | OP_TFORLOOP => {
                 let target = getarg_bx(i) - 1;
                 let target_pc = (pc as u32).wrapping_sub(target);
                 *loop_points.get_unchecked_mut(target_pc as usize) = true;
+
+                // TODO: Remove this trace point once loops are traceable
+                *loop_points.get_unchecked_mut(pc + 1) = true;
             }
             _ => continue,
         }

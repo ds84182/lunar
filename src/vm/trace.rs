@@ -4,8 +4,9 @@ use std::{
 };
 
 use crate::{
-    CallInfo, Instruction, LClosure, LUA_VFALSE, LUA_VNIL, LUA_VNUMFLT, LUA_VNUMINT, LUA_VTABLE,
-    LUA_VTRUE, StackValue, StkId, TValue, Table, ctb,
+    BIT_ISCOLLECTABLE, CallInfo, Instruction, LClosure, LUA_VFALSE, LUA_VNIL, LUA_VNUMFLT,
+    LUA_VNUMINT, LUA_VTABLE, LUA_VTRUE, StackValue, StkId, TValue, Table, ctb,
+    gc::luaC_barrierback_,
     ldo::luaD_throw,
     lua_Integer, lua_Number, lua_State,
     opcodes::*,
@@ -120,6 +121,17 @@ impl TraceRecorder {
 
             OP_GETI if unsafe { ttypetag(stack.add(getarg_b(i) as usize)) == LUA_VTABLE } => {
                 traced.arg_tt[0] = LUA_VTABLE;
+            }
+
+            OP_SETI if unsafe { ttypetag(stack.add(getarg_a(i) as usize)) == LUA_VTABLE } => {
+                traced.arg_tt[0] = LUA_VTABLE;
+                traced.arg_tt[1] = if getarg_k(i) {
+                    // Will be pulled from constant
+                    0
+                } else {
+                    // TODO: This is not really used, as the collectable bit check is small
+                    unsafe { ttypetag(stack.add(getarg_c(i) as usize)) }
+                };
             }
 
             // OP_GETUPVAL => {
@@ -357,6 +369,22 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
         }
     };
 
+    // luaC_barrierback_(*mut lua_State, *mut GCObject)
+    let ext_luaC_barrierback = {
+        let mut sig = module.make_signature();
+        sig.params.push(AbiParam::new(PTR_TYPE));
+        sig.params.push(AbiParam::new(PTR_TYPE));
+        ExtFunc {
+            name: "luaC_barrierback_",
+            sig,
+            addr: unsafe {
+                std::mem::transmute::<unsafe extern "C-unwind" fn(_, _) -> _, usize>(
+                    luaC_barrierback_,
+                ) as i64
+            },
+        }
+    };
+
     // powf(lua_Number, lua_Number) -> lua_Number
     let ext_powf = {
         unsafe extern "C" fn powf(a: lua_Number, b: lua_Number) -> lua_Number {
@@ -399,6 +427,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
     {
         let mut ext_luaH_get = ExtFuncRef::Uninit(&ext_luaH_get);
         let mut ext_luaH_getint = ExtFuncRef::Uninit(&ext_luaH_getint);
+        let mut ext_luaC_barrierback = ExtFuncRef::Uninit(&ext_luaC_barrierback);
         let mut ext_powf = ExtFuncRef::Uninit(&ext_powf);
 
         let mut bcx = FunctionBuilder::new(&mut ctx.func, &mut func_ctx);
@@ -899,6 +928,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
 
             let i = *ti.pc;
 
+            let k = getarg_k(i);
             let a = getarg_a(i);
             let b = getarg_b(i);
             let c = getarg_c(i);
@@ -1429,6 +1459,111 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                         // TODO: Branch between table int get fast path and luaH_get
                         _ => todo!(),
                     }
+                }
+
+                OP_SETI => {
+                    let table = cx.get_reg(a, &mut bcx);
+
+                    if cx.reg_static_type(a) == 255 {
+                        // Register type not known statically, insert type guard.
+                        block = cx.type_guard(&mut bcx, table.tt, ctb(LUA_VTABLE), &mut bail);
+                        cx.set_reg_static_type(a, ctb(LUA_VTABLE));
+                    }
+
+                    // Lookup the slot, bailing if the current slot value is nil.
+                    let value_ptr;
+                    {
+                        let key = bcx.ins().iconst(LUA_INT, b as i64);
+
+                        let slot_check_block = bcx.create_block();
+                        let bail_block = bcx.create_block();
+                        bcx.set_cold_block(bail_block);
+                        let continue_block = bcx.create_block();
+
+                        // Phi coming from `fastget_block` and `getint_block`
+                        bcx.append_block_param(slot_check_block, PTR_TYPE);
+
+                        cx.table_getint(
+                            &mut bcx,
+                            &mut ext_luaH_getint,
+                            slot_check_block,
+                            table.value,
+                            key,
+                        );
+
+                        let tt;
+
+                        {
+                            bcx.switch_to_block(slot_check_block);
+
+                            value_ptr = bcx.block_params(slot_check_block)[0];
+
+                            tt = bcx.ins().load(
+                                types::I8,
+                                MemFlags::trusted(),
+                                value_ptr,
+                                size_of::<crate::Value>() as i32,
+                            );
+
+                            let tt_no_variant = bcx.ins().band_imm(tt, 0x0F);
+
+                            let cond = bcx.ins().icmp_imm(IntCC::Equal, tt_no_variant, 0);
+
+                            bcx.ins().brif(cond, bail_block, [], continue_block, []);
+                        }
+
+                        {
+                            bcx.switch_to_block(bail_block);
+
+                            cx.writeback_regs(&mut bcx);
+
+                            let bail_id = cx.bail_id(&mut bail);
+                            let bail_id = bcx.ins().iconst(PTR_TYPE, bail_id);
+                            bcx.ins().return_(&[bail_id]);
+                        }
+
+                        bcx.switch_to_block(continue_block);
+                        block = continue_block;
+                    }
+
+                    let value;
+
+                    let static_tt = if k {
+                        // Read constant's type
+                        let kst = ksts.add(c as usize);
+                        let tt = (*kst).tt_;
+
+                        value = CgTValue {
+                            value: bcx.ins().iconst(PTR_TYPE, (*kst).value_.i),
+                            tt: bcx.ins().iconst(TT, tt as i64),
+                        };
+
+                        tt
+                    } else {
+                        value = cx.get_reg(c, &mut bcx);
+                        let tt = cx.reg_static_type(c);
+                        tt
+                    };
+
+                    // Write the value out to value_ptr
+                    bcx.ins()
+                        .store(MemFlags::trusted(), value.value, value_ptr, 0);
+                    bcx.ins().store(
+                        MemFlags::trusted(),
+                        value.tt,
+                        value_ptr,
+                        size_of::<crate::Value>() as i32,
+                    );
+
+                    if static_tt == 255 {
+                        // Unknown type, check if collectable and emit barrierback
+                        todo!()
+                    } else if (static_tt & BIT_ISCOLLECTABLE) != 0 {
+                        // Statically known type is always collectable, emit unconditional barrierback
+                        todo!()
+                    }
+
+                    // Otherwise don't emit barrierback when the type is known to be non-collectable
                 }
 
                 op => todo!("{op}"),
