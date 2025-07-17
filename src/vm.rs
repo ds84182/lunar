@@ -3320,6 +3320,10 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                         if !newci.is_null() {
                             break '_returning;
                         }
+                        #[cfg(feature = "jit")]
+                        {
+                            next_trace = luaV_record_loop((*cl).p, pc, &mut trace_recorder)
+                        };
                         trap = (*ci).u.l.trap;
                         continue;
                     }
