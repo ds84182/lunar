@@ -2,102 +2,102 @@ use crate::*;
 
 pub type OpCode = u32;
 
-/// R[A] := R[B]
+/// `R[A] := R[B]`
 pub const OP_MOVE: OpCode = 0;
-/// R[A] := sBx
+/// `R[A] := sBx`
 pub const OP_LOADI: OpCode = 1;
-/// R[A] := (lua_Number)sBx
+/// `R[A] := (lua_Number)sBx`
 pub const OP_LOADF: OpCode = 2;
-/// R[A] := K[Bx]
+/// `R[A] := K[Bx]`
 pub const OP_LOADK: OpCode = 3;
-/// R[A] := K[extra arg]
+/// `R[A] := K[extra arg]`
 ///
 /// Next instruction is always [`OP_EXTRAARG`].
 pub const OP_LOADKX: OpCode = 4;
-/// R[A] := false
+/// `R[A] := false`
 pub const OP_LOADFALSE: OpCode = 5;
-/// R[A] := false; pc++
+/// `R[A] := false; pc++`
 ///
 /// Used to convert a condition to a boolean value, in a code equivalent to (not cond ? false : true).
 /// (It produces false and skips the next instruction producing true.)
 pub const OP_LFALSESKIP: OpCode = 6;
-/// R[A] := true
+/// `R[A] := true`
 pub const OP_LOADTRUE: OpCode = 7;
-/// R[A], R[A+1], ..., R[A+B] := nil
+/// `R[A], R[A+1], ..., R[A+B] := nil`
 pub const OP_LOADNIL: OpCode = 8;
-/// R[A] := UpValue[B]
+/// `R[A] := UpValue[B]`
 pub const OP_GETUPVAL: OpCode = 9;
-/// UpValue[B] := R[A]
+/// `UpValue[B] := R[A]`
 pub const OP_SETUPVAL: OpCode = 10;
-/// R[A] := UpValue[B][K[C]:shortstring]
+/// `R[A] := UpValue[B][K[C]:shortstring]`
 pub const OP_GETTABUP: OpCode = 11;
-/// R[A] := R[B][R[C]]
+/// `R[A] := R[B][R[C]]`
 pub const OP_GETTABLE: OpCode = 12;
-/// R[A] := R[B][C]
+/// `R[A] := R[B][C]`
 pub const OP_GETI: OpCode = 13;
-/// R[A] := R[B][K[C]:shortstring]
+/// `R[A] := R[B][K[C]:shortstring]`
 pub const OP_GETFIELD: OpCode = 14;
-/// UpValue[A][K[B]:shortstring] := RK(C)
+/// `UpValue[A][K[B]:shortstring] := RK(C)`
 pub const OP_SETTABUP: OpCode = 15;
-/// R[A][R[B]] := RK(C)
+/// `R[A][R[B]] := RK(C)`
 pub const OP_SETTABLE: OpCode = 16;
-/// R[A][B] := RK(C)
+/// `R[A][B] := RK(C)`
 pub const OP_SETI: OpCode = 17;
-/// R[A][K[B]:shortstring] := RK(C)
+/// `R[A][K[B]:shortstring] := RK(C)`
 pub const OP_SETFIELD: OpCode = 18;
-/// R[A] := {}
+/// `R[A] := {}`
 pub const OP_NEWTABLE: OpCode = 19;
-/// R[A+1] := R[B]; R[A] := R[B][RK(C):string]
+/// `R[A+1] := R[B]; R[A] := R[B][RK(C):string]`
 pub const OP_SELF: OpCode = 20;
-/// R[A] := R[B] + sC
+/// `R[A] := R[B] + sC`
 pub const OP_ADDI: OpCode = 21;
-/// R[A] := R[B] + K[C]:number
+/// `R[A] := R[B] + K[C]:number`
 pub const OP_ADDK: OpCode = 22;
-/// R[A] := R[B] - K[C]:number
+/// `R[A] := R[B] - K[C]:number`
 pub const OP_SUBK: OpCode = 23;
-/// R[A] := R[B] * K[C]:number
+/// `R[A] := R[B] * K[C]:number`
 pub const OP_MULK: OpCode = 24;
-/// R[A] := R[B] % K[C]:number
+/// `R[A] := R[B] % K[C]:number`
 pub const OP_MODK: OpCode = 25;
-/// R[A] := R[B] ^ K[C]:number
+/// `R[A] := R[B] ^ K[C]:number`
 pub const OP_POWK: OpCode = 26;
-/// R[A] := R[B] / K[C]:number
+/// `R[A] := R[B] / K[C]:number`
 pub const OP_DIVK: OpCode = 27;
-/// R[A] := R[B] // K[C]:number
+/// `R[A] := R[B] // K[C]:number`
 pub const OP_IDIVK: OpCode = 28;
-/// R[A] := R[B] & K[C]:integer
+/// `R[A] := R[B] & K[C]:integer`
 pub const OP_BANDK: OpCode = 29;
-/// R[A] := R[B] | K[C]:integer
+/// `R[A] := R[B] | K[C]:integer`
 pub const OP_BORK: OpCode = 30;
-/// R[A] := R[B] ~ K[C]:integer
+/// `R[A] := R[B] ~ K[C]:integer`
 pub const OP_BXORK: OpCode = 31;
-/// R[A] := R[B] >> sC
+/// `R[A] := R[B] >> sC`
 pub const OP_SHRI: OpCode = 32;
-/// R[A] := sC << R[B]
+/// `R[A] := sC << R[B]`
 pub const OP_SHLI: OpCode = 33;
-/// R[A] := R[B] + R[C]
+/// `R[A] := R[B] + R[C]`
 pub const OP_ADD: OpCode = 34;
-/// R[A] := R[B] - R[C]
+/// `R[A] := R[B] - R[C]`
 pub const OP_SUB: OpCode = 35;
-/// R[A] := R[B] * R[C]
+/// `R[A] := R[B] * R[C]`
 pub const OP_MUL: OpCode = 36;
-/// R[A] := R[B] % R[C]
+/// `R[A] := R[B] % R[C]`
 pub const OP_MOD: OpCode = 37;
-/// R[A] := R[B] ^ R[C]
+/// `R[A] := R[B] ^ R[C]`
 pub const OP_POW: OpCode = 38;
-/// R[A] := R[B] / R[C]
+/// `R[A] := R[B] / R[C]`
 pub const OP_DIV: OpCode = 39;
-/// R[A] := R[B] // R[C]
+/// `R[A] := R[B] // R[C]`
 pub const OP_IDIV: OpCode = 40;
-/// R[A] := R[B] & R[C]
+/// `R[A] := R[B] & R[C]`
 pub const OP_BAND: OpCode = 41;
-/// R[A] := R[B] | R[C]
+/// `R[A] := R[B] | R[C]`
 pub const OP_BOR: OpCode = 42;
-/// R[A] := R[B] ~ R[C]
+/// `R[A] := R[B] ~ R[C]`
 pub const OP_BXOR: OpCode = 43;
-/// R[A] := R[B] << R[C]
+/// `R[A] := R[B] << R[C]`
 pub const OP_SHL: OpCode = 44;
-/// R[A] := R[B] >> R[C]
+/// `R[A] := R[B] >> R[C]`
 pub const OP_SHR: OpCode = 45;
 /// call C metamethod over R[A] and R[B]
 ///
@@ -114,96 +114,96 @@ pub const OP_MMBINI: OpCode = 47;
 /// Follows each arithmetic and bitwise opcode. If the operation succeeds, it skips this next
 /// opcode. Otherwise, this opcode calls the corresponding metamethod.
 pub const OP_MMBINK: OpCode = 48;
-/// R[A] := -R[B]
+/// `R[A] := -R[B]`
 pub const OP_UNM: OpCode = 49;
-/// R[A] := ~R[B]
+/// `R[A] := ~R[B]`
 pub const OP_BNOT: OpCode = 50;
-/// R[A] := not R[B]
+/// `R[A] := not R[B]`
 pub const OP_NOT: OpCode = 51;
-/// R[A] := #R[B] (length operator)
+/// `R[A] := #R[B] (length operator)`
 pub const OP_LEN: OpCode = 52;
-/// R[A] := R[A].. ... ..R[A + B - 1]
+/// `R[A] := R[A].. ... ..R[A + B - 1]`
 pub const OP_CONCAT: OpCode = 53;
-/// close all upvalues >= R[A]
+/// close all upvalues `>= R[A]`
 pub const OP_CLOSE: OpCode = 54;
 /// mark variable A "to be closed"
 pub const OP_TBC: OpCode = 55;
-/// pc += sJ
+/// `pc += sJ`
 pub const OP_JMP: OpCode = 56;
-/// if ((R[A] == R[B]) ~= k) then pc++
+/// `if ((R[A] == R[B]) ~= k) then pc++`
 ///
 /// Assumes that the next instruction is a jump.
 pub const OP_EQ: OpCode = 57;
-/// if ((R[A] <  R[B]) ~= k) then pc++
+/// `if ((R[A] <  R[B]) ~= k) then pc++`
 ///
 /// Assumes that the next instruction is a jump.
 pub const OP_LT: OpCode = 58;
-/// if ((R[A] <= R[B]) ~= k) then pc++
+/// `if ((R[A] <= R[B]) ~= k) then pc++`
 ///
 /// Assumes that the next instruction is a jump.
 pub const OP_LE: OpCode = 59;
-/// if ((R[A] == K[B]) ~= k) then pc++
+/// `if ((R[A] == K[B]) ~= k) then pc++`
 ///
 /// Assumes that the next instruction is a jump.
 pub const OP_EQK: OpCode = 60;
-/// if ((R[A] == sB) ~= k) then pc++
+/// `if ((R[A] == sB) ~= k) then pc++`
 ///
 /// Assumes that the next instruction is a jump.
 ///
 /// `C` signals whether the original operand was a float.
 /// It must be corrected in case of metamethods.
 pub const OP_EQI: OpCode = 61;
-/// if ((R[A] < sB) ~= k) then pc++
+/// `if ((R[A] < sB) ~= k) then pc++`
 ///
 /// Assumes that the next instruction is a jump.
 ///
 /// `C` signals whether the original operand was a float.
 /// It must be corrected in case of metamethods.
 pub const OP_LTI: OpCode = 62;
-/// if ((R[A] <= sB) ~= k) then pc++
+/// `if ((R[A] <= sB) ~= k) then pc++`
 ///
 /// Assumes that the next instruction is a jump.
 ///
 /// `C` signals whether the original operand was a float.
 /// It must be corrected in case of metamethods.
 pub const OP_LEI: OpCode = 63;
-/// if ((R[A] > sB) ~= k) then pc++
+/// `if ((R[A] > sB) ~= k) then pc++`
 ///
 /// Assumes that the next instruction is a jump.
 ///
 /// `C` signals whether the original operand was a float.
 /// It must be corrected in case of metamethods.
 pub const OP_GTI: OpCode = 64;
-/// if ((R[A] >= sB) ~= k) then pc++
+/// `if ((R[A] >= sB) ~= k) then pc++`
 ///
 /// Assumes that the next instruction is a jump.
 ///
 /// `C` signals whether the original operand was a float.
 /// It must be corrected in case of metamethods.
 pub const OP_GEI: OpCode = 65;
-/// if (not R[A] == k) then pc++
+/// `if (not R[A] == k) then pc++`
 ///
 /// Assumes that the next instruction is a jump.
 pub const OP_TEST: OpCode = 66;
-/// if (not R[B] == k) then pc++ else R[A] := R[B]
+/// `if (not R[B] == k) then pc++ else R[A] := R[B]`
 ///
 /// Assumes that the next instruction is a jump.
 ///
 /// Used in short-circuit expressions that need both to jump and produce a value, such as
 /// (a = b or c).
 pub const OP_TESTSET: OpCode = 67;
-/// R[A], ... ,R[A+C-2] := R[A](R[A+1], ... ,R[A+B-1])
+/// `R[A], ... ,R[A+C-2] := R[A](R[A+1], ... ,R[A+B-1])`
 ///
 /// If (B == 0) then B = top - A. If (C == 0), then `top` is set to last_result+1, so next open
 /// instruction (OP_CALL, OP_RETURN*, OP_SETLIST) may use `top`.
 pub const OP_CALL: OpCode = 68;
-/// return R[A](R[A+1], ... ,R[A+B-1])
+/// `return R[A](R[A+1], ... ,R[A+B-1])`
 ///
 /// `k` specifies that the function builds upvalues, which may need to be closed.
 /// `C > 0` means the function is vararg, so that its `func` must be corrected before returning;
 /// in this case, `C - 1` is its number of fixed parameters.
 pub const OP_TAILCALL: OpCode = 69;
-/// return R[A], ... ,R[A+B-2]
+/// `return R[A], ... ,R[A+B-2]`
 ///
 /// If (B == 0) then return up to `top`.
 ///
@@ -211,25 +211,25 @@ pub const OP_TAILCALL: OpCode = 69;
 /// `C > 0` means the function is vararg, so that its `func` must be corrected before returning;
 /// in this case, `C - 1` is its number of fixed parameters.
 pub const OP_RETURN: OpCode = 70;
-/// return
+/// `return`
 pub const OP_RETURN0: OpCode = 71;
-/// return R[A]
+/// `return R[A]`
 pub const OP_RETURN1: OpCode = 72;
 /// update counters; if loop continues then pc-=Bx;
 pub const OP_FORLOOP: OpCode = 73;
 /// check values and prepare counters; if not to run then pc+=Bx+1;
 pub const OP_FORPREP: OpCode = 74;
-/// create upvalue for R[A + 3]; pc+=Bx
+/// `create upvalue for R[A + 3]; pc+=Bx`
 pub const OP_TFORPREP: OpCode = 75;
-/// R[A+4], ... ,R[A+3+C] := R[A](R[A+1], R[A+2]);
+/// `R[A+4], ... ,R[A+3+C] := R[A](R[A+1], R[A+2]);`
 pub const OP_TFORCALL: OpCode = 76;
-/// if R[A+2] ~= nil then { R[A]=R[A+2]; pc -= Bx }
+/// `if R[A+2] ~= nil then { R[A]=R[A+2]; pc -= Bx }`
 pub const OP_TFORLOOP: OpCode = 77;
-/// R[A][C+i] := R[A+i], 1 <= i <= B
+/// `R[A][C+i] := R[A+i], 1 <= i <= B`
 pub const OP_SETLIST: OpCode = 78;
-/// R[A] := closure(KPROTO[Bx])
+/// `R[A] := closure(KPROTO[Bx])`
 pub const OP_CLOSURE: OpCode = 79;
-/// R[A], R[A+1], ..., R[A+C-2] = vararg
+/// `R[A], R[A+1], ..., R[A+C-2] = vararg`
 ///
 /// If (C == 0) then use actual number of varargs and set `top` (like in OP_CALL with C == 0).
 pub const OP_VARARG: OpCode = 80;
