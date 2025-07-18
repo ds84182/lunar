@@ -6,6 +6,10 @@ use std::{
 
 use crate::{global_State, ldo::luaD_throw, lua_State};
 
+mod rbtree;
+
+pub(crate) use rbtree::RBTree;
+
 pub(super) trait LuaDrop {
     fn drop_with_state(&mut self, g: GlobalState);
 }

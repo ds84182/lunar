@@ -13,7 +13,7 @@ use crate::{
     opcodes::*,
     table::{luaH_get, luaH_getint},
     ttypetag,
-    utils::{AllocError, DropGuard, GlobalState, LVec32, LuaDrop},
+    utils::{AllocError, DropGuard, GlobalState, LVec32, LuaDrop, RBTree},
 };
 
 struct TracedInstr {
@@ -169,6 +169,17 @@ pub(crate) struct TraceRecorder {
     uses: BitSet,
     /// Registers written by this basic block.
     defs: BitSet,
+    /// Last place where a register was defined and used.
+    ///
+    /// reg -> (def_idx, last_use_idx)
+    last_def_use: RBTree<u32, (u32, u32)>,
+    /// Span starting at the definition of the register and ending at the last use.
+    ///
+    /// Last use index is `u32::MAX` if the last usage has not been found yet.
+    ///
+    /// (reg, tb_start_index) -> tb_end_index
+    reg_span: RBTree<(u32, u32), u32>,
+    // TODO: Killset, (tb_end_index, reg) -> ()
     last_pc: *const Instruction,
     trace_out: *mut Option<NonNull<Trace>>,
 }
@@ -182,6 +193,8 @@ impl LuaDrop for TraceRecorder {
             closure: _,
             uses,
             defs,
+            last_def_use,
+            reg_span,
             last_pc: _,
             trace_out: _,
         } = self;
@@ -189,6 +202,8 @@ impl LuaDrop for TraceRecorder {
         inst_buffer.drop_with_state(g);
         uses.drop_with_state(g);
         defs.drop_with_state(g);
+        last_def_use.drop_with_state(g);
+        reg_span.drop_with_state(g);
     }
 }
 
@@ -201,6 +216,8 @@ impl TraceRecorder {
             closure: None,
             uses: BitSet::new(),
             defs: BitSet::new(),
+            last_def_use: RBTree::new(),
+            reg_span: RBTree::new(),
             last_pc: ptr::null(),
             trace_out: ptr::null_mut(),
         }
@@ -236,13 +253,70 @@ impl TraceRecorder {
 
         let trace = compile_trace(L, &self);
 
-        let trace_ptr = GlobalState::new_unchecked((*L).l_G).alloc();
-        if let Some(ptr) = trace_ptr {
-            ptr.write(trace);
-        }
-        self.trace_out.write(trace_ptr);
+        let g = GlobalState::new_unchecked((*L).l_G);
+
+        self.last_def_use.clear(g);
+        self.reg_span.clear(g);
+
+        let trace_ptr = g.alloc()?;
+        trace_ptr.write(trace);
+        self.trace_out.write(Some(trace_ptr));
 
         Some(())
+    }
+
+    fn def(&mut self, g: GlobalState, reg: u32) -> Result<(), AllocError> {
+        let was_def = self.defs.contains(reg);
+
+        self.defs.set(g, reg, true)?;
+
+        if was_def {
+            // Get the location of the last definition
+            if let Some((prev_def, last_use)) = self.last_def_use.get(&reg) {
+                // Set the range of the last definition
+                self.reg_span.insert(g, (reg, *prev_def), *last_use)?;
+            }
+        }
+
+        let tb_idx = self.inst_buffer.len() as u32;
+
+        self.last_def_use.insert(g, reg, (tb_idx, tb_idx))?;
+        self.reg_span.insert(g, (reg, tb_idx), u32::MAX)?;
+
+        Ok(())
+    }
+
+    fn used(&mut self, g: GlobalState, reg: u32) -> Result<(), AllocError> {
+        if !self.defs.contains(reg) {
+            // Incoming phi from outside of the trace
+            self.uses.set(g, reg, true)?;
+        } else {
+            // Update last usage
+            if let Some((_, last_use)) = self.last_def_use.get_mut(&reg) {
+                *last_use = self.inst_buffer.len() as u32;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Undefine all defs above base, terminating their register spans.
+    fn undef_all(&mut self, g: GlobalState, base: u32) -> Result<(), AllocError> {
+        let top = (self.defs.bits.len() * 32) as u32;
+        for reg in base..top {
+            let was_def = self.defs.contains(reg);
+
+            let _ = self.defs.set(g, reg, false);
+
+            if was_def {
+                // Get the location of the last definition
+                if let Some((prev_def, last_use)) = self.last_def_use.get(&reg) {
+                    // Set the range of the last definition
+                    self.reg_span.insert(g, (reg, *prev_def), *last_use)?;
+                }
+            }
+        }
+        Ok(())
     }
 
     pub(crate) unsafe fn record_start(
@@ -283,7 +357,7 @@ impl TraceRecorder {
             // No need to record trace arguments for constant load instructions.
             OP_LOADI | OP_LOADF | OP_LOADK | OP_LOADKX | OP_LOADFALSE | OP_LFALSESKIP
             | OP_LOADTRUE | OP_LOADNIL => {
-                if let Err(err) = self.defs.set(g, getarg_a(i), true) {
+                if let Err(err) = self.def(g, getarg_a(i)) {
                     err.throw(L);
                 }
             }
@@ -294,14 +368,12 @@ impl TraceRecorder {
             | OP_NOT => {
                 traced.arg_tt[0] = unsafe { ttypetag(stack.add(getarg_b(i) as usize)) };
 
-                if let Err(err) = self.defs.set(g, getarg_a(i), true) {
+                if let Err(err) = self.used(g, getarg_b(i)) {
                     err.throw(L);
                 }
 
-                if !self.defs.contains(getarg_b(i)) {
-                    if let Err(err) = self.uses.set(g, getarg_b(i), true) {
-                        err.throw(L);
-                    }
+                if let Err(err) = self.def(g, getarg_a(i)) {
+                    err.throw(L);
                 }
             }
 
@@ -311,20 +383,16 @@ impl TraceRecorder {
                 traced.arg_tt[0] = unsafe { ttypetag(stack.add(getarg_b(i) as usize)) };
                 traced.arg_tt[1] = unsafe { ttypetag(stack.add(getarg_c(i) as usize)) };
 
-                if let Err(err) = self.defs.set(g, getarg_a(i), true) {
+                if let Err(err) = self.used(g, getarg_b(i)) {
                     err.throw(L);
                 }
 
-                if !self.defs.contains(getarg_b(i)) {
-                    if let Err(err) = self.uses.set(g, getarg_b(i), true) {
-                        err.throw(L);
-                    }
+                if let Err(err) = self.used(g, getarg_c(i)) {
+                    err.throw(L);
                 }
 
-                if !self.defs.contains(getarg_c(i)) {
-                    if let Err(err) = self.uses.set(g, getarg_c(i), true) {
-                        err.throw(L);
-                    }
+                if let Err(err) = self.def(g, getarg_a(i)) {
+                    err.throw(L);
                 }
             }
 
@@ -333,34 +401,28 @@ impl TraceRecorder {
                 traced.arg_tt[0] = LUA_VTABLE;
                 traced.arg_tt[1] = unsafe { ttypetag(stack.add(getarg_c(i) as usize)) };
 
-                if let Err(err) = self.defs.set(g, getarg_a(i), true) {
+                if let Err(err) = self.used(g, getarg_b(i)) {
                     err.throw(L);
                 }
 
-                if !self.defs.contains(getarg_b(i)) {
-                    if let Err(err) = self.uses.set(g, getarg_b(i), true) {
-                        err.throw(L);
-                    }
+                if let Err(err) = self.used(g, getarg_c(i)) {
+                    err.throw(L);
                 }
 
-                if !self.defs.contains(getarg_c(i)) {
-                    if let Err(err) = self.uses.set(g, getarg_c(i), true) {
-                        err.throw(L);
-                    }
+                if let Err(err) = self.def(g, getarg_a(i)) {
+                    err.throw(L);
                 }
             }
 
             OP_GETI if unsafe { ttypetag(stack.add(getarg_b(i) as usize)) == LUA_VTABLE } => {
                 traced.arg_tt[0] = LUA_VTABLE;
 
-                if let Err(err) = self.defs.set(g, getarg_a(i), true) {
+                if let Err(err) = self.used(g, getarg_b(i)) {
                     err.throw(L);
                 }
 
-                if !self.defs.contains(getarg_b(i)) {
-                    if let Err(err) = self.uses.set(g, getarg_b(i), true) {
-                        err.throw(L);
-                    }
+                if let Err(err) = self.def(g, getarg_a(i)) {
+                    err.throw(L);
                 }
             }
 
@@ -374,18 +436,14 @@ impl TraceRecorder {
                     unsafe { ttypetag(stack.add(getarg_c(i) as usize)) }
                 };
 
-                if !self.defs.contains(getarg_a(i)) {
-                    if let Err(err) = self.uses.set(g, getarg_a(i), true) {
+                if !getarg_k(i) {
+                    if let Err(err) = self.used(g, getarg_c(i)) {
                         err.throw(L);
                     }
                 }
 
-                if !getarg_k(i) {
-                    if !self.defs.contains(getarg_c(i)) {
-                        if let Err(err) = self.uses.set(g, getarg_c(i), true) {
-                            err.throw(L);
-                        }
-                    }
+                if let Err(err) = self.def(g, getarg_a(i)) {
+                    err.throw(L);
                 }
             }
 
@@ -402,31 +460,35 @@ impl TraceRecorder {
                 let step = idx + 2;
                 let out_idx = idx + 3;
 
-                if !self.defs.contains(idx) {
-                    if let Err(err) = self.uses.set(g, idx, true) {
-                        err.throw(L);
-                    }
-                    if let Err(err) = self.defs.set(g, idx, true) {
-                        err.throw(L);
-                    }
+                if let Err(err) = self.undef_all(g, idx + 4) {
+                    err.throw(L);
                 }
 
-                if !self.defs.contains(count) {
-                    if let Err(err) = self.uses.set(g, count, true) {
-                        err.throw(L);
-                    }
-                    if let Err(err) = self.defs.set(g, count, true) {
-                        err.throw(L);
-                    }
+                if let Err(err) = self.used(g, idx) {
+                    err.throw(L);
                 }
 
-                if !self.defs.contains(step) {
-                    if let Err(err) = self.uses.set(g, step, true) {
-                        err.throw(L);
-                    }
+                if let Err(err) = self.def(g, idx) {
+                    err.throw(L);
                 }
 
-                if let Err(err) = self.defs.set(g, out_idx, true) {
+                if let Err(err) = self.used(g, count) {
+                    err.throw(L);
+                }
+
+                if let Err(err) = self.def(g, count) {
+                    err.throw(L);
+                }
+
+                if let Err(err) = self.used(g, step) {
+                    err.throw(L);
+                }
+
+                if let Err(err) = self.def(g, step) {
+                    err.throw(L);
+                }
+
+                if let Err(err) = self.def(g, out_idx) {
                     err.throw(L);
                 }
 
@@ -439,35 +501,39 @@ impl TraceRecorder {
                 traced.arg_tt[1] = LUA_VNUMINT;
 
                 let idx = getarg_a(i);
-                let limit = idx + 1;
+                let count = idx + 1;
                 let step = idx + 2;
                 let out_idx = idx + 3;
 
-                if !self.defs.contains(idx) {
-                    if let Err(err) = self.uses.set(g, idx, true) {
-                        err.throw(L);
-                    }
-                    if let Err(err) = self.defs.set(g, idx, true) {
-                        err.throw(L);
-                    }
+                if let Err(err) = self.undef_all(g, idx + 4) {
+                    err.throw(L);
                 }
 
-                if !self.defs.contains(limit) {
-                    if let Err(err) = self.uses.set(g, limit, true) {
-                        err.throw(L);
-                    }
-                    if let Err(err) = self.defs.set(g, limit, true) {
-                        err.throw(L);
-                    }
+                if let Err(err) = self.used(g, idx) {
+                    err.throw(L);
                 }
 
-                if !self.defs.contains(step) {
-                    if let Err(err) = self.uses.set(g, step, true) {
-                        err.throw(L);
-                    }
+                if let Err(err) = self.def(g, idx) {
+                    err.throw(L);
                 }
 
-                if let Err(err) = self.defs.set(g, out_idx, true) {
+                if let Err(err) = self.used(g, count) {
+                    err.throw(L);
+                }
+
+                if let Err(err) = self.def(g, count) {
+                    err.throw(L);
+                }
+
+                if let Err(err) = self.used(g, step) {
+                    err.throw(L);
+                }
+
+                if let Err(err) = self.def(g, step) {
+                    err.throw(L);
+                }
+
+                if let Err(err) = self.def(g, out_idx) {
                     err.throw(L);
                 }
             }
@@ -541,29 +607,22 @@ impl TraceRecorder {
             }
         }
 
-        if self
-            .inst_buffer
-            .push(unsafe { GlobalState::new_unchecked((*L).l_G) }, traced)
-            .is_err()
-        {
-            unsafe { luaD_throw(L, 4) };
+        if let Err((err, _)) = self.inst_buffer.push(g, traced) {
+            unsafe { err.throw(L) };
         }
 
         true
     }
 
-    // pub(crate) unsafe fn record_end(
-    //     &mut self,
-    //     L: *mut lua_State,
-    //     pc: *const Instruction,
-    //     next_pc: *const Instruction,
-    //     ci: *const CallInfo,
-    //     cl: NonNull<LClosure>,
-    // ) {
-    //     if !self.recording {
-    //         return;
-    //     }
-    // }
+    fn killset(&self, g: GlobalState) -> Result<RBTree<(u32, u32), ()>, AllocError> {
+        let mut killset = RBTree::new();
+
+        for ((reg, _start), end) in self.reg_span.iter() {
+            killset.insert(g, (*end, *reg), ())?;
+        }
+
+        Ok(killset)
+    }
 
     /// Cancel trace recording due to a thrown error.
     pub(crate) fn cancel(&mut self) {
@@ -603,6 +662,14 @@ impl Trace {
 
 pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Trace {
     let g = GlobalState::new_unchecked((*L).l_G);
+
+    let killset = DropGuard::new(
+        g,
+        match tr.killset(g) {
+            Ok(ks) => ks,
+            Err(err) => err.throw(L),
+        },
+    );
 
     use cranelift::codegen::ir::{BlockArg, UserFuncName};
     use cranelift::jit::{JITBuilder, JITModule};
@@ -789,15 +856,16 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
             known_tt: u8,
         }
 
-        struct TraceContext<'a> {
+        struct TraceContext<'a, 'tr> {
             L: *mut lua_State,
             g: GlobalState,
             arg_base: Value,
             regs: DropGuard<LVec32<Option<CgReg>>>,
             bail: &'a mut LVec32<TraceBail>,
+            last_def_use: &'tr RBTree<u32, (u32, u32)>,
         }
 
-        impl<'a> TraceContext<'a> {
+        impl<'a, 'tr> TraceContext<'a, 'tr> {
             fn set_reg(&mut self, r: u32, value: CgTValue) {
                 if (self.regs.len() as u32) < r + 1 {
                     if let Err(err) = self.regs.resize(self.g, r + 1, None) {
@@ -970,6 +1038,49 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                 }
             }
 
+            fn writeback_reg_if_last_def(
+                &mut self,
+                bcx: &mut FunctionBuilder<'_>,
+                tr_idx: u32,
+                reg_id: u32,
+            ) {
+                // TODO: Reenable this codepath once the performance degredation is found.
+                if true {
+                    return;
+                }
+
+                let Some((last_def, _)) = self.last_def_use.get(&reg_id) else {
+                    return;
+                };
+
+                if *last_def != tr_idx {
+                    return;
+                }
+
+                let offset = self.reg_offset(reg_id);
+
+                let Some(Some(reg)) = self.regs.get_mut(reg_id as usize) else {
+                    return;
+                };
+
+                if reg.writeback {
+                    bcx.ins().store(
+                        MemFlags::trusted().with_can_move(),
+                        reg.value.value,
+                        self.arg_base,
+                        offset,
+                    );
+                    bcx.ins().store(
+                        MemFlags::trusted().with_can_move(),
+                        reg.value.tt,
+                        self.arg_base,
+                        offset + (size_of::<crate::Value>() as i32),
+                    );
+
+                    reg.writeback = false;
+                }
+            }
+
             fn emit_bail(&self, bcx: &mut FunctionBuilder<'_>, bail_id: i64) {
                 self.writeback_regs(bcx);
 
@@ -1008,6 +1119,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                 bail: &mut Option<TraceBail>,
                 block: &mut Block,
                 ksts: *mut TValue,
+                tr_idx: u32,
                 a: u32,
                 b: u32,
                 b_tt: u8,
@@ -1058,6 +1170,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                 };
 
                 self.set_reg_typed(a, value, result_tt, bcx);
+                self.writeback_reg_if_last_def(bcx, tr_idx, a);
             }
 
             /// Int or float arithmetic between two registers.
@@ -1066,6 +1179,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                 bcx: &mut FunctionBuilder<'f>,
                 bail: &mut Option<TraceBail>,
                 block: &mut Block,
+                tr_idx: u32,
                 a: u32,
                 b: u32,
                 b_tt: u8,
@@ -1129,6 +1243,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                 };
 
                 self.set_reg_typed(a, value, result_tt, bcx);
+                self.writeback_reg_if_last_def(bcx, tr_idx, a);
             }
 
             /// Float-only arithmetic between two registers.
@@ -1137,6 +1252,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                 bcx: &mut FunctionBuilder<'f>,
                 bail: &mut Option<TraceBail>,
                 block: &mut Block,
+                tr_idx: u32,
                 a: u32,
                 b: u32,
                 b_tt: u8,
@@ -1175,6 +1291,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                 let value = flt_op(bcx, lhs, rhs);
 
                 self.set_reg_typed(a, value, LUA_VNUMFLT, bcx);
+                self.writeback_reg_if_last_def(bcx, tr_idx, a);
             }
 
             fn bitwise_k<'f>(
@@ -1183,6 +1300,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                 bail: &mut Option<TraceBail>,
                 block: &mut Block,
                 ksts: *mut TValue,
+                tr_idx: u32,
                 a: u32,
                 b: u32,
                 b_tt: u8,
@@ -1212,6 +1330,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                     LUA_VNUMINT,
                     bcx,
                 );
+                self.writeback_reg_if_last_def(bcx, tr_idx, a);
             }
 
             /// Get a value ptr from the table via integer key.
@@ -1285,10 +1404,12 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
             arg_base,
             regs: DropGuard::new(g, LVec32::new()),
             bail: &mut bail,
+            last_def_use: &tr.last_def_use,
         };
 
         // Replay trace into block
-        for ti in tr.inst_buffer.iter() {
+        for (tr_idx, ti) in tr.inst_buffer.iter().enumerate() {
+            let tr_idx = tr_idx as u32;
             let closure = tr.closure.unwrap().as_ptr();
             let ksts = (*(*closure).p).k;
 
@@ -1313,9 +1434,11 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                         LUA_VNUMINT,
                         &mut bcx,
                     );
+                    cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a);
                 }
                 OP_LOADF => {
                     cx.set_reg_typed(a, bcx.ins().f64const(sbx as f64), LUA_VNUMFLT, &mut bcx);
+                    cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a);
                 }
                 OP_LOADK => {
                     let kst = ksts.add(bx as usize);
@@ -1326,6 +1449,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                         (*kst).tt_,
                         &mut bcx,
                     );
+                    cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a);
                 }
                 OP_LOADKX => {
                     todo!("inline constant")
@@ -1338,6 +1462,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                         LUA_VFALSE,
                         &mut bcx,
                     );
+                    cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a);
                 }
                 OP_LOADTRUE => {
                     cx.set_reg_typed(
@@ -1347,6 +1472,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                         LUA_VTRUE,
                         &mut bcx,
                     );
+                    cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a);
                 }
                 OP_LOADNIL => {
                     for i in a..=(a + b) {
@@ -1357,6 +1483,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                             LUA_VNIL,
                             &mut bcx,
                         );
+                        cx.writeback_reg_if_last_def(&mut bcx, tr_idx, i);
                     }
                 }
                 // Unary-ish:
@@ -1364,6 +1491,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                     // TODO: Propagate static type
                     let src = cx.get_reg(b, &mut bcx);
                     cx.set_reg(a, src);
+                    cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a);
                 }
                 OP_ADDI => {
                     let [tt, _] = ti.arg_tt;
@@ -1395,6 +1523,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                     };
 
                     cx.set_reg_typed(a, value, result_tt, &mut bcx);
+                    cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a);
                 }
                 OP_ADDK => {
                     let [tt, _] = ti.arg_tt;
@@ -1404,6 +1533,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                         &mut bail,
                         &mut block,
                         ksts,
+                        tr_idx,
                         a,
                         b,
                         tt,
@@ -1420,6 +1550,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                         &mut bail,
                         &mut block,
                         ksts,
+                        tr_idx,
                         a,
                         b,
                         tt,
@@ -1439,6 +1570,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                         &mut bail,
                         &mut block,
                         ksts,
+                        tr_idx,
                         a,
                         b,
                         tt,
@@ -1477,6 +1609,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                     let value = bcx.inst_results(call)[0];
 
                     cx.set_reg_typed(a, value, LUA_VNUMFLT, &mut bcx);
+                    cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a);
                 }
                 // TODO: OP_DIVK
                 // TODO: OP_IDIVK
@@ -1488,6 +1621,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                         &mut bail,
                         &mut block,
                         ksts,
+                        tr_idx,
                         a,
                         b,
                         tt,
@@ -1503,6 +1637,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                         &mut bail,
                         &mut block,
                         ksts,
+                        tr_idx,
                         a,
                         b,
                         tt,
@@ -1518,6 +1653,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                         &mut bail,
                         &mut block,
                         ksts,
+                        tr_idx,
                         a,
                         b,
                         tt,
@@ -1557,6 +1693,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                         LUA_VNUMINT,
                         &mut bcx,
                     );
+                    cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a);
                 }
                 OP_ADD => {
                     let [b_tt, c_tt] = ti.arg_tt;
@@ -1565,6 +1702,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                         &mut bcx,
                         &mut bail,
                         &mut block,
+                        tr_idx,
                         a,
                         b,
                         b_tt,
@@ -1581,6 +1719,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                         &mut bcx,
                         &mut bail,
                         &mut block,
+                        tr_idx,
                         a,
                         b,
                         b_tt,
@@ -1597,6 +1736,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                         &mut bcx,
                         &mut bail,
                         &mut block,
+                        tr_idx,
                         a,
                         b,
                         b_tt,
@@ -1615,6 +1755,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                         &mut bcx,
                         &mut bail,
                         &mut block,
+                        tr_idx,
                         a,
                         b,
                         b_tt,
@@ -1664,6 +1805,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                     };
 
                     cx.set_reg_typed(a, value, result_tt, &mut bcx);
+                    cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a);
                 }
                 // Tables
                 OP_GETI => {
@@ -1731,6 +1873,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                     let value = bcx.ins().load(PTR_TYPE, MemFlags::trusted(), value_ptr, 0);
 
                     cx.set_reg(a, CgTValue { value, tt });
+                    cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a);
                 }
                 OP_GETTABLE => {
                     let [_, tt_c] = ti.arg_tt;
@@ -1820,6 +1963,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                             let value = bcx.ins().load(PTR_TYPE, MemFlags::trusted(), value_ptr, 0);
 
                             cx.set_reg(a, CgTValue { value, tt });
+                            cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a);
                         }
                         // TODO: Branch between table int get fast path and luaH_get
                         _ => todo!(),
@@ -1978,11 +2122,22 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
 
                     cx.set_reg_typed(a, next_idx, LUA_VNUMINT, &mut bcx);
                     cx.set_reg_typed(a + 3, next_idx, LUA_VNUMINT, &mut bcx);
+
+                    cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a + 1);
+                    cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a);
+                    cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a + 3);
                 }
 
                 OP_FORPREP => {
                     // Only integer loops supported.
                     assert_eq!(ti.arg_tt, [LUA_VNUMINT, LUA_VNUMINT]);
+
+                    // All registers above are dead. No need to writeback.
+                    for i in (a + 4)..cx.regs.len() as u32 {
+                        if let Some(reg) = &mut cx.regs[i as usize] {
+                            reg.writeback = false;
+                        }
+                    }
 
                     // TODO: This creates FOUR bail blocks, but we only need one.
 
@@ -2089,9 +2244,26 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
 
                     // Overwrite limit with count
                     cx.set_reg_typed(a + 1, count, LUA_VNUMINT, &mut bcx);
+
+                    cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a + 1);
+                    cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a);
+                    cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a + 3);
                 }
 
                 op => todo!("{op}"),
+            }
+
+            // Clear writeback for killed registers
+            let mut cursor = killset.upper_bound(std::ops::Bound::Included(&(tr_idx, 0)));
+            while let Some((cidx, reg)) = cursor.key() {
+                if *cidx != tr_idx {
+                    break;
+                }
+                // Kill register
+                if let Some(Some(reg)) = cx.regs.get_mut(*reg as usize) {
+                    reg.writeback = false;
+                }
+                cursor.move_next();
             }
         }
 
@@ -2119,6 +2291,11 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
     };
 
     eprintln!("Trace has {} bail outs", bail.as_ptr().len());
+    eprint!("killset: [ ");
+    for ((idx, reg), ()) in killset.iter() {
+        eprint!("r{reg}@{idx} ");
+    }
+    eprintln!("]");
     eprintln!();
 
     Trace {

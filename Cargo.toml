@@ -11,9 +11,10 @@ path = "src/lua.rs"
 cranelift = { version = "0.121.1", features = ["jit"], optional = true }
 cranelift-native = { version = "0.121.1", optional = true }
 cranelift-module = { version = "0.121.1", optional = true }
+wavltree = { version = "0.0.8", optional = true }
 libc = "0.2.174"
 talc = "4.4.3"
 
 [features]
 default = ["jit"]
-jit = ["dep:cranelift", "dep:cranelift-native", "dep:cranelift-module"]
+jit = ["dep:cranelift", "dep:cranelift-native", "dep:cranelift-module", "dep:wavltree"]

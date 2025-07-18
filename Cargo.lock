@@ -295,6 +295,7 @@ dependencies = [
  "cranelift-native",
  "libc",
  "talc",
+ "wavltree",
 ]
 
 [[package]]
@@ -446,6 +447,12 @@ checksum = "222bfa4769c6931c985711eb49a92748ea0acc4ca85fcd24e945a2f1bacda0c1"
 dependencies = [
  "libm",
 ]
+
+[[package]]
+name = "wavltree"
+version = "0.0.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ace10234ac0a20f8ba22b3605fbc73fb184eef5faaf5bb690313b28a6df13e6"
 
 [[package]]
 name = "windows-sys"
