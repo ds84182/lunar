@@ -1,4 +1,6 @@
-use std::{borrow::Borrow, marker::PhantomData, mem::offset_of, ops::Bound, ptr::NonNull};
+use std::{
+    borrow::Borrow, hash::Hash, marker::PhantomData, mem::offset_of, ops::Bound, ptr::NonNull,
+};
 
 use crate::utils::{AllocError, LuaDrop};
 
@@ -51,6 +53,23 @@ pub(crate) struct RBTree<K: Ord, V> {
 impl<K: LuaDrop + Ord, V: LuaDrop> LuaDrop for RBTree<K, V> {
     fn drop_with_state(&mut self, g: GlobalState) {
         self.clear(g);
+    }
+}
+
+impl<K: Ord, V: PartialEq> PartialEq for RBTree<K, V> {
+    fn eq(&self, other: &Self) -> bool {
+        self.iter()
+            .zip(other.iter())
+            .all(|((ka, va), (kb, vb))| ka == kb && va == vb)
+    }
+}
+
+impl<K: Ord + Hash, V: Hash> Hash for RBTree<K, V> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.iter().for_each(|(k, v)| {
+            k.hash(state);
+            v.hash(state);
+        });
     }
 }
 
