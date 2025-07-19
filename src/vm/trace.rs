@@ -1,6 +1,5 @@
 use std::{
     mem::offset_of,
-    ops::Range,
     ptr::{self, NonNull},
 };
 
@@ -886,20 +885,15 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
 
         #[derive(Copy, Clone, PartialEq, Eq)]
         enum CgValueType {
+            Any,
             Int,
             Float,
         }
 
         #[derive(Copy, Clone)]
-        struct CgValue {
-            int: Option<Value>,
-            float: Option<Value>,
-        }
-
-        #[derive(Copy, Clone)]
         struct CgTValue {
-            value: Value,
-            tt: Value,
+            value: Option<Value>,
+            tt: Option<Value>,
         }
 
         #[derive(Copy, Clone)]
@@ -961,8 +955,8 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
 
                 self.regs[r as usize] = Some(CgReg {
                     value: CgTValue {
-                        value,
-                        tt: bcx.ins().iconst(TT, tt as i64),
+                        value: Some(value),
+                        tt: None,
                     },
                     writeback: true,
                     known_tt: tt,
@@ -975,40 +969,83 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                 ty: CgValueType,
                 bcx: &mut FunctionBuilder<'_>,
             ) -> Value {
-                // if (self.regs.len() as u32) < reg + 1 {
-                //     if let Err(err) = self.regs.resize(self.g, reg + 1, None) {
-                //         unsafe { err.throw(self.L) };
-                //     }
-                // }
+                if (self.regs.len() as u32) < reg + 1 {
+                    if let Err(err) = self.regs.resize(self.g, reg + 1, None) {
+                        unsafe { err.throw(self.L) };
+                    }
+                }
 
-                // let src = &mut self.regs[reg as usize];
+                let src = &mut self.regs[reg as usize];
 
-                // todo!()
-                let tvalue = self.get_reg(reg, bcx);
-                match (ty, bcx.func.dfg.value_type(tvalue.value)) {
-                    (CgValueType::Int, LUA_INT) => tvalue.value,
-                    (CgValueType::Float, LUA_NUM) => tvalue.value,
+                let src = src.get_or_insert_with(|| CgReg {
+                    value: CgTValue {
+                        value: None,
+                        tt: None,
+                    },
+                    writeback: false,
+                    known_tt: 255,
+                });
+
+                let value = *src.value.value.get_or_insert_with(|| {
+                    let offset = Self::reg_offset(reg);
+
+                    bcx.ins().load(
+                        match ty {
+                            CgValueType::Float => LUA_NUM,
+                            CgValueType::Any | CgValueType::Int => LUA_INT,
+                        },
+                        MemFlags::trusted().with_can_move(),
+                        self.arg_base,
+                        offset,
+                    )
+                });
+
+                match (ty, bcx.func.dfg.value_type(value)) {
+                    (CgValueType::Any, _) => value,
+                    (CgValueType::Int, LUA_INT) => value,
+                    (CgValueType::Float, LUA_NUM) => value,
                     (CgValueType::Int, LUA_NUM) => {
-                        bcx.ins().bitcast(LUA_INT, MemFlags::new(), tvalue.value)
+                        bcx.ins().bitcast(LUA_INT, MemFlags::new(), value)
                     }
                     (CgValueType::Float, LUA_INT) => {
-                        bcx.ins().bitcast(LUA_NUM, MemFlags::new(), tvalue.value)
+                        bcx.ins().bitcast(LUA_NUM, MemFlags::new(), value)
                     }
                     _ => unreachable!(),
                 }
             }
 
             fn get_reg_tt(&mut self, reg: u32, bcx: &mut FunctionBuilder<'_>) -> Value {
-                // if (self.regs.len() as u32) < reg + 1 {
-                //     if let Err(err) = self.regs.resize(self.g, reg + 1, None) {
-                //         unsafe { err.throw(self.L) };
-                //     }
-                // }
+                if (self.regs.len() as u32) < reg + 1 {
+                    if let Err(err) = self.regs.resize(self.g, reg + 1, None) {
+                        unsafe { err.throw(self.L) };
+                    }
+                }
 
-                // let src = &mut self.regs[reg as usize];
+                let src = &mut self.regs[reg as usize];
 
-                // todo!()
-                self.get_reg(reg, bcx).tt
+                let src = src.get_or_insert_with(|| CgReg {
+                    value: CgTValue {
+                        value: None,
+                        tt: None,
+                    },
+                    writeback: false,
+                    known_tt: 255,
+                });
+
+                if src.known_tt != 255 {
+                    bcx.ins().iconst(TT, src.known_tt as i64)
+                } else {
+                    *src.value.tt.get_or_insert_with(|| {
+                        let offset = Self::reg_offset(reg);
+
+                        bcx.ins().load(
+                            TT,
+                            MemFlags::trusted().with_can_move(),
+                            self.arg_base,
+                            offset + (size_of::<crate::Value>() as i32),
+                        )
+                    })
+                }
             }
 
             fn get_reg_value_and_tt(
@@ -1028,39 +1065,34 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                 (self.get_reg_value(reg, ty, bcx), self.get_reg_tt(reg, bcx))
             }
 
-            #[deprecated]
-            fn get_reg(&mut self, r: u32, bcx: &mut FunctionBuilder<'_>) -> CgTValue {
-                if (self.regs.len() as u32) < r + 1 {
-                    if let Err(err) = self.regs.resize(self.g, r + 1, None) {
-                        unsafe { err.throw(self.L) };
-                    }
-                }
+            // #[deprecated]
+            // fn get_reg(&mut self, r: u32, bcx: &mut FunctionBuilder<'_>) -> CgTValue {
+            //     if (self.regs.len() as u32) < r + 1 {
+            //         if let Err(err) = self.regs.resize(self.g, r + 1, None) {
+            //             unsafe { err.throw(self.L) };
+            //         }
+            //     }
 
-                let src = &mut self.regs[r as usize];
+            //     let src = &mut self.regs[r as usize];
 
-                src.get_or_insert_with(|| {
-                    let offset = (r * size_of::<StackValue>() as u32) as i32;
-                    CgReg {
-                        value: CgTValue {
-                            value: bcx.ins().load(
-                                PTR_TYPE,
-                                MemFlags::trusted().with_can_move(),
-                                self.arg_base,
-                                offset,
-                            ),
-                            tt: bcx.ins().load(
-                                types::I8,
-                                MemFlags::trusted().with_can_move(),
-                                self.arg_base,
-                                offset + (size_of::<crate::Value>() as i32),
-                            ),
-                        },
-                        writeback: false,
-                        known_tt: 255,
-                    }
-                })
-                .value
-            }
+            //     src.get_or_insert_with(|| {
+            //         let offset = (r * size_of::<StackValue>() as u32) as i32;
+            //         CgReg {
+            //             value: CgTValue {
+            //                 value: bcx.ins().load(
+            //                     PTR_TYPE,
+            //                     MemFlags::trusted().with_can_move(),
+            //                     self.arg_base,
+            //                     offset,
+            //                 ),
+            //                 tt: None,
+            //             },
+            //             writeback: false,
+            //             known_tt: 255,
+            //         }
+            //     })
+            //     .value
+            // }
 
             fn get_reg_type_guarded(
                 &mut self,
@@ -1077,7 +1109,8 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                     self.set_reg_static_type(r, tt);
 
                     if let Some(Some(reg)) = self.regs.get_mut(r as usize) {
-                        reg.value.tt = bcx.ins().iconst(TT, tt as i64);
+                        // Will create constants at use-site instead.
+                        reg.value.tt = None;
                     }
                 }
 
@@ -1122,7 +1155,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                 -(self.bail.len() as i64)
             }
 
-            fn reg_offset(&self, r: u32) -> i32 {
+            fn reg_offset(r: u32) -> i32 {
                 // NOTE: This would change based on the current inlined function, once inlining is implemented.
                 (r as u32 * size_of::<StackValue>() as u32) as i32
             }
@@ -1133,19 +1166,31 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                     let Some(reg) = reg else { continue };
 
                     if reg.writeback {
-                        let offset = (i as u32 * size_of::<StackValue>() as u32) as i32;
-                        bcx.ins().store(
-                            MemFlags::trusted().with_can_move(),
-                            reg.value.value,
-                            self.arg_base,
-                            offset,
-                        );
-                        bcx.ins().store(
-                            MemFlags::trusted().with_can_move(),
-                            reg.value.tt,
-                            self.arg_base,
-                            offset + (size_of::<crate::Value>() as i32),
-                        );
+                        let offset = Self::reg_offset(i as u32);
+                        if let Some(value) = reg.value.value {
+                            bcx.ins().store(
+                                MemFlags::trusted().with_can_move(),
+                                value,
+                                self.arg_base,
+                                offset,
+                            );
+                        }
+                        if let Some(tt) = reg.value.tt {
+                            bcx.ins().store(
+                                MemFlags::trusted().with_can_move(),
+                                tt,
+                                self.arg_base,
+                                offset + (size_of::<crate::Value>() as i32),
+                            );
+                        } else if reg.known_tt != 255 {
+                            let tt = bcx.ins().iconst(TT, reg.known_tt as i64);
+                            bcx.ins().store(
+                                MemFlags::trusted().with_can_move(),
+                                tt,
+                                self.arg_base,
+                                offset + (size_of::<crate::Value>() as i32),
+                            );
+                        }
                     }
                 }
             }
@@ -1157,19 +1202,31 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                 };
 
                 if reg.writeback {
-                    let offset = self.reg_offset(r);
-                    bcx.ins().store(
-                        MemFlags::trusted().with_can_move(),
-                        reg.value.value,
-                        self.arg_base,
-                        offset,
-                    );
-                    bcx.ins().store(
-                        MemFlags::trusted().with_can_move(),
-                        reg.value.tt,
-                        self.arg_base,
-                        offset + (size_of::<crate::Value>() as i32),
-                    );
+                    let offset = Self::reg_offset(r);
+                    if let Some(value) = reg.value.value {
+                        bcx.ins().store(
+                            MemFlags::trusted().with_can_move(),
+                            value,
+                            self.arg_base,
+                            offset,
+                        );
+                    }
+                    if let Some(tt) = reg.value.tt {
+                        bcx.ins().store(
+                            MemFlags::trusted().with_can_move(),
+                            tt,
+                            self.arg_base,
+                            offset + (size_of::<crate::Value>() as i32),
+                        );
+                    } else if reg.known_tt != 255 {
+                        let tt = bcx.ins().iconst(TT, reg.known_tt as i64);
+                        bcx.ins().store(
+                            MemFlags::trusted().with_can_move(),
+                            tt,
+                            self.arg_base,
+                            offset + (size_of::<crate::Value>() as i32),
+                        );
+                    }
                 }
             }
 
@@ -1192,25 +1249,37 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                     return;
                 }
 
-                let offset = self.reg_offset(reg_id);
+                let offset = Self::reg_offset(reg_id);
 
                 let Some(Some(reg)) = self.regs.get_mut(reg_id as usize) else {
                     return;
                 };
 
                 if reg.writeback {
-                    bcx.ins().store(
-                        MemFlags::trusted().with_can_move(),
-                        reg.value.value,
-                        self.arg_base,
-                        offset,
-                    );
-                    bcx.ins().store(
-                        MemFlags::trusted().with_can_move(),
-                        reg.value.tt,
-                        self.arg_base,
-                        offset + (size_of::<crate::Value>() as i32),
-                    );
+                    if let Some(value) = reg.value.value {
+                        bcx.ins().store(
+                            MemFlags::trusted().with_can_move(),
+                            value,
+                            self.arg_base,
+                            offset,
+                        );
+                    }
+                    if let Some(tt) = reg.value.tt {
+                        bcx.ins().store(
+                            MemFlags::trusted().with_can_move(),
+                            tt,
+                            self.arg_base,
+                            offset + (size_of::<crate::Value>() as i32),
+                        );
+                    } else if reg.known_tt != 255 {
+                        let tt = bcx.ins().iconst(TT, reg.known_tt as i64);
+                        bcx.ins().store(
+                            MemFlags::trusted().with_can_move(),
+                            tt,
+                            self.arg_base,
+                            offset + (size_of::<crate::Value>() as i32),
+                        );
+                    }
 
                     reg.writeback = false;
                 }
@@ -1580,10 +1649,17 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
                 }
                 // Unary-ish:
                 OP_MOVE => {
-                    // TODO: Propagate static type
                     // TODO: Lazy load `R[a]` when overwriting `R[b]` by tracking register aliases
-                    let src = cx.get_reg(b, &mut bcx);
-                    cx.set_reg(a, src);
+                    let (value, tt) = cx.get_reg_value_and_tt(b, CgValueType::Any, &mut bcx);
+                    let static_tt = cx.reg_static_type(b);
+                    cx.set_reg(
+                        a,
+                        CgTValue {
+                            value: Some(value),
+                            tt: Some(tt),
+                        },
+                    );
+                    cx.set_reg_static_type(a, static_tt);
                     cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a);
                 }
                 OP_ADDI => {
@@ -1918,7 +1994,13 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
 
                     let value = bcx.ins().load(PTR_TYPE, MemFlags::trusted(), value_ptr, 0);
 
-                    cx.set_reg(a, CgTValue { value, tt });
+                    cx.set_reg(
+                        a,
+                        CgTValue {
+                            value: Some(value),
+                            tt: Some(tt),
+                        },
+                    );
                     cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a);
                 }
                 OP_GETTABLE => {
@@ -2002,7 +2084,13 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
 
                             let value = bcx.ins().load(PTR_TYPE, MemFlags::trusted(), value_ptr, 0);
 
-                            cx.set_reg(a, CgTValue { value, tt });
+                            cx.set_reg(
+                                a,
+                                CgTValue {
+                                    value: Some(value),
+                                    tt: Some(tt),
+                                },
+                            );
                             cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a);
                         }
                         // TODO: Branch between table int get fast path and luaH_get
@@ -2088,7 +2176,7 @@ pub(crate) unsafe fn compile_trace(L: *mut lua_State, tr: &TraceRecorder) -> Tra
 
                         tt
                     } else {
-                        (value, value_tt) = cx.get_reg_value_and_tt(c, CgValueType::Int, &mut bcx);
+                        (value, value_tt) = cx.get_reg_value_and_tt(c, CgValueType::Any, &mut bcx);
                         let tt = cx.reg_static_type(c);
                         tt
                     };
