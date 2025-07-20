@@ -1257,11 +1257,19 @@ pub(crate) unsafe fn compile_trace(
                     Err(err) => unsafe { err.throw(self.L) },
                 };
 
+                let current_block = bcx.current_block().unwrap();
+                let cold = bcx.func.layout.is_cold(current_block);
+
                 self.writeback_regs(bcx);
 
                 // Either tailcall to the side trace, or return if the side trace hasn't been compiled.
                 let side_block = bcx.create_block();
                 let return_block = bcx.create_block();
+
+                if cold {
+                    bcx.set_cold_block(side_block);
+                    bcx.set_cold_block(return_block);
+                }
 
                 let side_trace = bcx.ins().iconst(PTR_TYPE, side_trace.addr().get() as i64);
                 let entrypoint = bcx.ins().load(PTR_TYPE, MemFlags::trusted(), side_trace, 0);
