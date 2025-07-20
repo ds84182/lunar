@@ -1,7 +1,7 @@
 use crate::*;
 
-#[cfg(feature = "jit")]
-pub(crate) mod ir;
+// #[cfg(feature = "jit")]
+// pub(crate) mod ir;
 
 #[cfg(feature = "jit")]
 pub(crate) mod trace;
