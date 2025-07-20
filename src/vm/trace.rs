@@ -14,6 +14,8 @@ use crate::{
     utils::{AllocError, DropGuard, GlobalState, LVec32, LuaDrop, RBTree},
 };
 
+const LOOP_UNROLLING: bool = false;
+
 struct TracedInstr {
     pc: *const Instruction,
     // Types of instruction input arguments.
@@ -106,6 +108,11 @@ impl BitSet {
 // Maintain a btree on the start of blocks in the trace buffer so we can find a block for the jump.
 // TODO: Because of basic block splitting we need a separate pass (after recording) for use & defs.
 
+#[derive(Copy, Clone)]
+struct LoopHeader {
+    unroll_count: u32,
+}
+
 pub(crate) struct TraceRecorder {
     pub(super) recording: bool,
     looping: bool,
@@ -115,12 +122,9 @@ pub(crate) struct TraceRecorder {
     // Searched via binary search.
     // closure_span: NonNull<[(u32, *const LClosure)]>,
     closure: Option<NonNull<LClosure>>,
-    // entry_block: Option<NonNull<BlockData>>,
-    // current_block: Option<NonNull<BlockData>>,
-    // last_alloc_block: Option<NonNull<BlockData>>,
-    // // *const Instruction (light ud) -> *mut BlockData (light ud)
-    // block_table: NonNull<Table>,
     def_use: DefUse,
+    /// Placed on the target of each loop; records loop information like unroll count.
+    loop_headers: RBTree<*const Instruction, LoopHeader>,
     last_pc: *const Instruction,
     trace_out: *mut Option<NonNull<Trace>>,
     entrypoint_out: *mut Option<TraceEntrypoint>,
@@ -136,6 +140,7 @@ impl LuaDrop for TraceRecorder {
             inst_buffer,
             closure: _,
             def_use,
+            loop_headers,
             last_pc: _,
             trace_out: _,
             entrypoint_out: _,
@@ -145,6 +150,7 @@ impl LuaDrop for TraceRecorder {
 
         inst_buffer.drop_with_state(g);
         def_use.drop_with_state(g);
+        loop_headers.drop_with_state(g);
     }
 }
 
@@ -156,6 +162,7 @@ impl TraceRecorder {
             inst_buffer: LVec32::new(),
             closure: None,
             def_use: DefUse::new(),
+            loop_headers: RBTree::new(),
             last_pc: ptr::null(),
             trace_out: ptr::null_mut(),
             entrypoint_out: ptr::null_mut(),
@@ -214,6 +221,7 @@ impl TraceRecorder {
         let g = GlobalState::new_unchecked((*L).l_G);
 
         self.def_use.clear(g);
+        self.loop_headers.clear(g);
 
         if !self.entrypoint_out.is_null() {
             self.entrypoint_out.write(Some(trace.entrypoint));
@@ -249,9 +257,8 @@ impl TraceRecorder {
         self.closure = Some(cl);
         self.last_pc = pc;
 
-        if self.inst_buffer.first().is_some_and(|f| f.pc == pc) {
-            // Reached first instruction again. Bail.
-            self.looping = true;
+        if self.inst_buffer.len() > 500 {
+            return false;
         }
 
         let stack = unsafe { (*ci).func.p.add(1) };
@@ -308,11 +315,29 @@ impl TraceRecorder {
                 traced.arg_tt[0] = LUA_VNUMINT;
                 traced.arg_tt[1] = LUA_VNUMINT;
 
-                self.looping = true;
-                self.last_pc = self.last_pc.offset((-(getarg_bx(i) as isize)) + 1);
+                if !LOOP_UNROLLING {
+                    self.looping = true;
+                    self.last_pc = self.last_pc.offset((-(getarg_bx(i) as isize)) + 1);
+                } else {
+                    if let Some(head) = self.loop_headers.get_mut(&pc) {
+                        head.unroll_count += 1;
+
+                        if head.unroll_count > 15 {
+                            // Stop unrolling the loop
+                            self.looping = true;
+                            self.last_pc = self.last_pc.offset((-(getarg_bx(i) as isize)) + 1);
+                        }
+                    } else {
+                        if let Err(err) =
+                            self.loop_headers
+                                .insert(g, pc, LoopHeader { unroll_count: 1 })
+                        {
+                            err.throw(L);
+                        }
+                    }
+                }
             }
 
-            // TODO: FORPREP is causing miscompilations because we aren't following the control flow correctly.
             OP_FORPREP => {
                 traced.arg_tt[0] = LUA_VNUMINT;
                 traced.arg_tt[1] = LUA_VNUMINT;
@@ -2285,7 +2310,7 @@ pub(crate) unsafe fn compile_trace(
 
                     if static_tt == 255 {
                         // Unknown type, check if collectable and emit barrierback
-                        todo!()
+                        // todo!()
                     } else if (static_tt & BIT_ISCOLLECTABLE) != 0 {
                         // Statically known type is always collectable, emit unconditional barrierback
                         todo!()
@@ -2306,62 +2331,92 @@ pub(crate) unsafe fn compile_trace(
                         }
                     }
 
+                    let loop_unroll_continues = tr
+                        .inst_buffer
+                        .get(tr_idx as usize + 1)
+                        .is_some_and(|next_ti| ti.pc.add(1) != next_ti.pc);
+
+                    let traced_loop_exit = tr
+                        .inst_buffer
+                        .get(tr_idx as usize + 1)
+                        .map(|ti| ti.pc)
+                        .or(Some(tr.last_pc))
+                        .is_some_and(|pc| ti.pc.add(1) == pc);
+
                     let count = cx.get_reg_value(a + 1, CgValueType::Int, &mut bcx);
 
                     let cond = bcx.ins().icmp_imm(IntCC::NotEqual, count, 0);
 
-                    let bail_block = bcx.create_block();
+                    let break_block = bcx.create_block();
                     let continue_block = bcx.create_block();
 
-                    bcx.ins().brif(cond, continue_block, [], bail_block, []);
+                    bcx.ins().brif(cond, continue_block, [], break_block, []);
 
-                    {
-                        bcx.switch_to_block(bail_block);
+                    if !traced_loop_exit {
+                        bcx.switch_to_block(break_block);
 
                         cx.pc = ti.pc.add(1);
                         cx.side_trace_dirty = true;
                         cx.emit_side_exit(&mut bcx);
-                    }
 
-                    bcx.switch_to_block(continue_block);
-                    block = continue_block;
-
-                    cx.set_reg_typed(a + 1, bcx.ins().iadd_imm(count, -1), LUA_VNUMINT, &mut bcx);
-
-                    let idx = cx.get_reg_value(a, CgValueType::Int, &mut bcx);
-                    let step = cx.get_reg_value(a + 2, CgValueType::Int, &mut bcx);
-
-                    let next_idx = bcx.ins().iadd(idx, step);
-
-                    cx.set_reg_typed(a, next_idx, LUA_VNUMINT, &mut bcx);
-                    cx.set_reg_typed(a + 3, next_idx, LUA_VNUMINT, &mut bcx);
-
-                    cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a + 1);
-                    cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a);
-                    cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a + 3);
-
-                    // Unconditional side exit :)
-
-                    // Follow the loop to its beginning
-                    cx.pc = ti.pc.add(1).offset(-(getarg_bx(i) as isize));
-                    cx.side_trace_dirty = true;
-
-                    let side_trace = match cx.side_trace() {
-                        Ok(st) => st,
-                        Err(err) => err.throw(L),
-                    };
-
-                    if cx.pc == tr.inst_buffer[0].pc
-                        && trace_depth > 0
-                        && &*side_trace.as_ref().type_info == type_info
-                    {
-                        cx.writeback_regs(&mut bcx);
-                        bcx.ins().jump(entry_block, &[]);
+                        // Recover original PC
+                        cx.pc = ti.pc;
+                        cx.side_trace_dirty = true;
+                        block = continue_block;
                     } else {
+                        bcx.switch_to_block(continue_block);
                         cx.emit_side_exit(&mut bcx);
+
+                        block = break_block;
                     }
 
-                    emit_epilogue = false;
+                    bcx.switch_to_block(block);
+
+                    if !traced_loop_exit {
+                        cx.set_reg_typed(
+                            a + 1,
+                            bcx.ins().iadd_imm(count, -1),
+                            LUA_VNUMINT,
+                            &mut bcx,
+                        );
+
+                        let idx = cx.get_reg_value(a, CgValueType::Int, &mut bcx);
+                        let step = cx.get_reg_value(a + 2, CgValueType::Int, &mut bcx);
+
+                        let next_idx = bcx.ins().iadd(idx, step);
+
+                        cx.set_reg_typed(a, next_idx, LUA_VNUMINT, &mut bcx);
+                        cx.set_reg_typed(a + 3, next_idx, LUA_VNUMINT, &mut bcx);
+
+                        cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a + 1);
+                        cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a);
+                        cx.writeback_reg_if_last_def(&mut bcx, tr_idx, a + 3);
+                    }
+
+                    // Side-exit if we aren't continuing the loop.
+                    // TODO: Wrong if we trace the loop exit. DO NOT COMMIT
+                    if tr_idx == tr.inst_buffer.len() as u32 - 1 && !loop_unroll_continues {
+                        // Follow the loop to its beginning
+                        cx.pc = ti.pc.add(1).offset(-(getarg_bx(i) as isize));
+                        cx.side_trace_dirty = true;
+
+                        let side_trace = match cx.side_trace() {
+                            Ok(st) => st,
+                            Err(err) => err.throw(L),
+                        };
+
+                        if cx.pc == tr.inst_buffer[0].pc
+                            && trace_depth > 0
+                            && &*side_trace.as_ref().type_info == type_info
+                        {
+                            cx.writeback_regs(&mut bcx);
+                            bcx.ins().jump(entry_block, &[]);
+                        } else {
+                            cx.emit_side_exit(&mut bcx);
+                        }
+
+                        emit_epilogue = false;
+                    }
                 }
 
                 OP_FORPREP => {
@@ -2535,7 +2590,7 @@ pub(crate) unsafe fn compile_trace(
     }
     // eprintln!("Pre-opt:\n{}", ctx.func);
     module.define_function(trace_fn, &mut ctx).unwrap();
-    eprintln!("Opt:\n{}", ctx.func);
+    // eprintln!("Opt:\n{}", ctx.func);
     module.clear_context(&mut ctx);
 
     module.finalize_definitions().unwrap();
