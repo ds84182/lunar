@@ -1,6 +1,9 @@
 use crate::*;
 
 #[cfg(feature = "jit")]
+pub(crate) mod ir;
+
+#[cfg(feature = "jit")]
 pub(crate) mod trace;
 
 /// Fast track for 'gettable': if 't' is a table and 't[k]' is present,
@@ -1439,7 +1442,7 @@ unsafe fn luaV_record_loop(
             let lc = loop_counters.get_unchecked_mut(idx);
             lc.count += 1;
             if !tr.recording && lc.count > 56 && lc.trace.is_none() {
-                tr.begin_recording(&mut lc.trace);
+                tr.begin_recording(&mut lc.trace, ptr::null_mut());
             }
             // TODO: Could stitch trace here
             return lc.trace;
@@ -1487,22 +1490,37 @@ pub unsafe extern "C-unwind" fn luaV_execute(mut L: *mut lua_State, mut ci: *mut
                 }
 
                 #[cfg(feature = "jit")]
+                if !trace_recorder.recording {
+                    while let Some(trace) = next_trace.take() {
+                        let entrypoint = (*(trace.as_ptr())).entrypoint;
+                        let result = entrypoint(base, L, ci, cl);
+                        pc = (*(trace.as_ptr())).last_pc;
+
+                        if result != 0 {
+                            let side_trace = result as usize as *mut trace::SideTrace;
+                            pc = (*side_trace).pc;
+                            if (*side_trace).depth < 4 && !(*side_trace).visited {
+                                (*side_trace).visited = true;
+                                trace_recorder.begin_recording(
+                                    &raw mut (*side_trace).trace,
+                                    &raw mut (*side_trace).entrypoint,
+                                );
+                                trace_recorder
+                                    .setup_for_side_trace(NonNull::new_unchecked(side_trace));
+                            } else {
+                                next_trace = luaV_record_loop((*cl).p, pc, &mut trace_recorder)
+                            }
+                        } else {
+                            next_trace = luaV_record_loop((*cl).p, pc, &mut trace_recorder)
+                        }
+                    }
+                }
+
+                #[cfg(feature = "jit")]
                 if trace_recorder.recording {
                     let ok = trace_recorder.record_start(L, pc, ci, NonNull::new_unchecked(cl));
                     if !ok {
                         trace_recorder.end_recording(L);
-                    }
-                } else {
-                    while let Some(trace) = next_trace.take() {
-                        let entrypoint = (*(trace.as_ptr())).entrypoint;
-                        let result = entrypoint(base, L, ci, cl);
-                        if result < 0 {
-                            pc = trace.as_ref().bail(result);
-                        } else {
-                            pc = (*(trace.as_ptr())).last_pc;
-
-                            next_trace = luaV_record_loop((*cl).p, pc, &mut trace_recorder)
-                        }
                     }
                 }
 

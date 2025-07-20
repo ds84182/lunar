@@ -50,6 +50,12 @@ impl<T: LuaDrop> LuaDrop for LVec32<T> {
     }
 }
 
+impl<T: std::fmt::Debug> std::fmt::Debug for LVec32<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        <[T]>::fmt(&**self, f)
+    }
+}
+
 impl<T> LVec32<T> {
     pub(super) fn new() -> Self {
         Self {
@@ -142,6 +148,7 @@ impl<T> LVec32<T> {
     pub(super) fn into_boxed_slice(self, g: GlobalState) -> Result<AllocGuard<[T]>, AllocError> {
         // Shrink if needed
         let ptr = if self.len < self.cap {
+            // TODO: Dealloc on error?
             unsafe {
                 g.realloc_slice(
                     NonNull::new_unchecked(ptr::slice_from_raw_parts_mut(
@@ -166,6 +173,10 @@ impl<T> LVec32<T> {
             g,
             ptr: unsafe { NonNull::new_unchecked(ptr.as_ptr() as *mut [T]) },
         })
+    }
+
+    pub(super) fn reserve(&mut self, g: GlobalState, additional: u32) -> Result<(), AllocError> {
+        self.grow(g, additional)
     }
 }
 

@@ -289,144 +289,338 @@ const fn set<const S: u32, const P: u32>(i: &mut u32, o: u32) {
     *i = ((o << P) & mask) | (*i & !mask);
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) fn get_opcode(i: u32) -> u32 {
     get::<SIZE_OP, POS_OP>(i)
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) fn getarg_a(i: u32) -> u32 {
     get::<SIZE_A, POS_A>(i)
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) fn getarg_b(i: u32) -> u32 {
     get::<SIZE_B, POS_B>(i)
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) fn getarg_sb(i: u32) -> i32 {
     (get::<SIZE_B, POS_B>(i) as i32) - OFFSET_sC
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) fn getarg_c(i: u32) -> u32 {
     get::<SIZE_C, POS_C>(i)
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) fn getarg_sc(i: u32) -> i32 {
     (get::<SIZE_C, POS_C>(i) as i32) - OFFSET_sC
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) fn getarg_k(i: u32) -> bool {
     get::<1, POS_k>(i) != 0
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) fn getarg_bx(i: u32) -> u32 {
     get::<SIZE_Bx, POS_Bx>(i)
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) fn getarg_ax(i: u32) -> u32 {
     get::<SIZE_Ax, POS_Ax>(i)
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) fn getarg_sbx(i: u32) -> i32 {
     get::<SIZE_Bx, POS_Bx>(i) as i32 - OFFSET_sBx
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) fn getarg_sj(i: u32) -> i32 {
     get::<SIZE_sJ, POS_sJ>(i) as i32 - OFFSET_sJ
 }
 
+/// Wrapper for an instruction.
+#[derive(Copy, Clone)]
+#[repr(transparent)]
+pub(crate) struct Instr(pub(crate) Instruction);
+
+impl std::fmt::Debug for Instr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let op = self.opcode();
+        if let Some(op_name) = luaP_opnames.get(op as usize) {
+            write!(f, "{op_name} ")?;
+        } else {
+            write!(f, "{op} ")?;
+        }
+
+        match self.props().mode() {
+            iABC => {
+                write!(f, "{:?}", self.abc())
+            }
+            iABx => {
+                write!(f, "{:?}", self.a_bx())
+            }
+            iAsBx => {
+                write!(f, "{:?}", self.a_sbx())
+            }
+            iAx => {
+                write!(f, "{:?}", self.ax())
+            }
+            isJ => {
+                write!(f, "{:?}", self.sj())
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
+impl Instr {
+    #[inline]
+    pub(crate) fn opcode(self) -> OpCode {
+        get_opcode(self.0)
+    }
+
+    #[inline]
+    pub(crate) fn props(self) -> OpProps {
+        OpProps(
+            luaP_opmodes
+                .get(self.opcode() as usize)
+                .copied()
+                .unwrap_or(0),
+        )
+    }
+
+    #[inline]
+    pub(crate) fn abc(self) -> (u32, u32, u32) {
+        (getarg_a(self.0), getarg_b(self.0), getarg_c(self.0))
+    }
+
+    #[inline]
+    pub(crate) fn a_sbx(self) -> (u32, i32) {
+        (getarg_a(self.0), getarg_sbx(self.0))
+    }
+
+    #[inline]
+    pub(crate) fn a_bx(self) -> (u32, u32) {
+        (getarg_a(self.0), getarg_bx(self.0))
+    }
+
+    #[inline]
+    pub(crate) fn ax(self) -> u32 {
+        getarg_ax(self.0)
+    }
+
+    #[inline]
+    pub(crate) fn sj(self) -> i32 {
+        getarg_sj(self.0)
+    }
+}
+
+/// Wrapper for [`OpMode`].
+#[derive(Copy, Clone)]
+#[repr(transparent)]
+pub(crate) struct OpProps(pub(crate) OpMode);
+
+impl OpProps {
+    pub(crate) fn mode(self) -> OpMode {
+        self.0 & 0b111
+    }
+
+    pub(crate) fn sets_reg_a(self) -> bool {
+        self.0 & (1 << 3) != 0
+    }
+
+    pub(crate) fn is_test(self) -> bool {
+        self.0 & (1 << 4) != 0
+    }
+
+    pub(crate) fn uses_top(self) -> bool {
+        self.0 & (1 << 5) != 0
+    }
+
+    pub(crate) fn sets_top(self) -> bool {
+        self.0 & (1 << 6) != 0
+    }
+
+    pub(crate) fn is_metamethod(self) -> bool {
+        self.0 & (1 << 7) != 0
+    }
+}
+
+pub const luaP_opnames: &'static [&'static str; 83] = &[
+    "MOVE",
+    "LOADI",
+    "LOADF",
+    "LOADK",
+    "LOADKX",
+    "LOADFALSE",
+    "LFALSESKIP",
+    "LOADTRUE",
+    "LOADNIL",
+    "GETUPVAL",
+    "SETUPVAL",
+    "GETTABUP",
+    "GETTABLE",
+    "GETI",
+    "GETFIELD",
+    "SETTABUP",
+    "SETTABLE",
+    "SETI",
+    "SETFIELD",
+    "NEWTABLE",
+    "SELF",
+    "ADDI",
+    "ADDK",
+    "SUBK",
+    "MULK",
+    "MODK",
+    "POWK",
+    "DIVK",
+    "IDIVK",
+    "BANDK",
+    "BORK",
+    "BXORK",
+    "SHRI",
+    "SHLI",
+    "ADD",
+    "SUB",
+    "MUL",
+    "MOD",
+    "POW",
+    "DIV",
+    "IDIV",
+    "BAND",
+    "BOR",
+    "BXOR",
+    "SHL",
+    "SHR",
+    "MMBIN",
+    "MMBINI",
+    "MMBINK",
+    "UNM",
+    "BNOT",
+    "NOT",
+    "LEN",
+    "CONCAT",
+    "CLOSE",
+    "TBC",
+    "JMP",
+    "EQ",
+    "LT",
+    "LE",
+    "EQK",
+    "EQI",
+    "LTI",
+    "LEI",
+    "GTI",
+    "GEI",
+    "TEST",
+    "TESTSET",
+    "CALL",
+    "TAILCALL",
+    "RETURN",
+    "RETURN0",
+    "RETURN1",
+    "FORLOOP",
+    "FORPREP",
+    "TFORPREP",
+    "TFORCALL",
+    "TFORLOOP",
+    "SETLIST",
+    "CLOSURE",
+    "VARARG",
+    "VARARGPREP",
+    "EXTRAARG",
+];
+
 pub const luaP_opmodes: &'static [lu_byte; 83] = &[
     /*       MM OT IT T  A  mode		   opcode  */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_MOVE */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_MOVE */
     opmode(0, 0, 0, 0, 1, iAsBx), /* OP_LOADI */
     opmode(0, 0, 0, 0, 1, iAsBx), /* OP_LOADF */
-    opmode(0, 0, 0, 0, 1, iABx), /* OP_LOADK */
-    opmode(0, 0, 0, 0, 1, iABx), /* OP_LOADKX */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_LOADFALSE */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_LFALSESKIP */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_LOADTRUE */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_LOADNIL */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_GETUPVAL */
-    opmode(0, 0, 0, 0, 0, iABC), /* OP_SETUPVAL */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_GETTABUP */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_GETTABLE */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_GETI */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_GETFIELD */
-    opmode(0, 0, 0, 0, 0, iABC), /* OP_SETTABUP */
-    opmode(0, 0, 0, 0, 0, iABC), /* OP_SETTABLE */
-    opmode(0, 0, 0, 0, 0, iABC), /* OP_SETI */
-    opmode(0, 0, 0, 0, 0, iABC), /* OP_SETFIELD */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_NEWTABLE */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_SELF */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_ADDI */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_ADDK */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_SUBK */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_MULK */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_MODK */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_POWK */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_DIVK */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_IDIVK */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_BANDK */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_BORK */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_BXORK */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_SHRI */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_SHLI */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_ADD */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_SUB */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_MUL */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_MOD */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_POW */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_DIV */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_IDIV */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_BAND */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_BOR */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_BXOR */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_SHL */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_SHR */
-    opmode(1, 0, 0, 0, 0, iABC), /* OP_MMBIN */
-    opmode(1, 0, 0, 0, 0, iABC), /* OP_MMBINI*/
-    opmode(1, 0, 0, 0, 0, iABC), /* OP_MMBINK*/
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_UNM */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_BNOT */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_NOT */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_LEN */
-    opmode(0, 0, 0, 0, 1, iABC), /* OP_CONCAT */
-    opmode(0, 0, 0, 0, 0, iABC), /* OP_CLOSE */
-    opmode(0, 0, 0, 0, 0, iABC), /* OP_TBC */
-    opmode(0, 0, 0, 0, 0, isJ),  /* OP_JMP */
-    opmode(0, 0, 0, 1, 0, iABC), /* OP_EQ */
-    opmode(0, 0, 0, 1, 0, iABC), /* OP_LT */
-    opmode(0, 0, 0, 1, 0, iABC), /* OP_LE */
-    opmode(0, 0, 0, 1, 0, iABC), /* OP_EQK */
-    opmode(0, 0, 0, 1, 0, iABC), /* OP_EQI */
-    opmode(0, 0, 0, 1, 0, iABC), /* OP_LTI */
-    opmode(0, 0, 0, 1, 0, iABC), /* OP_LEI */
-    opmode(0, 0, 0, 1, 0, iABC), /* OP_GTI */
-    opmode(0, 0, 0, 1, 0, iABC), /* OP_GEI */
-    opmode(0, 0, 0, 1, 0, iABC), /* OP_TEST */
-    opmode(0, 0, 0, 1, 1, iABC), /* OP_TESTSET */
-    opmode(0, 1, 1, 0, 1, iABC), /* OP_CALL */
-    opmode(0, 1, 1, 0, 1, iABC), /* OP_TAILCALL */
-    opmode(0, 0, 1, 0, 0, iABC), /* OP_RETURN */
-    opmode(0, 0, 0, 0, 0, iABC), /* OP_RETURN0 */
-    opmode(0, 0, 0, 0, 0, iABC), /* OP_RETURN1 */
-    opmode(0, 0, 0, 0, 1, iABx), /* OP_FORLOOP */
-    opmode(0, 0, 0, 0, 1, iABx), /* OP_FORPREP */
-    opmode(0, 0, 0, 0, 0, iABx), /* OP_TFORPREP */
-    opmode(0, 0, 0, 0, 0, iABC), /* OP_TFORCALL */
-    opmode(0, 0, 0, 0, 1, iABx), /* OP_TFORLOOP */
-    opmode(0, 0, 1, 0, 0, iABC), /* OP_SETLIST */
-    opmode(0, 0, 0, 0, 1, iABx), /* OP_CLOSURE */
-    opmode(0, 1, 0, 0, 1, iABC), /* OP_VARARG */
-    opmode(0, 0, 1, 0, 1, iABC), /* OP_VARARGPREP */
-    opmode(0, 0, 0, 0, 0, iAx),  /* OP_EXTRAARG */
+    opmode(0, 0, 0, 0, 1, iABx),  /* OP_LOADK */
+    opmode(0, 0, 0, 0, 1, iABx),  /* OP_LOADKX */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_LOADFALSE */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_LFALSESKIP */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_LOADTRUE */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_LOADNIL */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_GETUPVAL */
+    opmode(0, 0, 0, 0, 0, iABC),  /* OP_SETUPVAL */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_GETTABUP */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_GETTABLE */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_GETI */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_GETFIELD */
+    opmode(0, 0, 0, 0, 0, iABC),  /* OP_SETTABUP */
+    opmode(0, 0, 0, 0, 0, iABC),  /* OP_SETTABLE */
+    opmode(0, 0, 0, 0, 0, iABC),  /* OP_SETI */
+    opmode(0, 0, 0, 0, 0, iABC),  /* OP_SETFIELD */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_NEWTABLE */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_SELF */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_ADDI */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_ADDK */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_SUBK */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_MULK */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_MODK */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_POWK */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_DIVK */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_IDIVK */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_BANDK */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_BORK */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_BXORK */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_SHRI */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_SHLI */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_ADD */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_SUB */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_MUL */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_MOD */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_POW */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_DIV */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_IDIV */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_BAND */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_BOR */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_BXOR */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_SHL */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_SHR */
+    opmode(1, 0, 0, 0, 0, iABC),  /* OP_MMBIN */
+    opmode(1, 0, 0, 0, 0, iABC),  /* OP_MMBINI*/
+    opmode(1, 0, 0, 0, 0, iABC),  /* OP_MMBINK*/
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_UNM */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_BNOT */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_NOT */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_LEN */
+    opmode(0, 0, 0, 0, 1, iABC),  /* OP_CONCAT */
+    opmode(0, 0, 0, 0, 0, iABC),  /* OP_CLOSE */
+    opmode(0, 0, 0, 0, 0, iABC),  /* OP_TBC */
+    opmode(0, 0, 0, 0, 0, isJ),   /* OP_JMP */
+    opmode(0, 0, 0, 1, 0, iABC),  /* OP_EQ */
+    opmode(0, 0, 0, 1, 0, iABC),  /* OP_LT */
+    opmode(0, 0, 0, 1, 0, iABC),  /* OP_LE */
+    opmode(0, 0, 0, 1, 0, iABC),  /* OP_EQK */
+    opmode(0, 0, 0, 1, 0, iABC),  /* OP_EQI */
+    opmode(0, 0, 0, 1, 0, iABC),  /* OP_LTI */
+    opmode(0, 0, 0, 1, 0, iABC),  /* OP_LEI */
+    opmode(0, 0, 0, 1, 0, iABC),  /* OP_GTI */
+    opmode(0, 0, 0, 1, 0, iABC),  /* OP_GEI */
+    opmode(0, 0, 0, 1, 0, iABC),  /* OP_TEST */
+    opmode(0, 0, 0, 1, 1, iABC),  /* OP_TESTSET */
+    opmode(0, 1, 1, 0, 1, iABC),  /* OP_CALL */
+    opmode(0, 1, 1, 0, 1, iABC),  /* OP_TAILCALL */
+    opmode(0, 0, 1, 0, 0, iABC),  /* OP_RETURN */
+    opmode(0, 0, 0, 0, 0, iABC),  /* OP_RETURN0 */
+    opmode(0, 0, 0, 0, 0, iABC),  /* OP_RETURN1 */
+    opmode(0, 0, 0, 0, 1, iABx),  /* OP_FORLOOP */
+    opmode(0, 0, 0, 0, 1, iABx),  /* OP_FORPREP */
+    opmode(0, 0, 0, 0, 0, iABx),  /* OP_TFORPREP */
+    opmode(0, 0, 0, 0, 0, iABC),  /* OP_TFORCALL */
+    opmode(0, 0, 0, 0, 1, iABx),  /* OP_TFORLOOP */
+    opmode(0, 0, 1, 0, 0, iABC),  /* OP_SETLIST */
+    opmode(0, 0, 0, 0, 1, iABx),  /* OP_CLOSURE */
+    opmode(0, 1, 0, 0, 1, iABC),  /* OP_VARARG */
+    opmode(0, 0, 1, 0, 1, iABC),  /* OP_VARARGPREP */
+    opmode(0, 0, 0, 0, 0, iAx),   /* OP_EXTRAARG */
 ];
