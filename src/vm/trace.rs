@@ -14,7 +14,12 @@ use crate::{
     utils::{AllocError, DropGuard, GlobalState, LVec32, LuaDrop, RBTree},
 };
 
+/// TODO: Disabled because it causes performance regressions in nbody.
 const LOOP_UNROLLING: bool = false;
+
+/// TODO: Disabled because it causes performance regressions (+500ms) in nbody.
+/// Speeds up fnv.lua.
+const LOOP_WITHIN_TRACE: bool = false;
 
 struct TracedInstr {
     pc: *const Instruction,
@@ -113,6 +118,10 @@ struct LoopHeader {
     unroll_count: u32,
 }
 
+struct LoopInfo {
+    pc: NonNull<Instruction>,
+}
+
 pub(crate) struct TraceRecorder {
     pub(super) recording: bool,
     looping: bool,
@@ -125,6 +134,7 @@ pub(crate) struct TraceRecorder {
     def_use: DefUse,
     /// Placed on the target of each loop; records loop information like unroll count.
     loop_headers: RBTree<*const Instruction, LoopHeader>,
+    loop_info: Option<LoopInfo>,
     last_pc: *const Instruction,
     trace_out: *mut Option<NonNull<Trace>>,
     entrypoint_out: *mut Option<TraceEntrypoint>,
@@ -141,6 +151,7 @@ impl LuaDrop for TraceRecorder {
             closure: _,
             def_use,
             loop_headers,
+            loop_info: _,
             last_pc: _,
             trace_out: _,
             entrypoint_out: _,
@@ -163,6 +174,7 @@ impl TraceRecorder {
             closure: None,
             def_use: DefUse::new(),
             loop_headers: RBTree::new(),
+            loop_info: None,
             last_pc: ptr::null(),
             trace_out: ptr::null_mut(),
             entrypoint_out: ptr::null_mut(),
@@ -185,6 +197,7 @@ impl TraceRecorder {
         self.closure = None;
         self.trace_out = trace_out;
         self.entrypoint_out = entrypoint_out;
+        self.loop_info = None;
         self.depth = 0;
         self.type_info = None;
     }
@@ -318,6 +331,9 @@ impl TraceRecorder {
                 if !LOOP_UNROLLING {
                     self.looping = true;
                     self.last_pc = self.last_pc.offset((-(getarg_bx(i) as isize)) + 1);
+                    self.loop_info = Some(LoopInfo {
+                        pc: NonNull::new_unchecked(self.last_pc.cast_mut()),
+                    });
                 } else {
                     if let Some(head) = self.loop_headers.get_mut(&pc) {
                         head.unroll_count += 1;
@@ -785,12 +801,13 @@ pub(crate) unsafe fn compile_trace(
     flag_builder.set("is_pic", "false").unwrap();
     flag_builder.set("opt_level", "speed").unwrap();
     flag_builder.set("preserve_frame_pointers", "true").unwrap();
+    flag_builder.set("enable_alias_analysis", "true").unwrap();
+    flag_builder.set("unwind_info", "false").unwrap();
     // flag_builder.set("enable_verifier", "false").unwrap();
     let isa_builder = cranelift_native::builder().unwrap_or_else(|msg| {
         panic!("host machine is not supported: {msg}");
     });
     let mut flags = settings::Flags::new(flag_builder);
-    flags.enable_alias_analysis();
     let isa = isa_builder.finish(flags).unwrap();
     let mut module = JITModule::new(JITBuilder::with_isa(isa, default_libcall_names()));
 
@@ -979,6 +996,7 @@ pub(crate) unsafe fn compile_trace(
         let mut bcx = FunctionBuilder::new(&mut ctx.func, &mut func_ctx);
         let entry_block = bcx.create_block();
         let mut block = bcx.create_block();
+        let mut loop_block = None;
 
         bcx.switch_to_block(entry_block);
         bcx.append_block_params_for_function_params(entry_block);
@@ -1002,7 +1020,7 @@ pub(crate) unsafe fn compile_trace(
             Float,
         }
 
-        #[derive(Copy, Clone)]
+        #[derive(Copy, Clone, Default)]
         struct CgTValue {
             value: Option<Value>,
             tt: Option<Value>,
@@ -1013,6 +1031,22 @@ pub(crate) unsafe fn compile_trace(
             value: CgTValue,
             writeback: bool,
             known_tt: u8,
+            /// Type known at loop entry.
+            known_loop_tt: u8,
+            /// Whether the register is live across a loop.
+            loop_phi: bool,
+        }
+
+        impl Default for CgReg {
+            fn default() -> Self {
+                Self {
+                    value: Default::default(),
+                    writeback: false,
+                    known_tt: 255,
+                    known_loop_tt: 255,
+                    loop_phi: false,
+                }
+            }
         }
 
         struct TraceContext<'tr> {
@@ -1045,11 +1079,11 @@ pub(crate) unsafe fn compile_trace(
                     }
                 }
 
-                self.regs[r as usize] = Some(CgReg {
-                    value,
-                    writeback: true,
-                    known_tt: 255,
-                });
+                let reg = self.regs[r as usize].get_or_insert_default();
+
+                reg.value = value;
+                reg.writeback = true;
+                reg.known_tt = 255;
             }
 
             fn set_reg_typed(
@@ -1071,14 +1105,14 @@ pub(crate) unsafe fn compile_trace(
                     }
                 }
 
-                self.regs[r as usize] = Some(CgReg {
-                    value: CgTValue {
-                        value: Some(value),
-                        tt: None,
-                    },
-                    writeback: true,
-                    known_tt: tt,
-                });
+                let reg = self.regs[r as usize].get_or_insert_default();
+
+                reg.value = CgTValue {
+                    value: Some(value),
+                    tt: None,
+                };
+                reg.writeback = true;
+                reg.known_tt = tt;
             }
 
             fn get_reg_value(
@@ -1095,14 +1129,9 @@ pub(crate) unsafe fn compile_trace(
 
                 let src = &mut self.regs[reg as usize];
 
-                let src = src.get_or_insert_with(|| CgReg {
-                    value: CgTValue {
-                        value: None,
-                        tt: None,
-                    },
-                    writeback: false,
-                    known_tt: 255,
-                });
+                let src = src.get_or_insert_default();
+
+                let known_tt = src.known_tt;
 
                 let value = *src.value.value.get_or_insert_with(|| {
                     let offset = Self::reg_offset(reg);
@@ -1110,6 +1139,7 @@ pub(crate) unsafe fn compile_trace(
                     bcx.ins().load(
                         match ty {
                             CgValueType::Float => LUA_NUM,
+                            CgValueType::Any if known_tt == LUA_VNUMFLT => LUA_NUM,
                             CgValueType::Any | CgValueType::Int => LUA_INT,
                         },
                         MemFlags::trusted().with_can_move(),
@@ -1141,14 +1171,7 @@ pub(crate) unsafe fn compile_trace(
 
                 let src = &mut self.regs[reg as usize];
 
-                let src = src.get_or_insert_with(|| CgReg {
-                    value: CgTValue {
-                        value: None,
-                        tt: None,
-                    },
-                    writeback: false,
-                    known_tt: 255,
-                });
+                let src = src.get_or_insert_default();
 
                 if src.known_tt != 255 {
                     bcx.ins().iconst(TT, src.known_tt as i64)
@@ -1208,14 +1231,7 @@ pub(crate) unsafe fn compile_trace(
                     return;
                 };
 
-                let reg = reg.get_or_insert_with(|| CgReg {
-                    value: CgTValue {
-                        value: None,
-                        tt: None,
-                    },
-                    writeback: false,
-                    known_tt: tt,
-                });
+                let reg = reg.get_or_insert_default();
 
                 if reg.known_tt != tt {
                     self.side_trace_dirty = true;
@@ -1747,6 +1763,92 @@ pub(crate) unsafe fn compile_trace(
 
             cx.side_trace_dirty = true;
             cx.pc = ti.pc;
+
+            if tr
+                .loop_info
+                .as_ref()
+                .is_some_and(|li: &LoopInfo| li.pc.as_ptr().cast_const() == ti.pc)
+                && tr.depth > 0
+            {
+                eprintln!("Looping. Live Regs across loop:");
+
+                let mut args = DropGuard::new(g, LVec32::new());
+
+                for i in 0..cx.regs.len() {
+                    let Some(reg) = &mut cx.regs[i] else {
+                        continue;
+                    };
+                    let mut range_end = tr
+                        .def_use
+                        .reg_span
+                        .lower_bound(std::ops::Bound::Included(&(i as u32, tr_idx)))
+                        .value()
+                        .copied();
+                    if let Some(end) = range_end {
+                        if end >= tr_idx {
+                            reg.loop_phi = true;
+                        }
+                    }
+
+                    if reg.loop_phi {
+                        eprintln!("R[{i}] (type: {})", reg.known_tt);
+                        let known_tt = reg.known_tt;
+                        let (value, tt) =
+                            cx.get_reg_value_and_tt(i as u32, CgValueType::Any, &mut bcx);
+                        if let Err((err, _)) = args.push(g, BlockArg::Value(value)) {
+                            err.throw(L);
+                        }
+                        if known_tt == 255 {
+                            if let Err((err, _)) = args.push(g, BlockArg::Value(tt)) {
+                                err.throw(L);
+                            }
+                        }
+                    }
+                }
+
+                block = bcx.create_block();
+                loop_block = Some(block);
+                bcx.ins().jump(block, args.iter());
+
+                for reg in cx.regs.iter() {
+                    let Some(reg) = reg else { continue };
+                    if !reg.loop_phi {
+                        continue;
+                    }
+                    bcx.append_block_param(
+                        block,
+                        match reg.known_tt {
+                            LUA_VNUMINT => LUA_INT,
+                            LUA_VNUMFLT => LUA_NUM,
+                            // TODO: PTR_TYPE for GcObjects
+                            255 => reg
+                                .value
+                                .value
+                                .map(|value| bcx.func.dfg.value_type(value))
+                                .unwrap_or(LUA_INT),
+                            _ => LUA_INT,
+                        },
+                    );
+                    if reg.known_tt == 255 {
+                        bcx.append_block_param(block, TT);
+                    }
+                }
+
+                bcx.switch_to_block(block);
+
+                let mut block_params = bcx.block_params(block).iter().copied();
+
+                for reg in cx.regs.iter_mut() {
+                    let Some(reg) = reg else { continue };
+                    if reg.loop_phi {
+                        reg.value.value = block_params.next();
+                        if reg.known_tt == 255 {
+                            reg.value.tt = block_params.next();
+                        }
+                        reg.known_loop_tt = reg.known_tt;
+                    }
+                }
+            }
 
             match get_opcode(i) {
                 // Constant Loads:
@@ -2340,7 +2442,6 @@ pub(crate) unsafe fn compile_trace(
                         .inst_buffer
                         .get(tr_idx as usize + 1)
                         .map(|ti| ti.pc)
-                        .or(Some(tr.last_pc))
                         .is_some_and(|pc| ti.pc.add(1) == pc);
 
                     let count = cx.get_reg_value(a + 1, CgValueType::Int, &mut bcx);
@@ -2394,25 +2495,102 @@ pub(crate) unsafe fn compile_trace(
                     }
 
                     // Side-exit if we aren't continuing the loop.
-                    // TODO: Wrong if we trace the loop exit. DO NOT COMMIT
                     if tr_idx == tr.inst_buffer.len() as u32 - 1 && !loop_unroll_continues {
                         // Follow the loop to its beginning
                         cx.pc = ti.pc.add(1).offset(-(getarg_bx(i) as isize));
                         cx.side_trace_dirty = true;
 
-                        let side_trace = match cx.side_trace() {
-                            Ok(st) => st,
-                            Err(err) => err.throw(L),
-                        };
+                        let looping_within_trace = LOOP_WITHIN_TRACE
+                            && if let Some(loop_block) = loop_block {
+                                'block: {
+                                    // Compare the concrete types of loop phis.
+                                    // Don't loop if we definitely know we're going to fail.
+                                    for reg in cx.regs.iter() {
+                                        let Some(reg) = reg else { continue };
+                                        if !reg.loop_phi {
+                                            continue;
+                                        }
+                                        if reg.known_loop_tt != 255
+                                            && reg.known_tt != reg.known_loop_tt
+                                        {
+                                            // Register type has changed, use a side trace or jump to entrypoint instead.
+                                            // TODO: If the src type is unknown allow this; if the dst type is unknown insert guard
+                                            eprintln!(
+                                                "Cannot loop within trace: Register has changed type ({} -> {})",
+                                                reg.known_loop_tt, reg.known_tt
+                                            );
+                                            break 'block false;
+                                        }
+                                    }
 
-                        if cx.pc == tr.inst_buffer[0].pc
-                            && trace_depth > 0
-                            && &*side_trace.as_ref().type_info == type_info
-                        {
-                            cx.writeback_regs(&mut bcx);
-                            bcx.ins().jump(entry_block, &[]);
-                        } else {
-                            cx.emit_side_exit(&mut bcx);
+                                    let mut args: DropGuard<LVec32<BlockArg>> =
+                                        DropGuard::new(g, LVec32::new());
+
+                                    for r in 0..cx.regs.len() {
+                                        let Some(reg) = &cx.regs[r] else { continue };
+                                        if !reg.loop_phi {
+                                            if reg.writeback {
+                                                cx.writeback_reg(&mut bcx, r as u32);
+                                            }
+
+                                            continue;
+                                        }
+                                        let known_loop_tt = reg.known_loop_tt;
+                                        let (value, tt) = cx.get_reg_value_and_tt(
+                                            r as u32,
+                                            CgValueType::Any,
+                                            &mut bcx,
+                                        );
+
+                                        // Insert bitcast if needed
+                                        let phi_type = bcx
+                                            .func
+                                            .dfg
+                                            .value_type(bcx.block_params(loop_block)[args.len()]);
+                                        let value_type = bcx.func.dfg.value_type(value);
+
+                                        let value = if phi_type != value_type {
+                                            bcx.ins().bitcast(phi_type, MemFlags::new(), value)
+                                        } else {
+                                            value
+                                        };
+
+                                        if let Err((err, _)) = args.push(g, BlockArg::Value(value))
+                                        {
+                                            err.throw(L);
+                                        }
+                                        if known_loop_tt == 255 {
+                                            if let Err((err, _)) = args.push(g, BlockArg::Value(tt))
+                                            {
+                                                err.throw(L);
+                                            }
+                                        }
+                                    }
+
+                                    bcx.ins().jump(loop_block, &**args);
+                                    eprintln!("Loop within trace successful");
+
+                                    true
+                                }
+                            } else {
+                                false
+                            };
+
+                        if !looping_within_trace {
+                            let side_trace = match cx.side_trace() {
+                                Ok(st) => st,
+                                Err(err) => err.throw(L),
+                            };
+
+                            if cx.pc == tr.inst_buffer[0].pc
+                                && trace_depth > 0
+                                && &*side_trace.as_ref().type_info == type_info
+                            {
+                                cx.writeback_regs(&mut bcx);
+                                bcx.ins().jump(entry_block, &[]);
+                            } else {
+                                cx.emit_side_exit(&mut bcx);
+                            }
                         }
 
                         emit_epilogue = false;
@@ -2489,7 +2667,7 @@ pub(crate) unsafe fn compile_trace(
                         block = skip_loop_block;
                     } else {
                         bcx.switch_to_block(skip_loop_block);
-                        cx.pc = ti.pc.add(1 + bx as usize);
+                        cx.pc = ti.pc.add(2 + bx as usize);
                         cx.side_trace_dirty = true;
                         cx.emit_side_exit(&mut bcx);
 
@@ -2588,8 +2766,10 @@ pub(crate) unsafe fn compile_trace(
 
         side_traces = cx.last_side_trace;
     }
+    // ctx.set_disasm(true);
     // eprintln!("Pre-opt:\n{}", ctx.func);
     module.define_function(trace_fn, &mut ctx).unwrap();
+    // eprintln!("{}", ctx.compiled_code().unwrap().vcode.as_ref().unwrap());
     // eprintln!("Opt:\n{}", ctx.func);
     module.clear_context(&mut ctx);
 
